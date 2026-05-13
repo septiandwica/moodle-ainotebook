@@ -192,12 +192,11 @@ class ai_client {
                 $contents[] = ['role' => 'user',  'parts' => [['text' => $h->message]]];
                 $contents[] = ['role' => 'model', 'parts' => [['text' => $h->response]]];
             }
-            $contents[] = ['role' => 'user', 'parts' => [['text' => $user_message]]];
-            
-            // Add binaries to the LAST message.
+            // Build user parts: Binaries FIRST, then the text message.
+            $user_parts = [];
             if (!empty($binaries)) {
                 foreach ($binaries as $bin) {
-                    $contents[count($contents)-1]['parts'][] = [
+                    $user_parts[] = [
                         'inline_data' => [
                             'mime_type' => $bin['mimetype'],
                             'data'      => $bin['data']
@@ -205,6 +204,8 @@ class ai_client {
                     ];
                 }
             }
+            $user_parts[] = ['text' => $user_message];
+            $contents[] = ['role' => 'user', 'parts' => $user_parts];
 
             $data = [
                 // [IMPROVED] Use Gemini's dedicated system_instruction field.
@@ -616,9 +617,9 @@ class ai_client {
 
                     if (trim($extracted) === '') {
                         if (empty($binaries)) {
-                            $extracted = "[System Note: No text could be extracted. The document may be empty or protected.]";
+                            $extracted = "[System Note: Document empty or non-extractable.]";
                         } else {
-                            $extracted = "[System Note: Text extraction failed. Please refer to the attached raw PDF data.]";
+                            $extracted = "[System Note: Document content provided as binary attachment.]";
                         }
                     }
                 } catch (\Exception $e) {

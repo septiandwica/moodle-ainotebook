@@ -581,6 +581,8 @@ $js .= <<<'JS'
             var cleanData = data.trim();
             // Fix: -->|Label|> to -->|Label|
             cleanData = cleanData.replace(/\|([^|]+)\|>/g, "|$1|");
+            // Fix: NodeID[Label]NodeID (AI repeating ID after bracket)
+            cleanData = cleanData.replace(/(\[[^\]]+\])[A-Za-z0-9]+/g, "$1");
             // Fix: double arrows or other weird connectors
             cleanData = cleanData.replace(/-->\s*-->/g, "-->");
             

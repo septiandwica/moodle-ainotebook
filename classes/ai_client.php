@@ -232,7 +232,7 @@ class ai_client {
             if (isset($result->error)) {
                 $error_msg = $result->error->message ?? 'Unknown error';
                 debugging("ainotebook Gemini API Error: " . $error_msg, DEBUG_DEVELOPER);
-                return "AI Error: " . $error_msg;
+                return "The AI service is currently unavailable. Please try again later.";
             }
 
             if (isset($result->candidates[0]->content->parts[0]->text)) {
@@ -255,7 +255,7 @@ class ai_client {
                 if ($err_code === 429 || stripos($err, 'rate limit') !== false || stripos($err, 'quota') !== false) {
                     return "I am currently receiving too many requests. Please wait a moment before asking again.";
                 }
-                return "The AI service returned an error. Please try again or contact your administrator.";
+                return "The AI service is currently unavailable. Please try again later.";
             }
 
             debugging("ainotebook: unexpected response shape from gemini: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);
@@ -332,7 +332,7 @@ class ai_client {
                     return "I am currently receiving too many requests. Please wait a moment before asking again.";
                 }
                 // Show a sanitised but informative error for everything else.
-                return "The AI service returned an error. Please try again or contact your administrator.";
+                return "The AI service is currently unavailable. Please try again later.";
             }
 
             debugging("ainotebook: unexpected response shape from {$provider}: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);

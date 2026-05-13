@@ -226,7 +226,13 @@ class ai_client {
 
             if ($result === null) {
                 debugging("ainotebook: null JSON from gemini. Raw: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);
-                return "I encountered an unexpected response from the AI service. Please try again.";
+                return "The AI service returned an invalid response. (Ref: JSON_NULL)";
+            }
+
+            if (isset($result->error)) {
+                $error_msg = $result->error->message ?? 'Unknown error';
+                debugging("ainotebook Gemini API Error: " . $error_msg, DEBUG_DEVELOPER);
+                return "AI Error: " . $error_msg . " (Ref: Gemini " . ($result->error->code ?? '403') . ")";
             }
 
             if (isset($result->candidates[0]->content->parts[0]->text)) {

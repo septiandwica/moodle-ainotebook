@@ -280,23 +280,41 @@ class ai_client {
             if (!empty($selected_file_ids) && !in_array($file->get_id(), $selected_file_ids)) continue;
 
             $mimetype = $file->get_mimetype();
+            $filename = $file->get_filename();
             $extracted = "";
 
             if ($mimetype == 'text/plain') {
                 $extracted = $file->get_content();
             } else if ($mimetype == 'application/pdf') {
-                $tmpfile = make_temp_directory('mod_ainotebook') . '/' . uniqid() . '.pdf';
-                $file->copy_content_to($tmpfile);
-                $output = [];
-                $ret = 0;
-                exec("pdftotext " . escapeshellarg($tmpfile) . " - 2>&1", $output, $ret);
-                $extracted = implode("\n", $output);
-                @unlink($tmpfile);
+                $tempdir = make_temp_directory('mod_ainotebook');
+                $tmpfile = $tempdir . '/' . uniqid() . '.pdf';
+                try {
+                    $file->copy_content_to($tmpfile);
+                    $output = [];
+                    $return_var = 0;
+                    // Using pdftotext -nopgbrk -layout to get better text formatting.
+                    exec("pdftotext -nopgbrk " . escapeshellarg($tmpfile) . " - 2>/dev/null", $output, $return_var);
+                    
+                    if ($return_var === 0) {
+                        $extracted = implode("\n", $output);
+                    } else {
+                        // Fallback: Just record that the file exists but text couldn't be extracted.
+                        $extracted = "[Warning: Could not extract text from this PDF. It might be an image-only PDF or protected.]";
+                    }
+                } catch (\Exception $e) {
+                    $extracted = "[Error: " . $e->getMessage() . "]";
+                } finally {
+                    if (file_exists($tmpfile)) @unlink($tmpfile);
+                }
             }
 
+            // Always add the file header to context so the AI knows what files are available.
+            $content .= "--- File Source: " . $filename . " ---\n";
             if (!empty($extracted)) {
-                $content .= "--- File: " . $file->get_filename() . " ---\n" . $extracted . "\n\n";
+                $content .= $extracted . "\n\n";
                 $totalchars += strlen($extracted);
+            } else {
+                $content .= "[No content available for this file]\n\n";
             }
         }
 

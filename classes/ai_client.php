@@ -496,7 +496,7 @@ class ai_client {
         return "\n" . implode("\n", $out) . "\n";
     }
 
-    protected static function get_material_context(int $cmid, array $selected_file_ids = []): string {
+    protected static function get_material_context(int $cmid, array $selected_file_ids = []): array {
         global $DB;
 
         $context = \context_module::instance($cmid);
@@ -504,7 +504,7 @@ class ai_client {
         $files   = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', false);
 
         if (empty($files)) {
-            return "";
+            return ['text' => "", 'binaries' => []];
         }
 
         // Fallback: if nothing selected, pick the first non-directory file.

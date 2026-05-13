@@ -577,20 +577,26 @@ $js .= <<<'JS'
             var now = new Date().toLocaleString();
             return `<div class="formal-pdf-header">
                 <div class="pdf-logo-section">
-                    <img src="${wwwroot}/mod/ainotebook/pix/icon.svg" style="height:40px; margin-right:10px;">
-                    <div>
-                        <h2 style="margin:0; color:var(--primary); font-size:1.4rem;">President University</h2>
-                        <p style="margin:0; font-size:0.8rem; color:#666;">Ecampus AI Learning System</p>
+                    <img src="${wwwroot}/mod/ainotebook/pix/icon.svg" class="pdf-brand-logo">
+                    <div class="pdf-brand-text">
+                        <h1 class="pdf-university-name">PRESIDENT UNIVERSITY</h1>
+                        <p class="pdf-system-name">Ecampus AI Learning Intelligence</p>
                     </div>
                 </div>
-                <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
-                <div class="pdf-meta-grid">
-                    <div class="meta-item"><strong>Student:</strong> ${studentName}</div>
-                    <div class="meta-item"><strong>Notebook:</strong> ${notebookName}</div>
-                    <div class="meta-item"><strong>Date:</strong> ${now}</div>
-                    <div class="meta-item"><strong>Document:</strong> ${title}</div>
+                <div class="pdf-accent-line"></div>
+                <div class="pdf-meta-container">
+                    <div class="pdf-meta-row">
+                        <div class="meta-item"><strong>STUDENT:</strong> <span>${studentName}</span></div>
+                        <div class="meta-item"><strong>NOTEBOOK:</strong> <span>${notebookName}</span></div>
+                    </div>
+                    <div class="pdf-meta-row">
+                        <div class="meta-item"><strong>DATE:</strong> <span>${now}</span></div>
+                        <div class="meta-item"><strong>CREDENTIAL:</strong> <span>Verified AI Transcript</span></div>
+                    </div>
                 </div>
-                <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
+                <div class="pdf-title-banner">
+                    <h2>${title.toUpperCase()}</h2>
+                </div>
             </div>`;
         };
 

@@ -416,6 +416,11 @@ class ai_client {
             $response = self::custom_provider_request($provider, $system_prompt, $user_prompt);
         }
 
+        // [SECURE] Do not show AI Error messages as smart suggestions.
+        if (empty($response) || stripos($response, 'AI Error') !== false || stripos($response, 'The AI service') !== false || stripos($response, 'I encountered') !== false) {
+            $response = "Summarize this material\nWhat are the key points?\nCreate a quiz";
+        }
+
         $suggestions = array_filter(array_map('trim', explode("\n", $response)));
         $suggestions = array_values(array_slice($suggestions, 0, 3));
 

@@ -46,7 +46,11 @@ class ai_client {
         $system_prompt .= "- Topic: {$ainotebook->name}\n";
 
         if (!empty($material_context)) {
-            $system_prompt .= "\n[STUDY MATERIALS]:\n{$material_context}\n";
+            $system_prompt .= "\n[STUDY MATERIALS (OCR/TEXT FALLBACK)]: \n{$material_context}\n";
+        }
+
+        if (!empty($binaries)) {
+            $system_prompt .= "\n[PDF ATTACHMENTS (PRIMARY SOURCE)]: I have attached the original PDF files. Use these as your PRIMARY source of information. The text above is only a fallback.\n";
         }
 
         // Chat style configuration.
@@ -611,7 +615,11 @@ class ai_client {
                     }
 
                     if (trim($extracted) === '') {
-                        $extracted = "[Warning: No text could be extracted from this PDF. It may be a scanned image or protected. Please upload a text-based version for better results.]";
+                        if (empty($binaries)) {
+                            $extracted = "[System Note: No text could be extracted. The document may be empty or protected.]";
+                        } else {
+                            $extracted = "[System Note: Text extraction failed. Please refer to the attached raw PDF data.]";
+                        }
                     }
                 } catch (\Exception $e) {
                     $extracted = "[Error: " . $e->getMessage() . "]";

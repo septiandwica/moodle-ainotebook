@@ -32,6 +32,11 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
 
 /* Dashboard Card */
 .main-dashboard-card { background: var(--pres-surface); border: 1px solid var(--pres-border); border-radius: 16px; display: flex; height: 75vh; min-height: 700px; overflow: hidden; margin-bottom: 24px; }
+@media (max-width: 992px) {
+    .main-dashboard-card { flex-direction: column; height: auto !important; min-height: 0; margin-bottom: 24px; overflow: visible !important; }
+    .ainotebook-sidebar { width: 100% !important; border-right: none; border-bottom: 1px solid var(--pres-border); height: 250px !important; }
+    .ainotebook-chat { height: 600px !important; max-height: 80vh !important; border-radius: 0 0 16px 16px; overflow: hidden; }
+}
 
 /* Sidebar */
 .ainotebook-sidebar { width: 320px; border-right: 1px solid var(--pres-border); display: flex; flex-direction: column; transition: width 0.3s ease; background: var(--pres-surface); }
@@ -51,7 +56,7 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
 .material-file a { color: var(--pres-text); text-decoration: none; font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
 
 /* Chat Panel */
-.ainotebook-chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.ainotebook-chat { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100%; max-height: 800px; overflow: hidden; }
 .chat-header { padding: 20px 32px; border-bottom: 1px solid var(--pres-border); display: flex; justify-content: space-between; align-items: center; height: 80px; box-sizing: border-box; }
 .chat-header h2 { margin: 0; font-size: 1.4rem; font-weight: 900; color: var(--pres-primary); }
 .chat-messages { flex: 1; overflow-y: auto; padding: 32px; background: var(--pres-bg); }
@@ -90,6 +95,9 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
 .creator-content { padding: 24px; transition: all 0.3s ease; }
 
 .creator-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+@media (max-width: 992px) {
+    .creator-grid { grid-template-columns: 1fr; }
+}
 .creator-card { background: var(--pres-bg); border: 1px solid var(--pres-border); border-radius: 12px; padding: 20px; display: flex; align-items: center; gap: 16px; cursor: pointer; }
 .creator-card:hover { border-color: var(--pres-primary); background: var(--pres-surface); }
 .creator-card.loading { opacity: 0.7; pointer-events: none; }
@@ -98,9 +106,20 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
 .creator-card p { margin: 0; font-size: 0.8rem; color: var(--pres-text-dim); }
 
 .creator-workspace { display: flex; gap: 24px; margin-top: 32px; border-top: 1px solid var(--pres-border); padding-top: 24px; }
+@media (max-width: 992px) {
+    .creator-workspace { flex-direction: column; }
+}
 .creator-history-panel { width: 300px; display: flex; flex-direction: column; border: 1px solid var(--pres-border); border-radius: 12px; background: var(--pres-bg); overflow: hidden; }
+@media (max-width: 992px) {
+    .creator-history-panel { width: 100% !important; overflow-x: auto !important; min-height: 0 !important; }
+    .history-list-items { display: flex !important; gap: 6px !important; overflow-x: auto !important; height: auto !important; padding: 10px !important; }
+    .history-item { min-width: 140px !important; margin-bottom: 0 !important; padding: 6px 10px !important; border-radius: 6px !important; }
+    .history-item span { font-size: 0.65rem !important; }
+    .history-item .history-main i { margin-right: 4px !important; font-size: 0.75rem !important; }
+    .history-actions button, .saved-badge { width: 20px !important; height: 20px !important; font-size: 0.7rem !important; }
+}
 .panel-header { padding: 12px 16px; background: var(--pres-primary-soft); font-size: 0.8rem; font-weight: 800; color: var(--pres-primary); text-transform: uppercase; border-bottom: 1px solid var(--pres-border); }
-.history-list-items { height: 600px; overflow-y: auto; padding: 8px; }
+.history-list-items { height: 300px; overflow-y: auto; padding: 8px; }
 
 .history-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 8px; margin-bottom: 6px; background: var(--pres-surface); border: 1px solid var(--pres-border); cursor: pointer; transition: all 0.2s; }
 .history-item:hover { border-color: var(--pres-primary); background: #fff; }

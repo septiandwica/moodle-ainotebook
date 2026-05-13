@@ -539,13 +539,25 @@ class ai_client {
                 $tmpfile = $tempdir . '/' . uniqid() . '.pdf';
                 try {
                     $file->copy_content_to($tmpfile);
+                    
+                    // Strategy 1: Layout-aware extraction (best for AI context)
                     $output     = [];
                     $return_var = 0;
-                    exec("pdftotext -nopgbrk " . escapeshellarg($tmpfile) . " - 2>/dev/null", $output, $return_var);
+                    exec("pdftotext -layout -nopgbrk " . escapeshellarg($tmpfile) . " - 2>/dev/null", $output, $return_var);
+                    $extracted = implode("\n", $output);
 
-                    $extracted = ($return_var === 0)
-                        ? implode("\n", $output)
-                        : "[Warning: Could not extract text from this PDF. It might be an image-only PDF or protected.]";
+                    // Strategy 2: If layout failed or returned empty, try raw extraction
+                    if ($return_var !== 0 || trim($extracted) === '') {
+                        $output = [];
+                        exec("pdftotext -raw -nopgbrk " . escapeshellarg($tmpfile) . " - 2>/dev/null", $output, $return_var);
+                        if ($return_var === 0) {
+                            $extracted = implode("\n", $output);
+                        }
+                    }
+
+                    if (trim($extracted) === '') {
+                        $extracted = "[Warning: No text could be extracted from this PDF. It may be a scanned image or protected. Please upload a text-based version for better results.]";
+                    }
                 } catch (\Exception $e) {
                     $extracted = "[Error: " . $e->getMessage() . "]";
                 } finally {

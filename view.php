@@ -1,0 +1,933 @@
+<?php
+/**
+ * @package    mod_ainotebook
+ * @copyright  2024 Tateta
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
+
+require_once(__DIR__ . '/../../config.php');
+require_once(__DIR__ . '/lib.php');
+
+$id = required_param('id', PARAM_INT); // Course Module ID.
+
+$cm = get_coursemodule_from_id('ainotebook', $id, 0, false, MUST_EXIST);
+$course = $DB->get_record('course', array('id' => $cm->course), '*', MUST_EXIST);
+$ainotebook = $DB->get_record('ainotebook', array('id' => $cm->instance), '*', MUST_EXIST);
+$config = get_config('mod_ainotebook');
+$ai_name = $config->ai_name ?? 'PresMate';
+
+require_login($course, true, $cm);
+$context = context_module::instance($cm->id);
+
+$sesskey = sesskey();
+$PAGE->set_url('/mod/ainotebook/view.php', array('id' => $id));
+$PAGE->set_title(format_string($ainotebook->name));
+$PAGE->set_heading(format_string($course->fullname));
+$PAGE->set_context($context);
+$PAGE->set_pagelayout('incourse');
+
+echo $OUTPUT->header();
+
+// Include FontAwesome and Custom CSS.
+echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">';
+echo '<link rel="stylesheet" href="styles.css?v=' . time() . '">';
+
+// Include Marked.js and Mermaid.js.
+echo '<script src="' . $CFG->wwwroot . '/mod/ainotebook/js/marked.min.js?v=' . time() . '"></script>';
+echo '<script src="' . $CFG->wwwroot . '/mod/ainotebook/js/mermaid.min.js?v=' . time() . '"></script>';
+
+// Get files.
+$fs = get_file_storage();
+$files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', false);
+
+?>
+
+<div id="ainotebook-wrapper">
+    <!-- Main Workspace Card: Materials + Chat -->
+    <div class="main-dashboard-card">
+        <!-- Sidebar Panel: Material List -->
+        <div id="ainotebook-sidebar-nav" class="ainotebook-sidebar">
+            <div class="sidebar-header">
+                <h3><i class="fa fa-folder-open"></i> Materials</h3>
+                <button id="toggle-sidebar" class="btn-icon"><i class="fa fa-angle-double-left"></i></button>
+            </div>
+            <div class="material-list">
+                <div class="select-all-container">
+                    <input type="checkbox" id="select-all-files" checked>
+                    <label for="select-all-files">Select All</label>
+                </div>
+                <?php
+                foreach ($files as $file) {
+                    if ($file->is_directory()) continue;
+                    $url = moodle_url::make_pluginfile_url($file->get_contextid(), $file->get_component(), $file->get_filearea(), $file->get_itemid(), $file->get_filepath(), $file->get_filename());
+                    echo '<div class="material-file-item">';
+                    echo '<input type="checkbox" class="file-checkbox" value="' . $file->get_id() . '" checked>';
+                    echo '<div class="material-file">';
+                    echo '<i class="fa fa-file-pdf-o"></i>';
+                    echo '<a href="' . $url . '" target="_blank">' . s($file->get_filename()) . '</a>';
+                    echo '</div>';
+                    echo '</div>';
+                }
+                ?>
+            </div>
+        </div>
+
+        <!-- Chat Panel: The AI Interface -->
+        <div class="ainotebook-chat">
+            <div class="chat-header">
+                <div class="chat-info">
+                    <h2><?php echo s($ai_name); ?></h2>
+                    <p class="chat-subtitle">Your AI Study Assistant by President University</p>
+                </div>
+                <button id="open-settings" class="btn-icon" title="Configure Chat"><i class="fa fa-cog"></i></button>
+            </div>
+            <div id="chat-messages" class="chat-messages">
+                <div class="message ai">
+                    Hello <strong><?php echo s(fullname($USER)); ?></strong>! I am <strong><?php echo s($ai_name); ?></strong>, your AI Study Assistant. 
+                    I have analyzed the materials uploaded on the left. 
+                    You can ask me anything about them, or type <strong>"Make a quiz"</strong> to test your knowledge!
+                </div>
+                <?php
+                $history = $DB->get_records('ainotebook_chat', ['ainotebookid' => $ainotebook->id, 'userid' => $USER->id], 'timecreated ASC');
+                foreach ($history as $log) {
+                    $clean_response = preg_replace('/```json-quiz[\s\S]*?```/', '', $log->response);
+                    $clean_response = preg_replace('/```mermaid[\s\S]*?```/', '', $clean_response);
+                    $clean_response = preg_replace('/\[REPORT_START\][\s\S]*?\[REPORT_END\]/', '', $clean_response);
+                    $clean_response = trim($clean_response);
+                    if (empty($clean_response)) $clean_response = "I have generated the requested material below.";
+
+                    echo '<div class="message user">' . nl2br(s($log->message)) . '</div>';
+                    echo '<div class="message ai">' . nl2br($clean_response) . '</div>';
+                }
+                ?>
+            </div>
+            <div class="input-wrapper-container">
+                <div class="input-wrapper">
+                    <input type="text" id="chat-input" placeholder="<?php echo get_string('asksomething', 'mod_ainotebook'); ?>">
+                    <span id="source-count" class="source-pill">0 sources</span>
+                    <button id="send-btn">
+                        <i class="fa fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Creator Hub Card: Separate at the bottom -->
+    <div id="creator-hub" class="creator-hub-card">
+        <div class="creator-header-action">
+            <h3>Creator</h3>
+            <button id="toggle-creator" class="btn-icon"><i class="fa fa-angle-double-up"></i></button>
+        </div>
+        <div id="creator-hub-content" class="creator-content collapsed">
+            <div class="creator-grid">
+                <div class="creator-card quiz" onclick="window.sendSuggested('Generate a comprehensive quiz from my materials.', 'quiz')">
+                    <div class="card-icon"><i class="fa fa-question-circle"></i></div>
+                    <div class="card-info">
+                        <h5>Quiz</h5>
+                        <p>Interactive test</p>
+                    </div>
+                </div>
+                <div class="creator-card report" onclick="window.sendSuggested('Generate a detailed study report.', 'report')">
+                    <div class="card-icon"><i class="fa fa-file-text-o"></i></div>
+                    <div class="card-info">
+                        <h5>Report</h5>
+                        <p>Summary & Progress</p>
+                    </div>
+                </div>
+                <div class="creator-card mindmap" onclick="window.sendSuggested('Generate a mindmap structure.', 'mindmap')">
+                    <div class="card-icon"><i class="fa fa-sitemap"></i></div>
+                    <div class="card-info">
+                        <h5>Mindmap</h5>
+                        <p>Visual Concept</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="creator-workspace">
+                <div class="creator-history-panel">
+                    <div class="panel-header">
+                        <i class="fa fa-history"></i> Generated Materials
+                    </div>
+                    <div id="history-list" class="history-list-items"></div>
+                </div>
+                <div id="creator-results" class="creator-preview-panel">
+                    <div class="preview-toolbar">
+                        <button id="download-result" class="btn-premium">
+                            <i class="fa fa-download"></i> Export to PDF
+                        </button>
+                    </div>
+                    <div id="results-content" class="preview-scroll-area">
+                        <div class="empty-preview">
+                            <i class="fa fa-magic fa-3x"></i>
+                            <p>Select an item from history to preview</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<?php
+$saved_artifacts = $DB->get_records('ainotebook_artifacts', ['ainotebookid' => $ainotebook->id, 'userid' => $USER->id], 'timecreated DESC');
+$saved_json = json_encode(array_values($saved_artifacts));
+
+// INLINE JS INJECTION (BYPASSING AMD CACHE).
+$js = <<<'JS'
+(function() {
+JS;
+$js .= "\n    var cmid = " . $cm->id . ";\n";
+$js .= "    var sesskey = '" . $sesskey . "';\n";
+$js .= "    var wwwroot = '" . $CFG->wwwroot . "';\n";
+$js .= "    var studentName = '" . addslashes(fullname($USER)) . "';\n";
+$js .= "    var notebookName = '" . addslashes($ainotebook->name) . "';\n";
+$js .= "    var savedArtifacts = " . $saved_json . ";\n";
+$js .= <<<'JS'
+
+    console.log("AI Notebook JS Loaded. CMID: " + cmid);
+
+    if (typeof mermaid !== "undefined") {
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: "default",
+            securityLevel: "loose",
+            flowchart: { useMaxWidth: false, htmlLabels: true }
+        });
+    }
+
+    // Global handlers available immediately.
+    window.sendSuggested = function(text, toolType = null) {
+        var input = document.getElementById("chat-input");
+        if (input) {
+            input.value = text;
+            
+            if (toolType) {
+                var card = document.querySelector(".creator-card." + toolType);
+                if (card) {
+                    card.classList.add("loading");
+                    var icon = card.querySelector(".card-icon i");
+                    if (icon) icon.className = "fa fa-circle-o-notch fa-spin";
+                }
+                // Call sendMessage in silent mode.
+                sendMessage(true);
+            } else {
+                var btn = document.getElementById("send-btn");
+                if (btn) btn.click();
+            }
+        }
+    };
+
+    var initChat = function() {
+        console.log("Initializing Chat UI...");
+        var sendBtn = document.getElementById("send-btn");
+        var input = document.getElementById("chat-input");
+        var messages = document.getElementById("chat-messages");
+        var resultsContainer = document.getElementById("creator-results");
+        var resultsContent = document.getElementById("results-content");
+        var downloadBtn = document.getElementById("download-result");
+
+        if (!sendBtn || !input || !messages) return false;
+
+        // Attach listeners early!
+        sendBtn.onclick = function(e) {
+            e.preventDefault();
+            sendMessage();
+        };
+
+        input.onkeypress = function(e) {
+            if (e.keyCode === 13) {
+                e.preventDefault();
+                sendMessage();
+            }
+        };
+
+        if (typeof mermaid !== "undefined") {
+            mermaid.initialize({ startOnLoad: false, theme: "base", securityLevel: "loose" });
+        }
+
+        var artifactHistory = [];
+
+        var getIcon = function(type) {
+            if (type === "quiz") return "fa-question-circle";
+            if (type === "mindmap") return "fa-sitemap";
+            if (type === "report") return "fa-file-text-o";
+            return "fa-magic";
+        };
+
+        var updateHistoryList = function() {
+            var list = document.getElementById("history-list");
+            if (!list) return;
+            if (artifactHistory.length === 0) {
+                list.innerHTML = '<p class="no-history">No materials generated yet.</p>';
+                return;
+            }
+            list.innerHTML = "";
+            artifactHistory.slice().reverse().forEach((art, i) => {
+                var realIdx = artifactHistory.length - 1 - i;
+                var item = document.createElement("div");
+                item.className = "history-item " + art.type + (art.saved ? " is-saved" : "");
+                item.innerHTML = `
+                    <div class="history-main" onclick="window.renderHistoryItem(${realIdx})">
+                        <i class="fa ${getIcon(art.type)}"></i>
+                        <span>${art.title}</span>
+                    </div>
+                    <div class="history-actions">
+                        ${!art.saved ? `<button title="Save to Database" onclick="window.saveArtifact(${realIdx})"><i class="fa fa-save"></i></button>` : `<span class="saved-badge"><i class="fa fa-check-circle"></i></span>`}
+                        <button title="Delete" onclick="window.deleteArtifact(${realIdx})"><i class="fa fa-trash"></i></button>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        };
+        // Load from DB.
+        if (savedArtifacts && savedArtifacts.length > 0) {
+            savedArtifacts.forEach(a => {
+                artifactHistory.push({
+                    dbid: a.id,
+                    type: a.type,
+                    data: JSON.parse(a.content),
+                    title: a.title,
+                    saved: true
+                });
+            });
+            updateHistoryList();
+        }
+
+        // UI Handlers.
+        var modal = document.getElementById("settings-modal");
+        var openBtn = document.getElementById("open-settings");
+        var closeBtn = document.getElementById("close-settings");
+        var saveBtn = document.getElementById("save-settings");
+
+        if (openBtn && modal) {
+            openBtn.onclick = function() { modal.classList.add("active"); };
+        }
+        if (closeBtn && modal) {
+            closeBtn.onclick = function() { modal.classList.remove("active"); };
+        }
+        if (saveBtn && modal) {
+            saveBtn.onclick = function() {
+                var config = {
+                    style: document.getElementById("chat-style").value,
+                    length: document.getElementById("chat-length").value
+                };
+                localStorage.setItem("ainotebook_config", JSON.stringify(config));
+                modal.classList.remove("active");
+                
+                // Visual feedback.
+                var originalText = saveBtn.innerHTML;
+                saveBtn.innerHTML = "<i class='fa fa-check'></i> Saved!";
+                setTimeout(() => { saveBtn.innerHTML = originalText; }, 2000);
+            };
+        }
+
+        // Load existing config.
+        var savedConfig = localStorage.getItem("ainotebook_config");
+        if (savedConfig) {
+            var config = JSON.parse(savedConfig);
+            if (document.getElementById("chat-style")) document.getElementById("chat-style").value = config.style;
+            if (document.getElementById("chat-length")) document.getElementById("chat-length").value = config.length;
+        }
+        
+        var selectAll = document.getElementById("select-all-files");
+        if (selectAll) {
+            selectAll.onchange = function() {
+                document.querySelectorAll(".file-checkbox").forEach(cb => cb.checked = selectAll.checked);
+            };
+        }
+
+        var detectAndRenderArtifacts = function(text, type, addToHistory = true) {
+            var found = false;
+            var artifact = null;
+            var cleanText = text;
+            var artType = null;
+
+            // 1. Check for QUIZ (Support both json-quiz and plain json tags).
+            var quizMatch = text.match(/```(?:json-quiz|json)\s*([\s\S]*?)```/);
+            if (quizMatch) {
+                try {
+                    var raw = quizMatch[1].trim();
+                    var parsed = JSON.parse(raw);
+                    var quizData = parsed.quiz || (parsed.questions ? parsed : null);
+                    if (quizData && quizData.questions) {
+                        artType = "quiz";
+                        artifact = { type: "quiz", data: quizData, title: "Quiz - " + new Date().toLocaleTimeString() };
+                        cleanText = text.replace(quizMatch[0], "").trim();
+                        found = true;
+                        console.log("Detected Quiz artifact.");
+                    }
+                } catch (e) {
+                    console.error("Quiz JSON parse error:", e);
+                }
+            }
+
+            // 2. Check for MINDMAP (Mermaid).
+            if (!found) {
+                var mermaidMatch = text.match(/```mermaid\s*([\s\S]*?)```/);
+                if (mermaidMatch) {
+                    artType = "mindmap";
+                    artifact = { type: "mindmap", data: mermaidMatch[1].trim(), title: "Mindmap - " + new Date().toLocaleTimeString() };
+                    cleanText = text.replace(mermaidMatch[0], "").trim();
+                    found = true;
+                    console.log("Detected Mindmap artifact.");
+                }
+            }
+
+            if (!found && text.includes("[REPORT_START]")) {
+                var reportMatch = text.match(/\[REPORT_START\]([\s\S]*?)\[REPORT_END\]/);
+                if (reportMatch) {
+                    artType = "report";
+                    artifact = { type: "report", data: reportMatch[1], title: "Report - " + new Date().toLocaleTimeString() };
+                    cleanText = text.replace(reportMatch[0], "").trim();
+                    found = true;
+                }
+            }
+
+            if (found && artifact) {
+                if (addToHistory) {
+                    artifactHistory.push(artifact);
+                    updateHistoryList();
+                }
+                renderArtifact(artifact);
+                return { found: true, type: artType, cleanText: cleanText };
+            }
+
+            return { found: false, cleanText: text };
+        };
+
+
+        window.renderHistoryItem = function(idx) {
+            window.lastRenderedIdx = idx;
+            renderArtifact(artifactHistory[idx]);
+        };
+
+        window.saveArtifact = function(idx) {
+            var art = artifactHistory[idx];
+            var formData = new FormData();
+            formData.append("cmid", cmid);
+            formData.append("sesskey", sesskey);
+            formData.append("type", art.type);
+            formData.append("title", art.title);
+            formData.append("content", JSON.stringify(art.data));
+
+            fetch(wwwroot + "/mod/ainotebook/save_artifact_ajax.php", {
+                method: "POST",
+                body: formData
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    art.saved = true;
+                    art.dbid = d.id;
+                    updateHistoryList();
+                    alert("Successfully saved to database!");
+                } else alert("Error saving: " + d.error);
+            });
+        };
+
+        window.deleteArtifact = function(idx) {
+            var art = artifactHistory[idx];
+            if (confirm("Delete this generated item?")) {
+                if (art.saved && art.dbid) {
+                    var formData = new FormData();
+                    formData.append("artifactid", art.dbid);
+                    formData.append("sesskey", sesskey);
+                    fetch(wwwroot + "/mod/ainotebook/delete_artifact_ajax.php", {
+                        method: "POST",
+                        body: formData
+                    })
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.success) {
+                            artifactHistory.splice(idx, 1);
+                            updateHistoryList();
+                        }
+                    });
+                } else {
+                    artifactHistory.splice(idx, 1);
+                    updateHistoryList();
+                }
+            }
+        };
+
+        var getIcon = function(type) {
+            if (type === "quiz") return "fa-question-circle";
+            if (type === "mindmap") return "fa-sitemap";
+            if (type === "report") return "fa-file-text-o";
+            return "fa-magic";
+        };
+
+        var renderArtifact = function(art) {
+            window.lastRenderedIdx = artifactHistory.indexOf(art);
+            if (art.type === "quiz") renderQuiz(art.data);
+            if (art.type === "mindmap") renderMindmap(art.data);
+            if (art.type === "report") renderReport(art.data);
+        };
+
+        var renderQuiz = function(data) {
+            resultsContainer.style.display = "block";
+            resultsContent.innerHTML = "<div class=\'quiz-results-header\'><h3>Interactive Quiz</h3><div class=\'quiz-score\' id=\'quiz-score\'>Score: 0/" + data.questions.length + "</div></div><div id=\'quiz-container\'></div>";
+            var container = document.getElementById("quiz-container");
+            var currentIdx = 0;
+            var score = 0;
+
+            var showQuestion = function(idx) {
+                container.innerHTML = "";
+                var q = data.questions[idx];
+                var qDiv = document.createElement("div");
+                qDiv.className = "quiz-question active-question";
+                
+                // Normalize answer (handle 0-3, "0"-"3", or "A"-"E")
+                var correctAnswer = q.answer;
+                if (typeof correctAnswer === "string") {
+                    var upper = correctAnswer.trim().toUpperCase();
+                    if (upper.length === 1 && upper >= "A" && upper <= "E") {
+                        correctAnswer = upper.charCodeAt(0) - 65;
+                    } else {
+                        correctAnswer = parseInt(upper);
+                    }
+                }
+                
+                var qText = q.text || q.question || "No question text provided.";
+                qDiv.innerHTML = `<h5>Question ${idx+1} of ${data.questions.length}</h5>
+                                 <p class="quiz-text">${qText}</p>
+                                 <div class="quiz-options"></div>
+                                 <div class="quiz-footer">
+                                    <button class="btn-hint" onclick="var h=this.parentNode.querySelector('.quiz-hint'); if(h){h.style.display='block'; this.style.display='none';}"><i class="fa fa-lightbulb-o"></i> Show Hint</button>
+                                    <div class="quiz-hint" style="display:none;"><strong>Hint:</strong> ${q.hint || "Try to recall the main concept from the study materials."}</div>
+                                 </div>`;
+                var optionsDiv = qDiv.querySelector(".quiz-options");
+                var alpha = ["A", "B", "C", "D", "E"];
+                q.options.forEach((opt, oi) => {
+                    var optDiv = document.createElement("div");
+                    optDiv.className = "quiz-option";
+                    optDiv.innerHTML = `<span class="opt-label">${alpha[oi] || oi}</span> <span class="opt-text">${opt}</span>`;
+                    optDiv.onclick = function() {
+                        if (qDiv.classList.contains("answered")) return;
+                        qDiv.classList.add("answered");
+                        optDiv.classList.add("selected");
+                        if (oi === correctAnswer) {
+                            optDiv.classList.add("correct");
+                            score++;
+                        } else {
+                            optDiv.classList.add("incorrect");
+                            var allOpts = optionsDiv.querySelectorAll(".quiz-option");
+                            if (allOpts[correctAnswer]) {
+                                allOpts[correctAnswer].classList.add("correct");
+                            }
+                        }
+                        document.getElementById("quiz-score").innerText = "Score: " + score + "/" + data.questions.length;
+                        
+                        var nextBtn = document.createElement("button");
+                        nextBtn.className = "btn-premium btn-quiz-next";
+                        nextBtn.innerHTML = (idx === data.questions.length - 1) ? "Finish & View Results" : "Next Question <i class=\'fa fa-chevron-right\'></i>";
+                        nextBtn.onclick = function() {
+                            if (idx < data.questions.length - 1) {
+                                showQuestion(idx + 1);
+                            } else {
+                                container.innerHTML = `
+                                    <div class="quiz-final-score">
+                                        <div class="score-circle">${score}</div>
+                                        <h4>Quiz Completed!</h4>
+                                        <p>You got <strong>${score}</strong> out of <strong>${data.questions.length}</strong> questions correct.</p>
+                                        <div style="margin-top:30px;">
+                                            <button class="btn-premium" onclick="document.getElementById(\'creator-results\').style.display=\'none\'">Close Results</button>
+                                            <button class="btn-minimal" onclick="window.renderHistoryItem(window.lastRenderedIdx)">Retake Quiz</button>
+                                        </div>
+                                    </div>`;
+                            }
+                        };
+                        qDiv.appendChild(nextBtn);
+                    };
+                    optionsDiv.appendChild(optDiv);
+                });
+                container.appendChild(qDiv);
+            };
+
+            showQuestion(0);
+            resultsContainer.scrollIntoView({ behavior: "smooth" });
+            
+            downloadBtn.innerHTML = "<i class=\'fa fa-download\'></i> Download Text";
+            downloadBtn.onclick = function() {
+                downloadFile("quiz.txt", data.questions.map((q,i) => (i+1) + ". " + (q.text || q.question || "No question") + "\n   " + q.options.join("\n   ")).join("\n\n"));
+            };
+        };
+
+        var prepareFormalHeader = function(title) {
+            var now = new Date().toLocaleString();
+            return `<div class="formal-pdf-header">
+                <div class="pdf-logo-section">
+                    <img src="${wwwroot}/mod/ainotebook/pix/icon.svg" style="height:40px; margin-right:10px;">
+                    <div>
+                        <h2 style="margin:0; color:var(--primary); font-size:1.4rem;">President University</h2>
+                        <p style="margin:0; font-size:0.8rem; color:#666;">Ecampus AI Learning System</p>
+                    </div>
+                </div>
+                <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
+                <div class="pdf-meta-grid">
+                    <div class="meta-item"><strong>Student:</strong> ${studentName}</div>
+                    <div class="meta-item"><strong>Notebook:</strong> ${notebookName}</div>
+                    <div class="meta-item"><strong>Date:</strong> ${now}</div>
+                    <div class="meta-item"><strong>Document:</strong> ${title}</div>
+                </div>
+                <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
+            </div>`;
+        };
+
+        var renderMindmap = function(data) {
+            resultsContainer.style.display = "block";
+            
+            // Cleanup common AI mistakes in Mermaid syntax
+            var cleanData = data.trim();
+            // Fix: -->|Label|> to -->|Label|
+            cleanData = cleanData.replace(/\|([^|]+)\|>/g, "|$1|");
+            // Fix: double arrows or other weird connectors
+            cleanData = cleanData.replace(/-->\s*-->/g, "-->");
+            
+            resultsContent.innerHTML = prepareFormalHeader("Mindmap Visualization") + "<h3>Mindmap Concept</h3><div id=\'mermaid-container\' class=\'mermaid\'>" + cleanData + "</div>";
+            try {
+                mermaid.init(undefined, document.querySelectorAll(".mermaid"));
+            } catch (err) {
+                console.error("Mermaid init error:", err);
+                document.getElementById("mermaid-container").innerHTML = "<div class='alert alert-warning'>Failed to render Mindmap due to a syntax error in the AI response. Please try generating it again.</div>";
+            }
+            resultsContainer.scrollIntoView({ behavior: "smooth" });
+            
+            downloadBtn.innerHTML = "<i class=\'fa fa-file-pdf-o\'></i> Export as PDF";
+            downloadBtn.onclick = function() {
+                window.print();
+            };
+        };
+
+        var renderReport = function(content) {
+            resultsContainer.style.display = "block";
+            resultsContent.innerHTML = prepareFormalHeader("Study Report") + "<div class=\'report-markdown\'>" + marked.parse(content) + "</div>";
+            resultsContainer.scrollIntoView({ behavior: "smooth" });
+            
+            downloadBtn.innerHTML = "<i class=\'fa fa-file-pdf-o\'></i> Export as PDF";
+            downloadBtn.onclick = function() {
+                window.print();
+            };
+        };
+
+        var downloadFile = function(filename, text) {
+            var element = document.createElement("a");
+            element.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(text));
+            element.setAttribute("download", filename);
+            element.style.display = "none";
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        };
+
+        var addMessage = function(text, type) {
+            var msg = document.createElement("div");
+            msg.className = "message " + type;
+            if (typeof marked !== "undefined") {
+                msg.innerHTML = marked.parse(text);
+            } else {
+                msg.innerHTML = text.replace(/\n/g, "<br>");
+            }
+            messages.appendChild(msg);
+            messages.scrollTop = messages.scrollHeight;
+        };
+
+        // Format existing messages.
+        document.querySelectorAll(".message.ai").forEach(function(el) {
+            if (typeof marked !== "undefined" && !el.classList.contains("typing")) {
+                el.innerHTML = marked.parse(el.innerText);
+            }
+        });
+
+        window.sendMessage = function(silent = false) {
+            var val = input.value.trim();
+            if (val === "") return;
+
+            // Auto-detect tool keywords in chat to trigger loading states (ONLY if not silent).
+            if (!silent) {
+                var lowerVal = val.toLowerCase();
+                var toolType = null;
+                if (lowerVal.includes("quiz")) toolType = "quiz";
+                else if (lowerVal.includes("report")) toolType = "report";
+                else if (lowerVal.includes("mindmap") || lowerVal.includes("mind map")) toolType = "mindmap";
+
+                if (toolType) {
+                    var card = document.querySelector(".creator-card." + toolType);
+                    if (card) {
+                        card.classList.add("loading");
+                        var icon = card.querySelector(".card-icon i");
+                        if (icon) icon.className = "fa fa-circle-o-notch fa-spin";
+                    }
+                }
+                addMessage(val, "user");
+            }
+
+            input.value = "";
+            input.style.height = "auto";
+            
+            var typing = null;
+            var loadingInterval = null;
+            if (!silent) {
+                var loadingMessages = [
+                    "PresMate is exploring materials...",
+                    "PresMate is analyzing context...",
+                    "PresMate is synthesizing knowledge...",
+                    "PresMate is preparing your response..."
+                ];
+                var msgIdx = 0;
+                
+                typing = document.createElement("div");
+                typing.className = "message ai typing";
+                typing.innerHTML = "<i class=\'fa fa-circle-o-notch fa-spin\'></i> " + loadingMessages[0];
+                messages.appendChild(typing);
+                messages.scrollTop = messages.scrollHeight;
+
+                loadingInterval = setInterval(function() {
+                    msgIdx = (msgIdx + 1) % loadingMessages.length;
+                    typing.innerHTML = "<i class=\'fa fa-circle-o-notch fa-spin\'></i> " + loadingMessages[msgIdx];
+                }, 2000);
+            }
+
+            input.disabled = true;
+            sendBtn.disabled = true;
+
+            var selectedFiles = [];
+            document.querySelectorAll(".file-checkbox:checked").forEach(function(cb) {
+                selectedFiles.push(cb.value);
+            });
+
+            var formData = new FormData();
+            formData.append("cmid", cmid);
+            formData.append("message", val);
+            formData.append("sesskey", sesskey);
+            formData.append("selected_files", JSON.stringify(selectedFiles));
+            formData.append("silent", silent ? 1 : 0);
+            
+            var savedConfig = localStorage.getItem("ainotebook_config") || "{}";
+            formData.append("config", savedConfig);
+
+            fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?t=" + Date.now(), {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (loadingInterval) clearInterval(loadingInterval);
+                if (typing && typing.parentNode) messages.removeChild(typing);
+                input.disabled = false;
+                sendBtn.disabled = false;
+                input.focus();
+
+                if (data.success) {
+                    var result = detectAndRenderArtifacts(data.response, "ai", true);
+                    
+                    if (!silent) {
+                        var displayMsg = result.cleanText;
+                        if (result.found) {
+                            displayMsg += "\n\n*(I have also generated a " + result.type + " for you in the Creator section below)*";
+                        }
+                        addMessage(displayMsg, "ai");
+                    }
+                    
+                    // Clear all loading states.
+                    document.querySelectorAll(".creator-card.loading").forEach(card => {
+                        card.classList.remove("loading");
+                        var icon = card.querySelector(".card-icon i");
+                        if (icon) {
+                            if (card.classList.contains("quiz")) icon.className = "fa fa-question-circle fa-3x brand-color";
+                            if (card.classList.contains("report")) icon.className = "fa fa-file-text-o fa-3x brand-success";
+                            if (card.classList.contains("mindmap")) icon.className = "fa fa-sitemap fa-3x brand-info";
+                        }
+                    });
+
+                    loadSuggestions();
+                } else {
+                    if (!silent) addMessage("Error: " + data.error, "ai");
+                }
+            })
+            .catch(error => {
+                if (loadingInterval) clearInterval(loadingInterval);
+                if (typing && typing.parentNode) messages.removeChild(typing);
+                input.disabled = false;
+                sendBtn.disabled = false;
+                addMessage("I am currently receiving too many requests. Please wait a moment.", "ai");
+                console.error("Fetch error:", error);
+            });
+        };
+
+        var loadSuggestions = function() {
+            var aiMessages = document.querySelectorAll(".message.ai");
+            var lastAi = aiMessages[aiMessages.length - 1];
+            if (!lastAi) return;
+
+            // Remove previous smart suggestions to keep chat clean.
+            document.querySelectorAll(".suggestion-container").forEach(el => el.remove());
+
+            var container = document.createElement("div");
+            container.className = "suggestion-container";
+            container.innerHTML = "<div class='loading-suggestions'><i class='fa fa-circle-o-notch fa-spin'></i> Thinking...</div>";
+            lastAi.parentNode.insertBefore(container, lastAi.nextSibling);
+
+            var formData = new FormData();
+            formData.append("cmid", cmid);
+            formData.append("sesskey", sesskey);
+
+            fetch(wwwroot + "/mod/ainotebook/suggestions_ajax.php?t=" + Date.now(), {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.suggestions && container) {
+                    container.innerHTML = "";
+                    data.suggestions.forEach(function(s) {
+                        var btn = document.createElement("button");
+                        btn.className = "suggestion-btn";
+                        
+                        // Suggestions are limited to 10 words by the AI/Backend.
+                        btn.innerText = s;
+                        btn.onclick = function() { sendSuggested(s); };
+                        container.appendChild(btn);
+                    });
+                } else {
+                    container.innerHTML = "";
+                }
+            })
+            .catch(e => {
+                console.error("Suggestions error:", e);
+                container.innerHTML = "";
+            });
+        };
+
+        // Suggestion loader.
+
+        // AI Tool Buttons.
+        document.querySelectorAll(".ai-tool-btn").forEach(btn => {
+            btn.onclick = function() {
+                const action = this.getAttribute("data-action");
+                let promptText = "";
+                if (action === "quiz") promptText = "Generate a quiz from the selected materials.";
+                if (action === "report") promptText = "Generate a study report from the selected materials.";
+                if (action === "mindmap") promptText = "Generate a mindmap structure for the selected materials.";
+                
+                if (promptText) {
+                    input.value = promptText;
+                    sendMessage(true); // Silent generation from Creator Hub.
+                }
+            };
+        });
+
+        // Sidebar Panel Toggle (Inside the main card).
+        var sidebar = document.getElementById("ainotebook-sidebar-nav");
+        var toggleBtn = document.getElementById("toggle-sidebar");
+        if (toggleBtn && sidebar) {
+            toggleBtn.onclick = function() {
+                sidebar.classList.toggle("collapsed");
+                var icon = toggleBtn.querySelector("i");
+                icon.className = sidebar.classList.contains("collapsed") ? "fa fa-angle-double-right" : "fa fa-angle-double-left";
+            };
+        }
+
+        // Creator Hub Card Toggle.
+        var creatorToggle = document.getElementById("toggle-creator");
+        var creatorContent = document.getElementById("creator-hub-content");
+        if (creatorToggle && creatorContent) {
+            creatorToggle.onclick = function() {
+                creatorContent.classList.toggle("collapsed");
+                var icon = creatorToggle.querySelector("i");
+                icon.className = creatorContent.classList.contains("collapsed") ? "fa fa-angle-double-down" : "fa fa-angle-double-up";
+            };
+        }
+
+        // Settings Modal.
+        var modal = document.getElementById("settings-modal");
+        var openBtn = document.getElementById("open-settings");
+        var closeBtn = document.getElementById("close-settings");
+        var saveBtn = document.getElementById("save-settings");
+
+        var resultsContainer = document.getElementById("creator-results");
+        loadSuggestions();
+        messages.scrollTop = messages.scrollHeight;
+        
+        var scanHistoryForArtifacts = function() {
+            messages.querySelectorAll(".message.ai").forEach(msg => {
+                detectAndRenderArtifacts(msg.innerText, "ai", true);
+            });
+            if (resultsContainer) resultsContainer.style.display = "none";
+        };
+
+        scanHistoryForArtifacts();
+        // Source counter and Select All logic.
+        var updateSourceCount = function() {
+            var checkedCount = document.querySelectorAll(".file-checkbox:checked").length;
+            var pill = document.getElementById("source-count");
+            if (pill) {
+                pill.innerText = checkedCount + (checkedCount === 1 ? " source" : " sources");
+                pill.style.display = checkedCount > 0 ? "inline-block" : "none";
+            }
+        };
+
+        var selectAll = document.getElementById("select-all-files");
+        if (selectAll) {
+            selectAll.onchange = function() {
+                var checkboxes = document.querySelectorAll(".file-checkbox");
+                checkboxes.forEach(function(cb) { cb.checked = selectAll.checked; });
+                updateSourceCount();
+            };
+        }
+
+        // Add event listeners to individual checkboxes.
+        document.querySelectorAll(".file-checkbox").forEach(function(cb) {
+            cb.onchange = updateSourceCount;
+        });
+
+        updateSourceCount();
+        return true;
+    };
+
+    var attempts = 0;
+    var timer = setInterval(function() {
+        if (initChat() || attempts > 20) clearInterval(timer);
+        attempts++;
+    }, 300);
+})();
+JS;
+
+$PAGE->requires->js_init_code($js);
+
+echo '
+<!-- Configuration Modal -->
+<div id="settings-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Configure chat</h3>
+            <button id="close-settings" class="btn-icon"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <p class="modal-desc">Notebooks can be customised to help you achieve different goals: do research, help learn, show various perspectives or converse in a particular style and tone.</p>
+            
+            <div class="setting-group">
+                <label>Define your conversational goal, style or role</label>
+                <select id="chat-style" class="custom-select">
+                    <option value="general">Best for general purpose research and brainstorming tasks.</option>
+                    <option value="tutor">Professional Tutor - patient and encouraging.</option>
+                    <option value="critic">Critical Thinker - challenges your assumptions.</option>
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <label>Choose your response length</label>
+                <select id="chat-length" class="custom-select">
+                    <option value="short">Short & Concise</option>
+                    <option value="medium" selected>Balanced</option>
+                    <option value="long">Detailed & Comprehensive</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="save-settings" class="btn-premium">Save Settings</button>
+        </div>
+    </div>
+</div>';
+
+echo $OUTPUT->footer();

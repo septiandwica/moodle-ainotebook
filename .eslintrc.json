@@ -1,0 +1,19 @@
+{
+  "root": true,
+  "env": {
+    "browser": true,
+    "node": true,
+    "amd": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "globals": {
+    "M": "readonly"
+  },
+  "rules": {
+    "no-undef": "error",
+    "camelcase": "error"
+  }
+}

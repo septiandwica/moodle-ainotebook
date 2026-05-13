@@ -927,14 +927,14 @@ $PAGE->requires->js_init_code($js);
 
 echo '
 <!-- Configuration Modal -->
-<div id="settings-modal" class="modal-overlay">
-    <div class="modal-content">
-        <div class="modal-header">
+<div id="settings-modal" class="ain-modal-overlay">
+    <div class="ain-modal-content">
+        <div class="ain-modal-header">
             <h3>Configure chat</h3>
             <button id="close-settings" class="btn-icon"><i class="fa fa-times"></i></button>
         </div>
-        <div class="modal-body">
-            <p class="modal-desc">Notebooks can be customised to help you achieve different goals: do research, help learn, show various perspectives or converse in a particular style and tone.</p>
+        <div class="ain-modal-body">
+            <p class="ain-modal-desc">Notebooks can be customised to help you achieve different goals: do research, help learn, show various perspectives or converse in a particular style and tone.</p>
             
             <div class="setting-group">
                 <label>Define your conversational goal, style or role</label>
@@ -954,7 +954,7 @@ echo '
                 </select>
             </div>
         </div>
-        <div class="modal-footer">
+        <div class="ain-modal-footer">
             <button id="save-settings" class="btn-premium">Save Settings</button>
         </div>
     </div>

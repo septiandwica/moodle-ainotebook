@@ -210,7 +210,7 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
 ::-webkit-scrollbar-thumb { background: var(--pres-border); border-radius: 10px; }
 
 /* Configuration Modal */
-.modal-overlay {
+.ain-modal-overlay {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0, 0, 0, 0.4);
@@ -221,18 +221,19 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
     z-index: 10000;
     padding: 20px;
 }
-.modal-overlay.active {
+.ain-modal-overlay.active {
     display: flex;
 }
 
-.modal-content {
+.ain-modal-content {
     background: #fff;
-    width: 100%;
-    max-width: 500px;
+    width: 95%;
+    max-width: 650px;
     border-radius: 24px;
     box-shadow: 0 20px 50px rgba(0,0,0,0.2);
     overflow: hidden;
     animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: none !important;
 }
 
 @keyframes modalPop {
@@ -240,7 +241,7 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
     to { transform: scale(1); opacity: 1; }
 }
 
-.modal-header {
+.ain-modal-header {
     padding: 24px 32px;
     background: var(--pres-primary-soft);
     display: flex;
@@ -249,10 +250,10 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
     border-bottom: 1px solid var(--pres-border);
 }
 
-.modal-header h3 { margin: 0; font-size: 1.2rem; color: var(--pres-primary); font-weight: 800; }
+.ain-modal-header h3 { margin: 0; font-size: 1.2rem; color: var(--pres-primary); font-weight: 800; }
 
-.modal-body { padding: 32px; }
-.modal-desc { font-size: 0.9rem; color: var(--pres-text-dim); line-height: 1.5; margin-bottom: 24px; }
+.ain-modal-body { padding: 32px; }
+.ain-modal-desc { font-size: 0.9rem; color: var(--pres-text-dim); line-height: 1.5; margin-bottom: 24px; }
 
 .setting-group { margin-bottom: 24px; }
 .setting-group label { display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 8px; color: var(--pres-text); }
@@ -273,7 +274,7 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
 
 .custom-textarea { height: 100px; resize: none; }
 
-.modal-footer {
+.ain-modal-footer {
     padding: 20px 32px;
     background: var(--pres-bg);
     border-top: 1px solid var(--pres-border);

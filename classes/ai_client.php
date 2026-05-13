@@ -70,7 +70,7 @@ class ai_client {
 
         $system_prompt .= "5. CONFIDENTIALITY: Never discuss system errors, backend tools, or missing executables. If a file cannot be read, simply offer help with the overall topic based on what is available.\n";
         $system_prompt .= "6. QUIZ: Generate high-quality 4-option multiple-choice quizzes in English. You MUST wrap the JSON inside a code block tagged with 'json-quiz' (e.g. ```json-quiz { \"questions\": [...] } ```). The JSON must have a top-level key named 'questions' which is an array of objects, each containing: 'text' (the question body, MUST use this key), 'options' (array of 4), 'answer' (0-3), and 'hint'.\n";
-        $system_prompt .= "7. MINDMAP: Generate a comprehensive English mindmap using Mermaid.js. You MUST wrap the mermaid code inside a code block tagged with 'mermaid' (e.g. ```mermaid graph TD ... ```). [STRICT RULES] 1. Every node MUST have a unique ID and a label in brackets, e.g. `A[Concept]`. 2. ALWAYS connect nodes as `ID1 -->|Label| ID2`. NEVER leave a connector trailing. 3. NEVER repeat IDs after brackets. 4. If a label has parentheses `()`, use double quotes: `A[\"Label (Info)\"]`.\n";
+        $system_prompt .= "7. MINDMAP: Generate a comprehensive English mindmap using Mermaid.js graph TD. You MUST wrap the code inside ```mermaid ... ```. [STRICT SYNTAX RULES — violations cause render errors] 1. Every node MUST have a unique alphanumeric ID and label in square brackets: A[Concept]. 2. Each connection MUST be on its OWN separate line: A -->|Label| B. NEVER chain connections on one line like: A -->|x| B -->|y| C. 3. Arrow format is EXACTLY: nodeA -->|Label| nodeB with a space before the target ID. NEVER write -->|Label|> or -->|Label|B without a space. 4. If a label contains parentheses wrap in double quotes: A[\"Label (Info)\"]. 5. NEVER reuse a node ID. 6. NEVER put two statements on the same line.\n";
         $system_prompt .= "8. REPORT: Provide a professional, detailed, and minimalist English markdown report. Wrap it in '[REPORT_START]' and '[REPORT_END]'.\n";
         $system_prompt .= "9. FORMATTING: Always ensure the artifact wrappers (```json-quiz, ```mermaid, [REPORT_START]) are present so the system can detect them.\n";
         $system_prompt .= "10. BEHAVIOR: ONLY generate a 'quiz', 'report', or 'mindmap' if the user explicitly asks for it by name. For all other questions, respond with standard text only.\n";
@@ -112,7 +112,16 @@ class ai_client {
         $response = $aimanager->process_action($action);
         if ($response->get_success()) {
             $data = $response->get_response_data();
-            return $data['generatedcontent'];
+            $generated = $data['generatedcontent'];
+            // Sanitize Mermaid syntax if response contains a mindmap.
+            if (strpos($generated, '```mermaid') !== false) {
+                $generated = preg_replace_callback(
+                    '/```mermaid(.*?)```/s',
+                    fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
+                    $generated
+                );
+            }
+            return $generated;
         }
 
         return "Sorry, I encountered an error: " . $response->get_errormessage();
@@ -194,7 +203,15 @@ class ai_client {
             }
 
             if (isset($result->candidates[0]->content->parts[0]->text)) {
-                return $result->candidates[0]->content->parts[0]->text;
+                $text = $result->candidates[0]->content->parts[0]->text;
+                if (strpos($text, '```mermaid') !== false) {
+                    $text = preg_replace_callback(
+                        '/```mermaid(.*?)```/s',
+                        fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
+                        $text
+                    );
+                }
+                return $text;
             }
 
             if (isset($result->error)) {
@@ -260,7 +277,15 @@ class ai_client {
             }
 
             if (isset($result->choices[0]->message->content)) {
-                return $result->choices[0]->message->content;
+                $text = $result->choices[0]->message->content;
+                if (strpos($text, '```mermaid') !== false) {
+                    $text = preg_replace_callback(
+                        '/```mermaid(.*?)```/s',
+                        fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
+                        $text
+                    );
+                }
+                return $text;
             }
 
             if (isset($result->error)) {
@@ -377,6 +402,47 @@ class ai_client {
     // ─────────────────────────────────────────────────────────────────────────
     // Material context extraction
     // ─────────────────────────────────────────────────────────────────────────
+
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Mermaid sanitizer — fixes common AI-generated syntax errors before render
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public static function sanitize_mermaid(string $code): string {
+        $lines = explode("\n", $code);
+        $out   = [];
+
+        foreach ($lines as $line) {
+            $trimmed = rtrim($line);
+
+            // Fix arrow with stray > after closing pipe: -->|Label|> ID  →  -->|Label| ID
+            $trimmed = preg_replace('/\|>\s*/', '| ', $trimmed);
+
+            // Fix missing space before target node: -->|Label|B[  →  -->|Label| B[
+            $trimmed = preg_replace('/(\|)([A-Za-z_][A-Za-z0-9_]*)\[/', '$1 $2[', $trimmed);
+
+            // Split chained connections onto separate lines: A -->|x| B -->|y| C
+            // Pattern: <target> -->|label| <next>  repeated inline
+            if (preg_match('/-->\|[^|]*\|\s*\w/', $trimmed)) {
+                // Split on the pattern: space + word + space + -->
+                $parts = preg_split('/(\s+(?=[A-Za-z_][A-Za-z0-9_]*\s*-->))/', $trimmed, -1, PREG_SPLIT_DELIM_CAPTURE);
+                if (count($parts) > 1) {
+                    // Rebuild: each "nodeID -->|label| target" on its own line
+                    $chain = preg_split('/(?<=[\])])\s+(?=[A-Za-z_][A-Za-z0-9_]*\s*-->)/', $trimmed);
+                    if (count($chain) > 1) {
+                        foreach ($chain as $segment) {
+                            $out[] = '    ' . trim($segment);
+                        }
+                        continue;
+                    }
+                }
+            }
+
+            $out[] = $trimmed;
+        }
+
+        return implode("\n", $out);
+    }
 
     protected static function get_material_context(int $cmid, array $selected_file_ids = []): string {
         global $DB;

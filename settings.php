@@ -36,32 +36,45 @@ if ($ADMIN->fulltree) {
         ''
     ));
 
-    // Combined Model List for PHP validation.
-    $all_models = array(
-        // Updated Groq Models (Llama 3.1).
-        'llama-3.1-8b-instant' => 'Llama 3.1 8B (Instant)',
-        'llama-3.1-70b-versatile' => 'Llama 3.1 70B (Versatile)',
-        'llama3-70b-8192' => 'Llama 3 70B (Legacy)',
-        'mixtral-8x7b-32768' => 'Mixtral 8x7B',
-        'gemma2-9b-it' => 'Gemma 2 9B',
-        'qwen-2.5-32b' => 'Qwen 2.5 32B (Reasoning)',
-        'llama-guard-3-8b' => 'Llama Guard 3 8B (Security)',
-        // OpenAI.
-        'gpt-4o' => 'GPT-4o',
-        'gpt-4-turbo' => 'GPT-4 Turbo',
-        'gpt-3.5-turbo' => 'GPT-3.5 Turbo',
-        // Gemini.
-        'gemini-1.5-pro' => 'Gemini 1.5 Pro',
-        'gemini-1.5-flash' => 'Gemini 1.5 Flash',
-        'gemini-pro' => 'Gemini Pro',
-        'custom' => 'Other (Type manually below)'
-    );
-
-    $settings->add(new admin_setting_configselect('mod_ainotebook/model_name',
-        'Select Model',
-        'The available models will update based on the provider selected above.',
+    // AI Provider Models (Separate settings for each to avoid JS flickering).
+    $settings->add(new admin_setting_configselect('mod_ainotebook/model_groq',
+        'Groq Model',
+        'This model will be used when Groq is selected as the AI Provider.',
         'llama-3.1-8b-instant',
-        $all_models
+        array(
+            'llama-3.1-8b-instant' => 'Llama 3.1 8B (Instant)',
+            'llama-3.1-70b-versatile' => 'Llama 3.1 70B (Versatile)',
+            'llama3-70b-8192' => 'Llama 3 70B (Legacy)',
+            'mixtral-8x7b-32768' => 'Mixtral 8x7B',
+            'gemma2-9b-it' => 'Gemma 2 9B',
+            'qwen-2.5-32b' => 'Qwen 2.5 32B (Reasoning)',
+            'llama-guard-3-8b' => 'Llama Guard 3 8B (Security)',
+            'custom' => 'Other (Type manually below)'
+        )
+    ));
+
+    $settings->add(new admin_setting_configselect('mod_ainotebook/model_openai',
+        'OpenAI Model',
+        'This model will be used when OpenAI is selected as the AI Provider.',
+        'gpt-4o',
+        array(
+            'gpt-4o' => 'GPT-4o',
+            'gpt-4-turbo' => 'GPT-4 Turbo',
+            'gpt-3.5-turbo' => 'GPT-3.5 Turbo',
+            'custom' => 'Other (Type manually below)'
+        )
+    ));
+
+    $settings->add(new admin_setting_configselect('mod_ainotebook/model_gemini',
+        'Gemini Model',
+        'This model will be used when Google Gemini is selected as the AI Provider.',
+        'gemini-1.5-flash',
+        array(
+            'gemini-1.5-pro' => 'Gemini 1.5 Pro',
+            'gemini-1.5-flash' => 'Gemini 1.5 Flash',
+            'gemini-pro' => 'Gemini Pro',
+            'custom' => 'Other (Type manually below)'
+        )
     ));
 
     // Custom Model Fallback.
@@ -84,75 +97,45 @@ if ($ADMIN->fulltree) {
         1
     ));
 
-    // JS Helper for dynamic filtering of the SINGLE dropdown.
+    // JS for simple visibility toggling (Zero flickering).
     if (!empty($PAGE)) {
         $js = '
         (function() {
-            var findEl = function(part) {
-                var name = "s_mod_ainotebook/" + part;
-                var el = document.getElementsByName(name)[0];
-                if (el) return el;
-                return document.querySelector("select[name*=\'" + part + "\']") || 
-                       document.querySelector("input[name*=\'" + part + "\']") ||
-                       document.querySelector("[id*=\'" + part + "\']");
-            };
-
             var init = function() {
-                var providerEl = findEl("ai_provider");
-                var modelEl = findEl("model_name");
-                var customEl = findEl("model_custom");
-                
-                if (!providerEl || !modelEl) return false;
+                var providerEl = document.querySelector(\'[name="s_mod_ainotebook/ai_provider"]\');
+                if (!providerEl || providerEl.dataset.ainotebookInit) return false;
 
-                var modelData = {
-                    "groq": [
-                        {val: "llama-3.1-8b-instant", text: "Llama 3.1 8B (Instant)"},
-                        {val: "llama-3.1-70b-versatile", text: "Llama 3.1 70B (Versatile)"},
-                        {val: "llama3-70b-8192", text: "Llama 3 70B (Legacy)"},
-                        {val: "mixtral-8x7b-32768", text: "Mixtral 8x7B"},
-                        {val: "gemma2-9b-it", text: "Gemma 2 9B"},
-                        {val: "qwen-2.5-32b", text: "Qwen 2.5 32B (Reasoning)"},
-                        {val: "llama-guard-3-8b", text: "Llama Guard 3 8B (Security)"}
-                    ],
-                    "openai": [
-                        {val: "gpt-4o", text: "GPT-4o"},
-                        {val: "gpt-4-turbo", text: "GPT-4 Turbo"},
-                        {val: "gpt-3.5-turbo", text: "GPT-3.5 Turbo"}
-                    ],
-                    "gemini": [
-                        {val: "gemini-1.5-pro", text: "Gemini 1.5 Pro"},
-                        {val: "gemini-1.5-flash", text: "Gemini 1.5 Flash"},
-                        {val: "gemini-pro", text: "Gemini Pro"}
-                    ],
-                    "moodle": []
+                var getRow = function(name) {
+                    var el = document.querySelector(\'[name="s_mod_ainotebook/\' + name + \'"]\');
+                    return el ? (el.closest(".form-group") || el.closest(".row") || el.parentElement.parentElement) : null;
                 };
 
-                var initialVal = modelEl.value;
-
-                function updateModels(e) {
+                function syncUI() {
                     var provider = providerEl.value;
-                    var models = modelData[provider] || [];
-                    modelEl.options.length = 0;
-                    models.forEach(function(m) {
-                        modelEl.options.add(new Option(m.text, m.val));
-                    });
-                    if (provider !== "moodle") {
-                        modelEl.options.add(new Option("Other (Type manually below)", "custom"));
-                    }
-                    if (e === "init" && initialVal) modelEl.value = initialVal;
+                    var rows = {
+                        "groq": getRow("model_groq"),
+                        "openai": getRow("model_openai"),
+                        "gemini": getRow("model_gemini"),
+                        "custom": getRow("model_custom")
+                    };
 
-                    var modelRow = modelEl.closest(".form-group") || modelEl.closest(".row") || modelEl.parentElement.parentElement;
-                    if (modelRow) modelRow.style.display = (provider === "moodle") ? "none" : "";
+                    if (rows.groq) rows.groq.style.display = (provider === "groq") ? "" : "none";
+                    if (rows.openai) rows.openai.style.display = (provider === "openai") ? "" : "none";
+                    if (rows.gemini) rows.gemini.style.display = (provider === "gemini") ? "" : "none";
                     
-                    if (customEl) {
-                        var customRow = customEl.closest(".form-group") || customEl.closest(".row") || customEl.parentElement.parentElement;
-                        if (customRow) customRow.style.display = (modelEl.value === "custom") ? "" : "none";
+                    if (rows.custom) {
+                        var currentModelEl = document.querySelector(\'[name="s_mod_ainotebook/model_\' + provider + \'"]\');
+                        rows.custom.style.display = (currentModelEl && currentModelEl.value === "custom") ? "" : "none";
                     }
                 }
 
-                providerEl.addEventListener("change", updateModels);
-                modelEl.addEventListener("change", updateModels);
-                updateModels("init");
+                providerEl.addEventListener("change", syncUI);
+                document.querySelectorAll(\'[name^="s_mod_ainotebook/model_"]\').forEach(function(el) {
+                    el.addEventListener("change", syncUI);
+                });
+
+                syncUI();
+                providerEl.dataset.ainotebookInit = "true";
                 return true;
             };
 

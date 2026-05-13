@@ -100,7 +100,16 @@ class ai_client {
 
     protected static function custom_provider_request(string $provider, string $prompt): string {
         $apikey = get_config('mod_ainotebook', 'api_key');
-        $model = get_config('mod_ainotebook', 'model_name');
+        $model = get_config('mod_ainotebook', 'model_' . $provider);
+        if (empty($model)) {
+            $fallbacks = [
+                'groq' => 'llama-3.1-8b-instant',
+                'openai' => 'gpt-4o',
+                'gemini' => 'gemini-1.5-flash'
+            ];
+            $model = $fallbacks[$provider] ?? 'custom';
+        }
+
         if ($model === 'custom') {
             $model = get_config('mod_ainotebook', 'model_custom');
         }
@@ -127,11 +136,11 @@ class ai_client {
                 return $result->candidates[0]->content->parts[0]->text;
             }
             if (isset($result->error)) {
-                $err = $result->error->message ?? "";
+                $err = $result->error->message ?? "Unknown Gemini Error";
                 if (stripos($err, 'rate limit') !== false) {
                     return "I am currently receiving too many requests. Please wait a moment before asking again.";
                 }
-                return "I am currently experiencing some technical difficulties. Please try again later.";
+                return "AI Error (Gemini): " . $err;
             }
         } else {
             $endpoint = ($provider === 'groq') ? 'https://api.groq.com/openai/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions';
@@ -150,11 +159,11 @@ class ai_client {
                 return $result->choices[0]->message->content;
             }
             if (isset($result->error)) {
-                $err = $result->error->message ?? "";
+                $err = $result->error->message ?? "Unknown Provider Error";
                 if (stripos($err, 'rate limit') !== false) {
                     return "I am currently receiving too many requests. Please wait a moment before asking again.";
                 }
-                return "I am currently experiencing some technical difficulties. Please try again later.";
+                return "AI Error ({$provider}): " . $err;
             }
         }
 

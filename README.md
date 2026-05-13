@@ -1,6 +1,6 @@
 # PresMate AI Notebook Creator Hub
 
-PresMate is a premium AI-powered study assistant plugin for Moodle, developed by **septiandwica** and supported by **Tateta** ([samastanuswantara.com](https://samastanuswantara.com)). It transforms traditional study materials into interactive, AI-driven learning experiences.
+PresMate is a premium AI-powered study assistant plugin for Moodle, developed by **septiandwica** and supported by **Tateta** ([samastanuswantara.com](https://samastanuswantara.com)). This plugin is **exclusive for President University**. It transforms traditional study materials into interactive, AI-driven learning experiences.
 
 ![PresMate Icon](pix/icon.svg)
 

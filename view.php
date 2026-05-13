@@ -594,35 +594,54 @@ $js .= <<<'JS'
             </div>`;
         };
 
+        // ── Mermaid syntax sanitizer (mirrors PHP-side sanitize_mermaid) ─────────
+        var sanitizeMermaid = function(code) {
+            var lines = code.trim().split("\n");
+            var out = [];
+            lines.forEach(function(line) {
+                var t = line.trimEnd();
+                // 1. Node labels with () must be quoted: A[X (Y)]  →  A["X (Y)"]
+                t = t.replace(/([A-Za-z0-9_]+)\[([^\]"]*\([^\]]*\)[^\]"]*)\]/g, function(_, id, label) {
+                    return id + '["' + label.replace(/"/g, "'") + '"]';
+                });
+                // 2. Stray > after pipe: -->|Label|>  →  -->|Label| 
+                t = t.replace(/\|>\s*/g, "| ");
+                // 3. Missing space before target: -->|Label|B[  →  -->|Label| B[
+                t = t.replace(/(\|)([A-Za-z_][A-Za-z0-9_]*)\[/g, "$1 $2[");
+                // 4. Split chained arrows: A[x] -->|y| B[z] -->|w| C  →  separate lines
+                if ((t.match(/-->/g) || []).length > 1) {
+                    // Split after ] or identifier when followed by another --> chain
+                    var parts = t.split(/(?<=[\]A-Za-z0-9_])\s+(?=[A-Za-z0-9_]+(\s*-->|\s*\[))/);
+                    if (parts.length > 1) {
+                        parts.forEach(function(p) { if (p.trim()) out.push("    " + p.trim()); });
+                        return;
+                    }
+                }
+                // 5. Remove trailing connector with no target
+                t = t.replace(/-->\s*\|[^|]+\|\s*$/, "");
+                // 6. Remove duplicate arrows
+                t = t.replace(/-->\s*-->/g, "-->");
+                if (t.trim()) out.push(t);
+            });
+            return out.join("\n");
+        };
+
         var renderMindmap = function(data) {
             resultsContainer.style.display = "block";
-            
-            // Cleanup common AI mistakes in Mermaid syntax
-            var cleanData = data.trim();
-            // Fix: NodeID[Label]NodeID (AI repeating ID after bracket)
-            cleanData = cleanData.replace(/(\[[^\]]+\])[A-Za-z0-9]+/g, "$1");
-            // Fix: -->|Label| followed by nothing (trailing connector)
-            cleanData = cleanData.replace(/-->\s*\|[^|]+\|\s*$/gm, "");
-            // Fix: Hanging text after a node (NODE_STRING error)
-            cleanData = cleanData.replace(/(\[[^\]]+\])\s+([A-Za-z0-9\s]+)(?=-->|\n|$)/g, "$1");
-            // Fix: double arrows or other weird connectors
-            cleanData = cleanData.replace(/-->\s*-->/g, "-->");
-            
-            resultsContent.innerHTML = prepareFormalHeader("Mindmap Visualization") + "<h3>Mindmap Concept</h3><div id=\'mermaid-container\' class=\'mermaid\'>" + cleanData + "</div>";
+            var cleanData = sanitizeMermaid(data);
+
+            resultsContent.innerHTML = prepareFormalHeader("Mindmap Visualization") + "<h3>Mindmap Concept</h3><div id='mermaid-container' class='mermaid'>" + cleanData + "</div>";
             try {
                 mermaid.init(undefined, document.querySelectorAll(".mermaid"));
             } catch (err) {
                 console.error("Mermaid init error:", err);
-                document.getElementById("mermaid-container").innerHTML = "<div class='alert alert-warning'>Failed to render Mindmap due to a syntax error in the AI response. Please try generating it again.</div>";
+                document.getElementById("mermaid-container").innerHTML = "<div class='alert alert-warning'>Failed to render Mindmap. The AI generated invalid syntax. Please try again.</div>";
             }
             resultsContainer.scrollIntoView({ behavior: "smooth" });
-            
-            downloadBtn.innerHTML = "<i class=\'fa fa-file-pdf-o\'></i> Export as PDF";
-            downloadBtn.onclick = function() {
-                window.print();
-            };
-        };
 
+            downloadBtn.innerHTML = "<i class='fa fa-file-pdf-o'></i> Export as PDF";
+            downloadBtn.onclick = function() { window.print(); };
+        };
         var renderReport = function(content) {
             resultsContainer.style.display = "block";
             resultsContent.innerHTML = prepareFormalHeader("Study Report") + "<div class=\'report-markdown\'>" + marked.parse(content) + "</div>";

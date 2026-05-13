@@ -409,39 +409,68 @@ class ai_client {
     // ─────────────────────────────────────────────────────────────────────────
 
     public static function sanitize_mermaid(string $code): string {
-        $lines = explode("\n", $code);
+        $lines = explode("\n", trim($code));
         $out   = [];
 
         foreach ($lines as $line) {
             $trimmed = rtrim($line);
 
-            // Fix arrow with stray > after closing pipe: -->|Label|> ID  →  -->|Label| ID
+            // 1. Fix node labels containing () without double quotes.
+            //    e.g. A[User Experience (UX) Design]  →  A["User Experience (UX) Design"]
+            //    Also catches nested parens. Only fix unquoted labels.
+            $trimmed = preg_replace_callback(
+                '/([A-Za-z0-9_]+)\[([^\]"]*\([^\]]*\)[^\]"]*)\]/',
+                function ($m) {
+                    // Already quoted? skip.
+                    if (strpos($m[2], '"') !== false) return $m[0];
+                    return $m[1] . '["' . $m[2] . '"]';
+                },
+                $trimmed
+            );
+
+            // 2. Fix stray > after closing pipe: -->|Label|> ID  →  -->|Label| ID
             $trimmed = preg_replace('/\|>\s*/', '| ', $trimmed);
 
-            // Fix missing space before target node: -->|Label|B[  →  -->|Label| B[
+            // 3. Fix missing space before target node ID: -->|Label|B[  →  -->|Label| B[
             $trimmed = preg_replace('/(\|)([A-Za-z_][A-Za-z0-9_]*)\[/', '$1 $2[', $trimmed);
 
-            // Split chained connections onto separate lines: A -->|x| B -->|y| C
-            // Pattern: <target> -->|label| <next>  repeated inline
-            if (preg_match('/-->\|[^|]*\|\s*\w/', $trimmed)) {
-                // Split on the pattern: space + word + space + -->
-                $parts = preg_split('/(\s+(?=[A-Za-z_][A-Za-z0-9_]*\s*-->))/', $trimmed, -1, PREG_SPLIT_DELIM_CAPTURE);
-                if (count($parts) > 1) {
-                    // Rebuild: each "nodeID -->|label| target" on its own line
-                    $chain = preg_split('/(?<=[\])])\s+(?=[A-Za-z_][A-Za-z0-9_]*\s*-->)/', $trimmed);
-                    if (count($chain) > 1) {
-                        foreach ($chain as $segment) {
-                            $out[] = '    ' . trim($segment);
-                        }
-                        continue;
+            // 4. Split chained connections onto separate lines.
+            //    e.g. A[X] -->|y| B[Z] -->|w| C[V]  →  two lines
+            //    Detect: closing bracket or ID followed by space then --> on same line.
+            if (substr_count($trimmed, '-->') > 1) {
+                // Split after each "]" or node-ID that is followed by " -->"
+                $parts = preg_split('/(?<=[\]A-Za-z0-9_])\s+(?=[A-Za-z0-9_]+\s*-->|[A-Za-z0-9_]+\[)/', $trimmed);
+                // Rebuild: first part is "A -->|x| B", rest start new connections
+                $rebuilt = [];
+                $carry   = '';
+                foreach ($parts as $part) {
+                    $part = trim($part);
+                    if (preg_match('/^[A-Za-z0-9_]+(\[|-->)/', $part) && $carry !== '') {
+                        $rebuilt[] = '    ' . $carry;
+                        $carry = $part;
+                    } else {
+                        $carry = $carry === '' ? $part : $carry . ' ' . $part;
                     }
+                }
+                if ($carry !== '') $rebuilt[] = '    ' . $carry;
+                if (count($rebuilt) > 1) {
+                    foreach ($rebuilt as $r) $out[] = $r;
+                    continue;
                 }
             }
 
-            $out[] = $trimmed;
+            // 5. Remove trailing connectors with no target: "A -->|Label|" at end of line
+            $trimmed = preg_replace('/-->\s*\|[^|]+\|\s*$/', '', $trimmed);
+
+            // 6. Remove duplicate double-arrows
+            $trimmed = preg_replace('/-->\s*-->/', '-->', $trimmed);
+
+            if (trim($trimmed) !== '') {
+                $out[] = $trimmed;
+            }
         }
 
-        return implode("\n", $out);
+        return "\n" . implode("\n", $out) . "\n";
     }
 
     protected static function get_material_context(int $cmid, array $selected_file_ids = []): string {

@@ -25,7 +25,9 @@ class ai_client {
         $ainotebook = $DB->get_record('ainotebook', ['id' => $cm->instance], '*', MUST_EXIST);
 
         $fullname         = fullname($USER);
-        $material_context = self::get_material_context($cmid, $selected_file_ids);
+        $material_data    = self::get_material_context($cmid, $selected_file_ids);
+        $material_context = $material_data['text'] ?? "";
+        $binaries         = $material_data['binaries'] ?? [];
         $ainame           = "PresMate";
 
         // ── Build system prompt ───────────────────────────────────────────────
@@ -96,7 +98,7 @@ class ai_client {
         $provider = get_config('mod_ainotebook', 'ai_provider');
 
         if ($provider !== 'moodle') {
-            return self::custom_provider_request($provider, $system_prompt, $user_message, $history ? array_reverse($history) : []);
+            return self::custom_provider_request($provider, $system_prompt, $user_message, $history ? array_reverse($history) : [], $binaries);
         }
 
         // Moodle AI subsystem: flatten everything into a single prompt string
@@ -146,7 +148,8 @@ class ai_client {
         string $provider,
         string $system_prompt,
         string $user_message,
-        array  $history = []
+        array  $history = [],
+        array  $binaries = []
     ): string {
         $apikey = get_config('mod_ainotebook', 'api_key');
         $model  = get_config('mod_ainotebook', 'model_' . $provider);
@@ -186,6 +189,18 @@ class ai_client {
                 $contents[] = ['role' => 'model', 'parts' => [['text' => $h->response]]];
             }
             $contents[] = ['role' => 'user', 'parts' => [['text' => $user_message]]];
+            
+            // Add binaries to the LAST message.
+            if (!empty($binaries)) {
+                foreach ($binaries as $bin) {
+                    $contents[count($contents)-1]['parts'][] = [
+                        'inline_data' => [
+                            'mime_type' => $bin['mimetype'],
+                            'data'      => $bin['data']
+                        ]
+                    ];
+                }
+            }
 
             $data = [
                 // [IMPROVED] Use Gemini's dedicated system_instruction field.
@@ -350,7 +365,8 @@ class ai_client {
             return $cached;
         }
 
-        $material = self::get_material_context($cmid, $selected_file_ids);
+        $material_data = self::get_material_context($cmid, $selected_file_ids);
+        $material      = $material_data['text'] ?? "";
         if (empty($material)) {
             return ["Summarize this material", "What are the key points?", "Create a quiz"];
         }
@@ -524,6 +540,7 @@ class ai_client {
         }
 
         $content    = "";
+        $binaries   = [];
         $totalchars = 0;
         $maxchars   = 40000;
 
@@ -542,6 +559,14 @@ class ai_client {
             if ($mimetype === 'text/plain') {
                 $extracted = $file->get_content();
             } elseif ($mimetype === 'application/pdf') {
+                // Strategy 0: Collect Base64 for multimodal.
+                if ($file->get_filesize() < 5 * 1024 * 1024) {
+                    $binaries[] = [
+                        'mimetype' => 'application/pdf',
+                        'data'     => base64_encode($file->get_content()),
+                        'filename' => $filename
+                    ];
+                }
                 $tempdir = make_temp_directory('mod_ainotebook');
                 $tmpfile = $tempdir . '/' . uniqid() . '.pdf';
                 try {
@@ -565,22 +590,23 @@ class ai_client {
                     // Strategy 3: OCR Fallback (for scanned images)
                     if (trim($extracted) === '' || strlen(trim($extracted)) < 50) {
                         $imgbase = $tempdir . '/' . uniqid() . '-page';
-                        // Convert first 3 pages to high-res images (300 DPI)
-                        exec("pdftoppm -f 1 -l 3 -r 300 " . escapeshellarg($tmpfile) . " " . escapeshellarg($imgbase) . " 2>/dev/null");
+                        // Convert first 5 pages to images (balanced for performance/quality)
+                        exec("pdftoppm -f 1 -l 5 -r 300 " . escapeshellarg($tmpfile) . " " . escapeshellarg($imgbase) . " 2>/dev/null");
                         
                         $ocr_text = "";
-                        $images = glob($imgbase . "-*.ppm");
+                        $images = glob($imgbase . "*.ppm"); 
                         sort($images); 
                         
                         foreach ($images as $img) {
                             $output_ocr = [];
-                            exec("tesseract " . escapeshellarg($img) . " stdout 2>/dev/null", $output_ocr);
+                            // Run tesseract with both English and Indonesian support.
+                            exec("tesseract -l eng+ind " . escapeshellarg($img) . " stdout 2>/dev/null", $output_ocr);
                             $ocr_text .= implode("\n", $output_ocr) . "\n";
                             @unlink($img); 
                         }
                         
                         if (strlen(trim($ocr_text)) > 50) {
-                            $extracted = "[OCR Extracted Text]:\n" . $ocr_text;
+                            $extracted = "[OCR Extracted Text (Eng+Ind)]:\n" . $ocr_text;
                         }
                     }
 
@@ -609,7 +635,12 @@ class ai_client {
             $content = substr($content, 0, $maxchars);
         }
 
-        $cache->set($cache_key, $content);
-        return $content;
+        $result = [
+            'text'     => $content,
+            'binaries' => $binaries
+        ];
+
+        $cache->set($cache_key, $result);
+        return $result;
     }
 }

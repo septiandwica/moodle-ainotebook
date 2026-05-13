@@ -8,143 +8,203 @@
 defined('MOODLE_INTERNAL') || die();
 
 if ($ADMIN->fulltree) {
-    // AI Branding.
-    $settings->add(new admin_setting_configtext('mod_ainotebook/ai_name',
+
+    // ── AI Branding ───────────────────────────────────────────────────────────
+    $settings->add(new admin_setting_configtext(
+        'mod_ainotebook/ai_name',
         'AI Name',
         'The display name of your AI Assistant (e.g. PresMate).',
         'PresMate',
         PARAM_TEXT
     ));
 
-    // Selection of AI Provider.
-    $settings->add(new admin_setting_configselect('mod_ainotebook/ai_provider',
+    // ── Provider selector ─────────────────────────────────────────────────────
+    $settings->add(new admin_setting_configselect(
+        'mod_ainotebook/ai_provider',
         'AI Provider',
         'Select which AI provider to use.',
         'groq',
-        array(
-            'groq' => 'Groq (Fastest)',
+        [
+            'groq'   => 'Groq (Fastest)',
             'openai' => 'OpenAI',
             'gemini' => 'Google Gemini',
-            'moodle' => 'Moodle AI Subsystem (Default)'
-        )
+            'moodle' => 'Moodle AI Subsystem (Default)',
+        ]
     ));
 
-    // API Key.
-    $settings->add(new admin_setting_configpasswordunmask('mod_ainotebook/api_key',
+    // ── API Key ───────────────────────────────────────────────────────────────
+    $settings->add(new admin_setting_configpasswordunmask(
+        'mod_ainotebook/api_key',
         'API Key',
-        'Your API Key for the selected provider (Leave empty if using Moodle AI).',
+        'Your API Key for the selected provider (leave empty if using Moodle AI).',
         ''
     ));
 
-    // AI Provider Models (Separate settings for each to avoid JS flickering).
-    $settings->add(new admin_setting_configselect('mod_ainotebook/model_groq',
+    // ── Groq Models (updated May 2025) ────────────────────────────────────────
+    $settings->add(new admin_setting_configselect(
+        'mod_ainotebook/model_groq',
         'Groq Model',
-        'This model will be used when Groq is selected as the AI Provider.',
-        'llama-3.1-8b-instant',
-        array(
-            'llama-3.1-8b-instant' => 'Llama 3.1 8B (Instant)',
-            'llama-3.1-70b-versatile' => 'Llama 3.1 70B (Versatile)',
-            'llama3-70b-8192' => 'Llama 3 70B (Legacy)',
-            'mixtral-8x7b-32768' => 'Mixtral 8x7B',
-            'gemma2-9b-it' => 'Gemma 2 9B',
-            'qwen-2.5-32b' => 'Qwen 2.5 32B (Reasoning)',
-            'llama-guard-3-8b' => 'Llama Guard 3 8B (Security)',
-            'custom' => 'Other (Type manually below)'
-        )
+        'Model used when Groq is selected.',
+        'llama-3.3-70b-versatile',
+        [
+            'llama-3.1-8b-instant'                      => 'Llama 3.1 8B Instant — 560 t/s',
+            'llama-3.3-70b-versatile'                    => 'Llama 3.3 70B Versatile — 280 t/s',
+            'openai/gpt-oss-120b'                        => 'GPT OSS 120B (via Groq) — 500 t/s',
+            'openai/gpt-oss-20b'                         => 'GPT OSS 20B (via Groq) — 1000 t/s',
+            'meta-llama/llama-4-scout-17b-16e-instruct'  => 'Llama 4 Scout 17B [Preview] — 750 t/s',
+            'qwen/qwen3-32b'                             => 'Qwen3 32B [Preview] — 400 t/s',
+            'custom'                                     => 'Other (type manually below)',
+        ]
     ));
 
-    $settings->add(new admin_setting_configselect('mod_ainotebook/model_openai',
+    // ── OpenAI Models ─────────────────────────────────────────────────────────
+    $settings->add(new admin_setting_configselect(
+        'mod_ainotebook/model_openai',
         'OpenAI Model',
-        'This model will be used when OpenAI is selected as the AI Provider.',
+        'Model used when OpenAI is selected.',
         'gpt-4o',
-        array(
-            'gpt-4o' => 'GPT-4o',
-            'gpt-4-turbo' => 'GPT-4 Turbo',
+        [
+            'gpt-4o'        => 'GPT-4o',
+            'gpt-4.1'       => 'GPT-4.1',
+            'gpt-4-turbo'   => 'GPT-4 Turbo',
             'gpt-3.5-turbo' => 'GPT-3.5 Turbo',
-            'custom' => 'Other (Type manually below)'
-        )
+            'custom'        => 'Other (type manually below)',
+        ]
     ));
 
-    $settings->add(new admin_setting_configselect('mod_ainotebook/model_gemini',
+    // ── Gemini Models ─────────────────────────────────────────────────────────
+    $settings->add(new admin_setting_configselect(
+        'mod_ainotebook/model_gemini',
         'Gemini Model',
-        'This model will be used when Google Gemini is selected as the AI Provider.',
+        'Model used when Google Gemini is selected.',
         'gemini-1.5-flash',
-        array(
-            'gemini-1.5-pro' => 'Gemini 1.5 Pro',
+        [
+            'gemini-2.0-flash' => 'Gemini 2.0 Flash',
+            'gemini-1.5-pro'   => 'Gemini 1.5 Pro',
             'gemini-1.5-flash' => 'Gemini 1.5 Flash',
-            'gemini-pro' => 'Gemini Pro',
-            'custom' => 'Other (Type manually below)'
-        )
+            'custom'           => 'Other (type manually below)',
+        ]
     ));
 
-    // Custom Model Fallback.
-    $settings->add(new admin_setting_configtext('mod_ainotebook/model_custom',
-        'Other / Custom Model ID',
+    // ── Custom model ID (only shown when "Other" is selected) ─────────────────
+    $settings->add(new admin_setting_configtext(
+        'mod_ainotebook/model_custom',
+        'Custom Model ID',
         'Enter a custom model ID if you selected "Other" above.',
         '',
         PARAM_TEXT
     ));
 
-    // General Plugin Settings.
-    $settings->add(new admin_setting_heading('mod_ainotebook/general_heading', 
-        'General Settings', 
+    // ── General ───────────────────────────────────────────────────────────────
+    $settings->add(new admin_setting_heading(
+        'mod_ainotebook/general_heading',
+        'General Settings',
         ''
     ));
 
-    $settings->add(new admin_setting_configcheckbox('mod_ainotebook/autoadd',
+    $settings->add(new admin_setting_configcheckbox(
+        'mod_ainotebook/autoadd',
         'Auto-add to new courses',
         'If enabled, the AI Notebook activity will be automatically added to all newly created courses.',
         1
     ));
 
-    // JS for simple visibility toggling (Zero flickering).
+    // ─────────────────────────────────────────────────────────────────────────
+    // JS visibility logic.
+    //
+    // Strategy: inject a <style> block into <head> BEFORE the page paints so
+    // irrelevant rows are hidden from the very first frame (zero flicker).
+    // Once JS takes over, the style block is cleared and real display logic runs.
+    // ─────────────────────────────────────────────────────────────────────────
     if (!empty($PAGE)) {
-        $js = '
-        (function() {
-            var init = function() {
-                var providerEl = document.querySelector(\'[name="s_mod_ainotebook/ai_provider"]\');
-                if (!providerEl || providerEl.dataset.ainotebookInit) return false;
 
-                var getRow = function(name) {
-                    var el = document.querySelector(\'[name="s_mod_ainotebook/\' + name + \'"]\');
-                    return el ? (el.closest(".form-group") || el.closest(".row") || el.parentElement.parentElement) : null;
-                };
+        $saved_provider = get_config('mod_ainotebook', 'ai_provider') ?: 'groq';
+        $saved_model    = get_config('mod_ainotebook', 'model_' . $saved_provider) ?: '';
 
-                function syncUI() {
-                    var provider = providerEl.value;
-                    var rows = {
-                        "groq": getRow("model_groq"),
-                        "openai": getRow("model_openai"),
-                        "gemini": getRow("model_gemini"),
-                        "custom": getRow("model_custom")
-                    };
+        // Build CSS that hides non-active rows before JS runs.
+        $pre_paint_css = '';
+        foreach (['groq', 'openai', 'gemini'] as $p) {
+            if ($p !== $saved_provider) {
+                $pre_paint_css .= ".form-group:has([name='s_mod_ainotebook/model_{$p}']){display:none!important}";
+            }
+        }
+        if ($saved_model !== 'custom') {
+            $pre_paint_css .= ".form-group:has([name='s_mod_ainotebook/model_custom']){display:none!important}";
+        }
+        if ($saved_provider === 'moodle') {
+            $pre_paint_css .= ".form-group:has([name='s_mod_ainotebook/api_key']){display:none!important}";
+        }
 
-                    if (rows.groq) rows.groq.style.display = (provider === "groq") ? "" : "none";
-                    if (rows.openai) rows.openai.style.display = (provider === "openai") ? "" : "none";
-                    if (rows.gemini) rows.gemini.style.display = (provider === "gemini") ? "" : "none";
-                    
-                    if (rows.custom) {
-                        var currentModelEl = document.querySelector(\'[name="s_mod_ainotebook/model_\' + provider + \'"]\');
-                        rows.custom.style.display = (currentModelEl && currentModelEl.value === "custom") ? "" : "none";
-                    }
-                }
+        $pre_paint_css_json = json_encode($pre_paint_css);
 
-                providerEl.addEventListener("change", syncUI);
-                document.querySelectorAll(\'[name^="s_mod_ainotebook/model_"]\').forEach(function(el) {
-                    el.addEventListener("change", syncUI);
-                });
+        $PAGE->requires->js_init_code("
+(function () {
+    // ── Pre-paint: hide rows immediately so there is no flicker ──────────────
+    var style = document.createElement('style');
+    style.id  = 'ainb-prepaint';
+    style.textContent = {$pre_paint_css_json};
+    document.head.appendChild(style);
 
-                syncUI();
-                providerEl.dataset.ainotebookInit = "true";
-                return true;
-            };
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function getEl(name) {
+        return document.querySelector('[name=\"s_mod_ainotebook/' + name + '\"]');
+    }
+    function getRow(name) {
+        var el = getEl(name);
+        if (!el) return null;
+        return el.closest('.form-group') || el.closest('.row') || el.parentElement.parentElement;
+    }
+    function show(row, visible) {
+        if (row) row.style.display = visible ? '' : 'none';
+    }
 
-            var attempts = 0;
-            var timer = setInterval(function() {
-                attempts++;
-                if (init() || attempts > 20) clearInterval(timer);
-            }, 300);
-        })();';
-        $PAGE->requires->js_init_code($js);
+    // ── Main sync ─────────────────────────────────────────────────────────────
+    function syncUI() {
+        var providerEl = getEl('ai_provider');
+        if (!providerEl) return;
+
+        var provider = providerEl.value;
+
+        // Show only the model row that matches the current provider.
+        ['groq', 'openai', 'gemini'].forEach(function (p) {
+            show(getRow('model_' + p), p === provider);
+        });
+
+        // API key row: hide for Moodle (managed externally).
+        show(getRow('api_key'), provider !== 'moodle');
+
+        // Custom model field: show only when active provider's model = 'custom'.
+        var activeModelEl = getEl('model_' + provider);
+        show(getRow('model_custom'), !!(activeModelEl && activeModelEl.value === 'custom'));
+    }
+
+    // ── Init (wait for Moodle to render the form) ─────────────────────────────
+    function init() {
+        var providerEl = getEl('ai_provider');
+        if (!providerEl || providerEl.dataset.ainbInit) return false;
+        providerEl.dataset.ainbInit = '1';
+
+        // Remove pre-paint CSS and apply real logic.
+        var prepaint = document.getElementById('ainb-prepaint');
+        if (prepaint) prepaint.textContent = '';
+        syncUI();
+
+        providerEl.addEventListener('change', syncUI);
+
+        // Re-sync when any model dropdown changes (for the custom field).
+        document.querySelectorAll('[name^=\"s_mod_ainotebook/model_\"]').forEach(function (el) {
+            el.addEventListener('change', syncUI);
+        });
+
+        return true;
+    }
+
+    var attempts = 0;
+    var timer = setInterval(function () {
+        attempts++;
+        if (init() || attempts > 30) clearInterval(timer);
+    }, 100);
+})();
+        ");
     }
 }

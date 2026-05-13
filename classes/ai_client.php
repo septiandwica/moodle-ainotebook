@@ -29,6 +29,7 @@ class ai_client {
         $ainame = "PresMate";
 
         $system_prompt = "You are {$ainame}, an AI Study Assistant developed by President University Ecampus and supported by Tateta.\n";
+        $system_prompt .= "NOTE: The user may select multiple study materials. You MUST synthesize information from all provided files when answering or generating artifacts. If multiple files are provided, acknowledge them in your scope of knowledge.\n";
         $system_prompt .= "Current Context:\n";
         $system_prompt .= "- Student Name: {$fullname}\n";
         $system_prompt .= "- Course Title: {$course->fullname}\n";
@@ -164,7 +165,7 @@ class ai_client {
         return "I encountered an unexpected response. Please try again.";
     }
 
-    public static function get_suggestions(int $cmid, int $userid): array {
+    public static function get_suggestions(int $cmid, int $userid, array $selected_file_ids = []): array {
         global $DB;
 
         // Get instance ID.
@@ -187,7 +188,7 @@ class ai_client {
         $cached = $cache->get($cache_key);
         if ($cached !== false) return $cached;
 
-        $material = self::get_material_context($cmid);
+        $material = self::get_material_context($cmid, $selected_file_ids);
         if (empty($material)) {
             return ["Summarize this material", "What are the key points?", "Create a quiz"];
         }

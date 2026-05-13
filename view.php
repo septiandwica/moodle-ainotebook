@@ -525,16 +525,36 @@ $js .= <<<'JS'
                             if (idx < data.questions.length - 1) {
                                 showQuestion(idx + 1);
                             } else {
+                                var percent = (score / data.questions.length) * 100;
+                                var feedback = "Keep Learning!";
+                                var desc = "Every mistake is a step forward. Review the materials and try again to master the topic.";
+                                if (percent >= 100) {
+                                    feedback = "Excellent!";
+                                    desc = "Perfect score! You have a solid understanding of the materials. Well done!";
+                                } else if (percent >= 80) {
+                                    feedback = "Great Job!";
+                                    desc = "You've mastered most of the concepts. Just a few details left to polish!";
+                                } else if (percent >= 60) {
+                                    feedback = "Good Progress!";
+                                    desc = "You're on the right track. A quick review of the material should get you to the top.";
+                                }
+
                                 container.innerHTML = `
-                                    <div class="quiz-final-score">
-                                        <div class="score-circle">${score}</div>
-                                        <h4>Quiz Completed!</h4>
-                                        <p>You got <strong>${score}</strong> out of <strong>${data.questions.length}</strong> questions correct.</p>
-                                        <div style="margin-top:30px;">
-                                            <button class="btn-premium" onclick="document.getElementById(\'creator-results\').style.display=\'none\'">Close Results</button>
-                                            <button class="btn-minimal" onclick="window.renderHistoryItem(window.lastRenderedIdx)">Retake Quiz</button>
+                                    <div class="quiz-score-container">
+                                        <div class="score-circle">
+                                            <div class="score-value">${score}</div>
+                                            <div class="score-max">/ ${data.questions.length}</div>
                                         </div>
+                                        <div class="score-feedback">${feedback}</div>
+                                        <p class="score-desc">${desc}</p>
+                                        <div class="retake-action-area" style="display:flex; justify-content:center;"></div>
                                     </div>`;
+                                
+                                var retakeBtn = document.createElement("button");
+                                retakeBtn.className = "btn-premium btn-retake";
+                                retakeBtn.innerHTML = "<i class=\'fa fa-refresh\'></i> Retake Quiz";
+                                retakeBtn.onclick = function() { renderQuiz(data); };
+                                container.querySelector(".retake-action-area").appendChild(retakeBtn);
                             }
                         };
                         qDiv.appendChild(nextBtn);
@@ -772,9 +792,15 @@ $js .= <<<'JS'
             container.innerHTML = "<div class='loading-suggestions'><i class='fa fa-circle-o-notch fa-spin'></i> Thinking...</div>";
             lastAi.parentNode.insertBefore(container, lastAi.nextSibling);
 
+            var selectedFiles = [];
+            document.querySelectorAll(".file-checkbox:checked").forEach(function(cb) {
+                selectedFiles.push(cb.value);
+            });
+
             var formData = new FormData();
             formData.append("cmid", cmid);
             formData.append("sesskey", sesskey);
+            formData.append("selected_files", JSON.stringify(selectedFiles));
 
             fetch(wwwroot + "/mod/ainotebook/suggestions_ajax.php?t=" + Date.now(), {
                 method: "POST",

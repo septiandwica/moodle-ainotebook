@@ -17,7 +17,10 @@ $course = $DB->get_record('course', array('id' => $cm->course), '*', MUST_EXIST)
 require_login($course, true, $cm);
 require_sesskey();
 
-$suggestions = \mod_ainotebook\ai_client::get_suggestions($cmid, $USER->id);
+$selected_files = optional_param('selected_files', '[]', PARAM_RAW);
+$file_ids = json_decode($selected_files, true) ?: [];
+
+$suggestions = \mod_ainotebook\ai_client::get_suggestions($cmid, $USER->id, $file_ids);
 
 echo json_encode([
     'success' => true,

@@ -226,13 +226,13 @@ class ai_client {
 
             if ($result === null) {
                 debugging("ainotebook: null JSON from gemini. Raw: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);
-                return "The AI service returned an invalid response. (Ref: JSON_NULL)";
+                return "The AI service returned an invalid response. Please try again.";
             }
 
             if (isset($result->error)) {
                 $error_msg = $result->error->message ?? 'Unknown error';
                 debugging("ainotebook Gemini API Error: " . $error_msg, DEBUG_DEVELOPER);
-                return "AI Error: " . $error_msg . " (Ref: Gemini " . ($result->error->code ?? '403') . ")";
+                return "AI Error: " . $error_msg;
             }
 
             if (isset($result->candidates[0]->content->parts[0]->text)) {
@@ -255,7 +255,7 @@ class ai_client {
                 if ($err_code === 429 || stripos($err, 'rate limit') !== false || stripos($err, 'quota') !== false) {
                     return "I am currently receiving too many requests. Please wait a moment before asking again.";
                 }
-                return "The AI service returned an error. Please try again or contact your administrator. (Ref: HTTP {$err_code})";
+                return "The AI service returned an error. Please try again or contact your administrator.";
             }
 
             debugging("ainotebook: unexpected response shape from gemini: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);
@@ -306,7 +306,7 @@ class ai_client {
             // [FIX] Log the raw response in dev mode so we can always see what came back.
             if ($result === null) {
                 debugging("ainotebook: null JSON from {$provider}. Raw: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);
-                return "I encountered an unexpected response from the AI service. Please try again.";
+                return "I encountered an unexpected response. Please try again.";
             }
 
             if (isset($result->choices[0]->message->content)) {
@@ -332,7 +332,7 @@ class ai_client {
                     return "I am currently receiving too many requests. Please wait a moment before asking again.";
                 }
                 // Show a sanitised but informative error for everything else.
-                return "The AI service returned an error. Please try again or contact your administrator. (Ref: {$err_type})";
+                return "The AI service returned an error. Please try again or contact your administrator.";
             }
 
             debugging("ainotebook: unexpected response shape from {$provider}: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);

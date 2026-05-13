@@ -179,9 +179,7 @@ JS;
 $js .= "\n    var cmid = " . $cm->id . ";\n";
 $js .= "    var sesskey = '" . $sesskey . "';\n";
 $js .= "    var wwwroot = '" . $CFG->wwwroot . "';\n";
-$js .= "    var studentName = '" . addslashes(fullname($USER)) . "';\n";
-$js .= "    var notebookName = '" . addslashes($ainotebook->name) . "';\n";
-$js .= "    var savedArtifacts = " . $saved_json . ";\n";
+$js .= "    var studentName = '" . addslashes(fullname($USER)) . "';\n    var studentId = '" . addslashes($USER->idnumber ?: $USER->id) . "';\n    var notebookName = '" . addslashes($ainotebook->name) . "';\n    var savedArtifacts = " . $saved_json . ";\n";
 $js .= <<<'JS'
 
     console.log("AI Notebook JS Loaded. CMID: " + cmid);
@@ -574,29 +572,33 @@ $js .= <<<'JS'
         };
 
         var prepareFormalHeader = function(title) {
-            var now = new Date().toLocaleString();
-            return `<div class="formal-pdf-header">
-                <div class="pdf-logo-section">
-                    <img src="${wwwroot}/mod/ainotebook/pix/icon.svg" class="pdf-brand-logo">
-                    <div class="pdf-brand-text">
-                        <h1 class="pdf-university-name">PRESIDENT UNIVERSITY</h1>
-                        <p class="pdf-system-name">Ecampus AI Learning Intelligence</p>
+            var now = new Date().toLocaleDateString();
+            return `
+            <div class="pdf-cover-page">
+                <div class="pdf-cover-logo">
+                    <img src="${wwwroot}/mod/ainotebook/pix/icon.svg" class="pdf-brand-logo-large">
+                    <div class="pdf-brand-text-large">
+                        <h1 class="pdf-univ-title">PRESIDENT</h1>
+                        <h1 class="pdf-univ-subtitle">UNIVERSITY</h1>
                     </div>
                 </div>
-                <div class="pdf-accent-line"></div>
-                <div class="pdf-meta-container">
-                    <div class="pdf-meta-row">
-                        <div class="meta-item"><strong>STUDENT:</strong> <span>${studentName}</span></div>
-                        <div class="meta-item"><strong>NOTEBOOK:</strong> <span>${notebookName}</span></div>
-                    </div>
-                    <div class="pdf-meta-row">
-                        <div class="meta-item"><strong>DATE:</strong> <span>${now}</span></div>
-                        <div class="meta-item"><strong>CREDENTIAL:</strong> <span>Verified AI Transcript</span></div>
+                
+                <div class="pdf-cover-main">
+                    <h1 class="pdf-report-title">COMPREHENSIVE STUDY REPORT:</h1>
+                    <h1 class="pdf-report-subject">${title.toUpperCase()}</h1>
+                </div>
+
+                <div class="pdf-cover-footer">
+                    <div class="pdf-info-card">
+                        <div class="info-row"><strong>STUDENT:</strong> ${studentName}</div>
+                        <div class="info-row"><strong>STUDENT ID:</strong> ${studentId}</div>
+                        <div class="info-row"><strong>DATE:</strong> ${now}</div>
                     </div>
                 </div>
-                <div class="pdf-title-banner">
-                    <h2>${title.toUpperCase()}</h2>
-                </div>
+            </div>
+            <div class="pdf-page-header">
+                <div class="pdf-page-number">Page 2 of X</div>
+                <div class="pdf-header-label">STUDY REPORT</div>
             </div>`;
         };
 

@@ -589,7 +589,6 @@ $js .= <<<'JS'
         var prepareFormalHeader = function(title) {
             var now = new Date().toLocaleDateString();
             return `
-            <div class="pdf-page-number-footer">Page <span class="page-num"></span> of <span class="page-total"></span></div>
             <div class="pdf-cover-page">
                 <div class="pdf-cover-logo">
                     <img src="${pdfLogoUrl}" class="pdf-brand-logo-large">

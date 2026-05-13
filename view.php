@@ -179,7 +179,22 @@ JS;
 $js .= "\n    var cmid = " . $cm->id . ";\n";
 $js .= "    var sesskey = '" . $sesskey . "';\n";
 $js .= "    var wwwroot = '" . $CFG->wwwroot . "';\n";
-$js .= "    var studentName = '" . addslashes(fullname($USER)) . "';\n    var studentId = '" . addslashes($USER->idnumber ?: $USER->id) . "';\n    var notebookName = '" . addslashes($ainotebook->name) . "';\n    var savedArtifacts = " . $saved_json . ";\n";
+
+    // [DYNAMIC LOGO] Check for custom uploaded logo.
+    $pdf_logo_url = '';
+    $fs = get_file_storage();
+    $context_system = context_system::instance();
+    $logo_files = $fs->get_area_files($context_system->id, 'mod_ainotebook', 'pdf_logo', 0, 'itemid, filepath, filename', false);
+    if ($logo_files) {
+        $logo_file = reset($logo_files);
+        $pdf_logo_url = moodle_url::make_pluginfile_url($logo_file->get_contextid(), $logo_file->get_component(), $logo_file->get_filearea(), $logo_file->get_itemid(), $logo_file->get_filepath(), $logo_file->get_filename())->out(false);
+    } else {
+        $pdf_logo_url = $CFG->wwwroot . '/mod/ainotebook/pix/presunivlogo.png';
+    }
+
+    $js .= "    var pdfLogoUrl = '" . $pdf_logo_url . "';\n";
+    $js .= "    var studentName = '" . addslashes(fullname($USER)) . "';\n";
+    $js .= "    var studentId = '" . addslashes($USER->idnumber ?: $USER->id) . "';\n    var notebookName = '" . addslashes($ainotebook->name) . "';\n    var savedArtifacts = " . $saved_json . ";\n";
 $js .= <<<'JS'
 
     console.log("AI Notebook JS Loaded. CMID: " + cmid);
@@ -574,9 +589,10 @@ $js .= <<<'JS'
         var prepareFormalHeader = function(title) {
             var now = new Date().toLocaleDateString();
             return `
+            <div class="pdf-page-number-footer">Page <span class="page-num"></span> of <span class="page-total"></span></div>
             <div class="pdf-cover-page">
                 <div class="pdf-cover-logo">
-                    <img src="${wwwroot}/mod/ainotebook/pix/icon.svg" class="pdf-brand-logo-large">
+                    <img src="${pdfLogoUrl}" class="pdf-brand-logo-large">
                     <div class="pdf-brand-text-large">
                         <h1 class="pdf-univ-title">PRESIDENT</h1>
                         <h1 class="pdf-univ-subtitle">UNIVERSITY</h1>
@@ -597,7 +613,6 @@ $js .= <<<'JS'
                 </div>
             </div>
             <div class="pdf-page-header">
-                <div class="pdf-page-number">Page 2 of X</div>
                 <div class="pdf-header-label">STUDY REPORT</div>
             </div>`;
         };

@@ -158,11 +158,30 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
 .btn-icon:hover { background: var(--pres-primary-soft); color: var(--pres-primary); }
 
 /* PDF Export Elements & Print Styles */
-.pdf-cover-page, .pdf-page-header { display: none; }
+.pdf-cover-page, .pdf-page-header, .pdf-page-number-footer { display: none; }
 
 @media print {
     /* Font forced for print */
     * { font-family: 'Poppins', sans-serif !important; }
+
+    /* Page numbering logic */
+    body { counter-reset: page; }
+    
+    .pdf-page-number-footer { 
+        display: block !important;
+        position: fixed;
+        bottom: 20px;
+        right: 40px;
+        font-size: 0.8rem;
+        color: #64748b;
+        font-weight: 700;
+        z-index: 9999;
+    }
+    .pdf-page-number-footer .page-num::after { counter-increment: page; content: counter(page); }
+    /* Note: "of X" total pages is not natively possible in most browsers without JS, 
+       but we can at least show "Page X" or hardcode "Page X of Y" if needed. 
+       Removing the "total" part for accuracy. */
+    .pdf-page-number-footer .page-total { display: none; }
 
     /* Hide UI */
     #page-header, #page-footer, .navbar, .secondary-navigation, #nav-drawer, .settings-menu, .breadcrumb, 
@@ -197,10 +216,8 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
         box-sizing: border-box;
     }
 
-    .pdf-cover-logo { display: flex; align-items: center; gap: 15px; margin-bottom: 80px; }
-    .pdf-brand-logo-large { height: 80px; }
-    .pdf-univ-title { margin: 0; font-size: 2.5rem; font-weight: 900; color: #003366; line-height: 0.9; }
-    .pdf-univ-subtitle { margin: 0; font-size: 2.2rem; font-weight: 400; color: #003366; line-height: 0.9; }
+    .pdf-cover-logo { margin-bottom: 80px; }
+    .pdf-brand-logo-large { height: 120px; width: auto; object-fit: contain; }
 
     .pdf-cover-main { flex: 1; display: flex; flex-direction: column; justify-content: center; }
     .pdf-report-title { font-size: 2.2rem; font-weight: 800; color: #003366; margin-bottom: 10px; }
@@ -213,7 +230,6 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
         padding: 24px 40px; 
         display: inline-block; 
         text-align: left;
-        box-shadow: 0 10px 0 #f1f5f9;
         margin-top: 50px;
     }
     .info-row { font-size: 1.1rem; color: #003366; font-weight: 600; margin-bottom: 8px; }
@@ -222,31 +238,27 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
     /* ── CONTENT PAGE HEADER ── */
     .pdf-page-header {
         display: flex !important;
-        justify-content: space-between;
+        justify-content: center;
         align-items: center;
         padding: 20px 0;
-        border-bottom: 1px solid #e2e8f0;
         margin-bottom: 40px;
-        font-size: 0.9rem;
-        font-weight: 700;
-        color: #64748b;
+        font-size: 1.1rem;
+        font-weight: 900;
+        color: #003366;
+        letter-spacing: 2px;
     }
 
-    /* ── REPORT CONTENT CARD ── */
+    /* ── REPORT CONTENT AREA ── */
     .report-markdown {
         background: #fff;
-        border: 1px solid #e2e8f0;
-        border-top: 10px solid #003366;
-        border-radius: 12px;
-        padding: 40px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        padding: 0 20px;
         min-height: 80vh;
     }
 
-    .report-markdown h1 { font-size: 2.2rem; font-weight: 900; color: #003366; margin: 0 0 30px 0; }
+    .report-markdown h1 { font-size: 2.2rem; font-weight: 900; color: #003366; margin: 0 0 30px 0; border-bottom: 5px solid #003366; padding-bottom: 10px; }
     .report-markdown h2 { font-size: 1.8rem; font-weight: 800; color: #003366; margin: 40px 0 20px 0; }
     .report-markdown h3 { font-size: 1.4rem; font-weight: 700; color: #003366; margin: 30px 0 15px 0; }
-    .report-markdown p { font-size: 11pt; line-height: 1.8; color: #334155; margin-bottom: 20px; }
+    .report-markdown p { font-size: 11pt; line-height: 1.8; color: #334155; margin-bottom: 20px; text-align: justify; }
 
     .report-markdown ul, .report-markdown ol { padding-left: 20px; margin-bottom: 24px; }
     .report-markdown li { font-size: 11pt; line-height: 1.8; color: #334155; margin-bottom: 12px; }
@@ -254,7 +266,10 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
 
     .mermaid { page-break-inside: avoid; margin: 40px 0; text-align: center; background: #f8fafc; padding: 20px; border-radius: 12px; }
 
-    @page { margin: 1.5cm; }
+    @page { margin: 2cm; }
+    
+    /* Hide footer on cover page */
+    .pdf-cover-page ~ .pdf-page-number-footer { display: block !important; }
 }
 
 ::-webkit-scrollbar { width: 5px; }

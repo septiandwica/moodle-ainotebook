@@ -18,6 +18,15 @@ if ($ADMIN->fulltree) {
         PARAM_TEXT
     ));
 
+    $settings->add(new admin_setting_configstoredfile(
+        'mod_ainotebook/pdf_logo',
+        'PDF Export Logo',
+        'Upload a custom logo for the PDF export. If empty, the default President University logo will be used.',
+        'pdf_logo',
+        0,
+        ['maxfiles' => 1, 'accepted_types' => ['.png', '.jpg', '.jpeg', '.svg']]
+    ));
+
     // ── Provider selector ─────────────────────────────────────────────────────
     $settings->add(new admin_setting_configselect(
         'mod_ainotebook/ai_provider',

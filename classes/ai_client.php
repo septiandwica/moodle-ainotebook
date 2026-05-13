@@ -30,7 +30,14 @@ class ai_client {
 
         // ── Build system prompt ───────────────────────────────────────────────
         $system_prompt  = "You are {$ainame}, an AI Study Assistant for President University Ecampus.\n";
-        $system_prompt .= "NOTE: The user may select multiple study materials. You MUST synthesize information from all provided files when answering. If multiple files are provided, acknowledge them briefly in your scope.\n";
+        $num_files = count($selected_file_ids);
+        if ($num_files === 1) {
+            $system_prompt .= "NOTE: You are analyzing ONE specific study document provided below.\n";
+        } else if ($num_files > 1) {
+            $system_prompt .= "NOTE: You are synthesizing information from {$num_files} study documents provided below. Ensure you cover key points from all sources.\n";
+        } else {
+            $system_prompt .= "NOTE: No specific study materials were selected. Assist using general knowledge of the course topic while encouraging the student to select materials from the sidebar.\n";
+        }
         $system_prompt .= "Current Context:\n";
         $system_prompt .= "- Student: {$fullname}\n";
         $system_prompt .= "- Course: {$course->fullname}\n";
@@ -552,6 +559,28 @@ class ai_client {
                         exec("pdftotext -raw -nopgbrk " . escapeshellarg($tmpfile) . " - 2>/dev/null", $output, $return_var);
                         if ($return_var === 0) {
                             $extracted = implode("\n", $output);
+                        }
+                    }
+
+                    // Strategy 3: OCR Fallback (for scanned images)
+                    if (trim($extracted) === '' || strlen(trim($extracted)) < 50) {
+                        $imgbase = $tempdir . '/' . uniqid() . '-page';
+                        // Convert first 3 pages to high-res images (300 DPI)
+                        exec("pdftoppm -f 1 -l 3 -r 300 " . escapeshellarg($tmpfile) . " " . escapeshellarg($imgbase) . " 2>/dev/null");
+                        
+                        $ocr_text = "";
+                        $images = glob($imgbase . "-*.ppm");
+                        sort($images); 
+                        
+                        foreach ($images as $img) {
+                            $output_ocr = [];
+                            exec("tesseract " . escapeshellarg($img) . " stdout 2>/dev/null", $output_ocr);
+                            $ocr_text .= implode("\n", $output_ocr) . "\n";
+                            @unlink($img); 
+                        }
+                        
+                        if (strlen(trim($ocr_text)) > 50) {
+                            $extracted = "[OCR Extracted Text]:\n" . $ocr_text;
                         }
                     }
 

@@ -73,8 +73,20 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
 
 /* Creator Hub Workspace */
 .creator-hub-card { background: var(--pres-surface); border: 1px solid var(--pres-border); border-radius: 16px; overflow: hidden; margin-top: 24px; }
-.creator-header-action { padding: 20px 24px; background: var(--pres-surface); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--pres-border); }
-.creator-header-action h3 { margin: 0; font-size: 1rem; font-weight: 800; color: var(--pres-primary); text-transform: uppercase; }
+.creator-header-action { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    padding: 20px 24px; 
+    background: var(--pres-bg-card); 
+    border-bottom: 1px solid var(--pres-border); 
+    z-index: 10;
+}
+.chat-brand-section { display: flex; align-items: center; gap: 14px; }
+.chat-brand-icon { height: 32px; width: 32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
+
+.chat-info h2 { margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--pres-primary); letter-spacing: -0.5px; line-height: 1; }
+.chat-subtitle { margin: 2px 0 0 0; font-size: 0.75rem; color: var(--pres-text-dim); font-weight: 500; }
 .creator-content { padding: 24px; transition: all 0.3s ease; }
 
 .creator-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }

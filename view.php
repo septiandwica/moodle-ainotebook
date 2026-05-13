@@ -75,9 +75,12 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
         <!-- Chat Panel: The AI Interface -->
         <div class="ainotebook-chat">
             <div class="chat-header">
-                <div class="chat-info">
-                    <h2><?php echo s($ai_name); ?></h2>
-                    <p class="chat-subtitle">Your AI Study Assistant by President University</p>
+                <div class="chat-brand-section">
+                    <img src="<?php echo $CFG->wwwroot; ?>/mod/ainotebook/pix/icon.svg" class="chat-brand-icon">
+                    <div class="chat-info">
+                        <h2><?php echo s($ai_name); ?></h2>
+                        <p class="chat-subtitle">Your AI Study Assistant by President University</p>
+                    </div>
                 </div>
                 <button id="open-settings" class="btn-icon" title="Configure Chat"><i class="fa fa-cog"></i></button>
             </div>

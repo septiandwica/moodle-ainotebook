@@ -418,7 +418,7 @@ class ai_client {
 
         // [SECURE] Do not show AI Error messages as smart suggestions.
         if (empty($response) || stripos($response, 'AI Error') !== false || stripos($response, 'The AI service') !== false || stripos($response, 'I encountered') !== false) {
-            $response = "Summarize this material\nWhat are the key points?\nCreate a quiz";
+            $response = "The AI service is currently unavailable. Please try again later.";
         }
 
         $suggestions = array_filter(array_map('trim', explode("\n", $response)));

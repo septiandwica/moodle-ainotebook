@@ -1,7 +1,7 @@
 <?php
 /**
  * @package    mod_ainotebook
- * @copyright  2024 Tateta
+ * @copyright  2026 Tateta (samastanuswantara.com)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -31,19 +31,29 @@ class ai_client {
         $ainame           = "PresMate";
 
         // ── Build system prompt ───────────────────────────────────────────────
-        $system_prompt  = "You are {$ainame}, an AI Study Assistant for President University Ecampus.\n";
+        $course_context = self::get_context_material($cmid);
+        
+        $system_prompt = "You are {$ainame}, an AI Study Assistant for President University Ecampus.\n";
+        $system_prompt .= $course_context;
         $num_files = count($selected_file_ids);
         if ($num_files === 1) {
             $system_prompt .= "NOTE: You are analyzing ONE specific study document provided below.\n";
         } else if ($num_files > 1) {
             $system_prompt .= "NOTE: You are synthesizing information from {$num_files} study documents provided below. Ensure you cover key points from all sources.\n";
         } else {
-            $system_prompt .= "NOTE: No specific study materials were selected. Assist using general knowledge of the course topic while encouraging the student to select materials from the sidebar.\n";
+            $system_prompt .= "NOTE: No specific study materials were selected. Please remind the student to select materials from the sidebar or upload materials if they haven't.\n";
         }
         $system_prompt .= "Current Context:\n";
         $system_prompt .= "- Student: {$fullname}\n";
         $system_prompt .= "- Course: {$course->fullname}\n";
         $system_prompt .= "- Topic: {$ainotebook->name}\n";
+        
+        $system_prompt .= "\n--- STRICT RULE: NO GENERAL ANSWERS ---\n";
+        $system_prompt .= "You are DEMI Tutor, an AI restricted strictly to answering questions about the uploaded course materials for this specific Moodle page. If a student asks about exam schedules, graduation requirements, financial administration, or personal academic records, do not attempt to answer. Instead, trigger the following standard rejection response verbatim:\n";
+        $system_prompt .= "\"I'm sorry, but that is out of my context! I am DEMI Tutor, and I can only help you master your current course materials, quizzes, summaries, and mindmaps. For scheduling, grades, and academic administration, please chat with DEMI Admin in PUIS.\"\n";
+        $system_prompt .= "You MUST ONLY answer questions using the information provided in the COURSE CONTEXT MATERIAL and STUDY MATERIALS.\n";
+        $system_prompt .= "If the user asks a question (e.g., general math like 2+2, or unrelated topics) that is NOT covered in the provided materials, you MUST politely refuse to answer and state that you are an exclusive assistant for this course and can only answer questions based on the provided materials.\n";
+        $system_prompt .= "DO NOT provide general answers for outside topics. DO NOT say 'This is outside the materials, but here is a general answer'. You must REFUSE completely.\n";
 
         if (!empty($material_context)) {
             $system_prompt .= "\n[STUDY MATERIALS (OCR/TEXT FALLBACK)]: \n{$material_context}\n";
@@ -73,8 +83,8 @@ class ai_client {
 
         $system_prompt .= "1. IDENTITY: Start directly with the answer. Do NOT introduce yourself or state who developed you UNLESS explicitly asked 'who are you?' or 'who developed you?'. If asked, answer: 'I am an assistant model developed by President University Ecampus and supported by Tateta.'\n";
 
-        // ── [IMPROVED] Scope rule – less rigid, graceful fallback ─────────────
-        $system_prompt .= "2. SCOPE: Prioritize information from the provided study materials. If the question is directly covered by them, answer only from those sources. If the question is a general academic question not explicitly in the materials, you may answer briefly and note: 'This is outside the provided study materials, but here is a general answer.' For completely off-topic or non-academic requests, politely decline: 'I apologize, but I can only assist with academic questions related to this course. How can I help you with your study materials?'\n";
+        // ── STRICT Scope rule ─────────────
+        $system_prompt .= "2. SCOPE: [STRICT RULE] You are strictly limited to the provided study materials. If a question is outside the context, you MUST output the verbatim rejection response defined above.\n";
 
         $system_prompt .= "3. LANGUAGE: [STRICT RULE] By default, ALL responses and generated artifacts (Quizzes, Mindmaps, Reports, Suggestions) MUST be in 100% English. Even if the study material is in Indonesian or another language, you MUST translate your knowledge into English. Only use another language (like Indonesian) if the student explicitly asks you to do so in their current message.\n";
 
@@ -87,6 +97,7 @@ class ai_client {
         $system_prompt .= "8. REPORT: Provide a professional, detailed, and minimalist English markdown report. Wrap it in '[REPORT_START]' and '[REPORT_END]'.\n";
         $system_prompt .= "9. FORMATTING: Always ensure the artifact wrappers (```json-quiz, ```mermaid, [REPORT_START]) are present so the system can detect them.\n";
         $system_prompt .= "10. BEHAVIOR: ONLY generate a 'quiz', 'report', or 'mindmap' if the user explicitly asks for it by name. For all other questions, respond with standard text only.\n";
+        $system_prompt .= "11. ADAPTIVE LEARNING: Monitor the student's understanding. If the student answers questions incorrectly or shows confusion on a specific topic, proactively recommend specific pages or sections from the uploaded study materials (e.g., 'Sepertinya kamu kurang paham di Bab 3, saya sarankan baca kembali halaman 12-15 dari dokumen dosen.').\n";
 
         // ── Fetch conversation history ─────────────────────────────────────────
         $history = $DB->get_records(
@@ -148,7 +159,7 @@ class ai_client {
     /**
      * @param  array $history  Ordered (oldest-first) records from ainotebook_chat.
      */
-    protected static function custom_provider_request(
+    public static function custom_provider_request(
         string $provider,
         string $system_prompt,
         string $user_message,
@@ -174,6 +185,8 @@ class ai_client {
             return "Error: API Key is missing. Please set it in Site Administration > Plugins > Activity Modules > AI Notebook.";
         }
 
+        global $CFG;
+        require_once($CFG->libdir . '/filelib.php');
         $curl = new \curl();
         $curl->setopt([
             'CURLOPT_SSL_VERIFYPEER' => false,
@@ -232,6 +245,10 @@ class ai_client {
             if (isset($result->error)) {
                 $error_msg = $result->error->message ?? 'Unknown error';
                 debugging("ainotebook Gemini API Error: " . $error_msg, DEBUG_DEVELOPER);
+                
+                if (stripos($error_msg, 'quota') !== false || stripos($error_msg, 'rate limit') !== false || stripos($error_msg, '429') !== false) {
+                    return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
+                }
                 return "The AI service is currently unavailable. Please try again later.";
             }
 
@@ -253,7 +270,7 @@ class ai_client {
                 debugging("ainotebook API error (gemini) [HTTP {$err_code}]: {$err}", DEBUG_DEVELOPER);
 
                 if ($err_code === 429 || stripos($err, 'rate limit') !== false || stripos($err, 'quota') !== false) {
-                    return "I am currently receiving too many requests. Please wait a moment before asking again.";
+                    return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
                 }
                 return "The AI service is currently unavailable. Please try again later.";
             }
@@ -328,8 +345,8 @@ class ai_client {
                 debugging("ainotebook API error ({$provider}) [{$err_type}]: {$err}", DEBUG_DEVELOPER);
 
                 // Only show rate-limit message for actual rate limit errors.
-                if (stripos($err_type, 'rate_limit') !== false || stripos($err, 'rate limit') !== false) {
-                    return "I am currently receiving too many requests. Please wait a moment before asking again.";
+                if (stripos($err_type, 'rate_limit') !== false || stripos($err, 'rate limit') !== false || stripos($err, 'quota') !== false) {
+                    return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
                 }
                 // Show a sanitised but informative error for everything else.
                 return "The AI service is currently unavailable. Please try again later.";
@@ -379,7 +396,7 @@ class ai_client {
         $material_data = self::get_material_context($cmid, $selected_file_ids);
         $material      = $material_data['text'] ?? "";
         if (empty($material)) {
-            return ["Summarize this material", "What are the key points?", "Create a quiz"];
+            return [];
         }
 
         $system_prompt = "You are a helpful academic assistant. Suggest 3 brief follow-up questions a student might ask next. STRICT RULES: Each suggestion MUST NOT EXCEED 10 WORDS. Each suggestion MUST be in English. Reply ONLY with the questions, one per line. No numbers, no bullet points, no preamble.";
@@ -416,31 +433,174 @@ class ai_client {
             $response = self::custom_provider_request($provider, $system_prompt, $user_prompt);
         }
 
-        // [SECURE] Do not show AI Error messages as smart suggestions.
-        if (empty($response) || stripos($response, 'AI Error') !== false || stripos($response, 'The AI service') !== false || stripos($response, 'I encountered') !== false) {
-            $response = "The AI service is currently unavailable. Please try again later.";
+        if (empty($response) || stripos($response, 'AI Error') !== false || stripos($response, 'The AI service') !== false || stripos($response, 'I encountered') !== false || stripos($response, 'I am having') !== false || stripos($response, 'DEMI Tutor is currently assisting') !== false) {
+            $suggestions = []; // Force empty to trigger fallback
+        } else {
+            $suggestions = array_filter(array_map('trim', explode("\n", $response)));
+            $suggestions = array_values(array_slice($suggestions, 0, 3));
+
+            // Enforce word count limit as a backend safety net.
+            $suggestions = array_map(function (string $s): string {
+                $words = preg_split('/\s+/', $s);
+                return count($words) > 10 ? implode(' ', array_slice($words, 0, 10)) : $s;
+            }, $suggestions);
         }
 
-        $suggestions = array_filter(array_map('trim', explode("\n", $response)));
-        $suggestions = array_values(array_slice($suggestions, 0, 3));
-
-        // Enforce word count limit as a backend safety net.
-        $suggestions = array_map(function (string $s): string {
-            $words = preg_split('/\s+/', $s);
-            return count($words) > 10 ? implode(' ', array_slice($words, 0, 10)) : $s;
-        }, $suggestions);
-
-        if (empty($suggestions)) {
-            $suggestions = ["Summarize this", "What are the key points?", "Make a quiz"];
-        }
+        // If suggestions are empty, we return an empty array instead of fallback defaults.
 
         $cache->set($cache_key, $suggestions);
         return $suggestions;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Material context extraction
+    // Material context extraction (RAG)
     // ─────────────────────────────────────────────────────────────────────────
+    
+    public static function get_context_material(int $cmid): string {
+        $cm = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
+        $context = \context_module::instance($cmid);
+        
+        $fs = get_file_storage();
+        $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id ASC', false);
+        
+        if (empty($files)) {
+            return "";
+        }
+        
+        $context_text = "\n\n--- COURSE CONTEXT MATERIAL (MUST USE THIS KNOWLEDGE TO ANSWER QUESTIONS) ---\n";
+        foreach ($files as $file) {
+            $filename = $file->get_filename();
+            $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+            
+            if ($ext === 'txt') {
+                $context_text .= "\n[Document: $filename]\n";
+                $context_text .= $file->get_content();
+            } else if ($ext === 'pdf') {
+                $tmpdir = make_request_directory();
+                $tmppath = $tmpdir . '/' . $filename;
+                $file->copy_content_to($tmppath);
+                $outpath = $tmpdir . '/out.txt';
+                
+                exec("pdftotext " . escapeshellarg($tmppath) . " " . escapeshellarg($outpath), $output, $return_var);
+                if ($return_var === 0 && file_exists($outpath)) {
+                    $context_text .= "\n[Document: $filename]\n";
+                    $context_text .= file_get_contents($outpath);
+                }
+            }
+        }
+        $context_text .= "\n---------------------------------------------------------------------------\n";
+        return $context_text;
+    }
+
+    public static function evaluate_student(int $cmid, int $target_userid): array {
+        global $DB;
+        
+        $cm = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
+        $ainotebookid = $cm->instance;
+        $target_user = $DB->get_record('user', ['id' => $target_userid], '*', MUST_EXIST);
+        
+        $history = $DB->get_records('ainotebook_chat', ['ainotebookid' => $ainotebookid, 'userid' => $target_userid], 'timecreated ASC', '*', 0, 50);
+        $artifacts = $DB->get_records('ainotebook_artifacts', ['ainotebookid' => $ainotebookid, 'userid' => $target_userid], 'timecreated ASC');
+        
+        if (empty($history) && empty($artifacts)) {
+            return [
+                'score' => 0,
+                'understanding' => 'No activity found.',
+                'activity_summary' => 'The student has not interacted with the AI yet.',
+                'recommendation' => 'Encourage the student to start asking questions.'
+            ];
+        }
+        
+        $user_prompt = "Student Name: " . fullname($target_user) . "\n\n";
+        $user_prompt .= "--- CHAT HISTORY ---\n";
+        foreach ($history as $h) {
+            $user_prompt .= "Student: " . $h->message . "\n";
+        }
+        $user_prompt .= "\n--- GENERATED ARTIFACTS ---\n";
+        foreach ($artifacts as $a) {
+            $user_prompt .= "- Type: " . $a->type . ", Title: " . $a->title . "\n";
+        }
+        
+        $system_prompt = "You are an Academic Evaluator. Your task is to analyze a student's interaction history with an AI study assistant and evaluate their learning progress.\n";
+        $system_prompt .= "Based on their questions and the artifacts they generated, determine their level of understanding, activity, and assign a score.\n";
+        $system_prompt .= "STRICT INSTRUCTIONS:\n";
+        $system_prompt .= "1. You MUST respond ONLY with a raw JSON object.\n";
+        $system_prompt .= "2. DO NOT wrap the JSON in markdown code blocks (no ```json ... ```). Output the JSON directly.\n";
+        $system_prompt .= "3. The JSON must exactly match this structure:\n";
+        $system_prompt .= "{\n";
+        $system_prompt .= "  \"score\": <integer between 0 and 100>,\n";
+        $system_prompt .= "  \"understanding\": \"<2-3 sentences evaluating their comprehension based on the depth of their questions>\",\n";
+        $system_prompt .= "  \"activity_summary\": \"<1-2 sentences summarizing their activity level and artifacts>\",\n";
+        $system_prompt .= "  \"recommendation\": \"<1 sentence actionable advice for the teacher>\"\n";
+        $system_prompt .= "}\n";
+        
+        $provider = get_config('mod_ainotebook', 'ai_provider');
+        
+        if ($provider === 'moodle') {
+            $flat_prompt = $system_prompt . "\n\n" . $user_prompt;
+            $aimanager   = \core\di::get(\core_ai\manager::class);
+            $cm_context  = \context_module::instance($cmid);
+            $action   = new \core_ai\aiactions\generate_text(
+                contextid:  $cm_context->id,
+                userid:     $target_userid,
+                prompttext: $flat_prompt
+            );
+            $response_obj = $aimanager->process_action($action);
+            if ($response_obj->get_success()) {
+                $data     = $response_obj->get_response_data();
+                $response = $data['generatedcontent'];
+            } else {
+                $response = "";
+            }
+        } else {
+            $response = self::custom_provider_request($provider, $system_prompt, $user_prompt);
+        }
+        
+        $response = preg_replace('/^```json\s*/', '', $response);
+        $response = preg_replace('/```$/', '', trim($response));
+        
+        $json = json_decode($response, true);
+        if (!$json || !isset($json['score'])) {
+            $is_rate_limit = (stripos($response, 'DEMI Tutor is currently assisting') !== false || stripos($response, 'AI service is currently unavailable') !== false);
+            
+            $json = [
+                'score' => 0,
+                'understanding' => $is_rate_limit ? 'DEMI Tutor is currently assisting many students. Please wait a few moments and try again.' : 'Error parsing AI evaluation.',
+                'activity_summary' => $is_rate_limit ? 'Evaluation paused due to high system load.' : 'Could not generate summary.',
+                'recommendation' => 'Try generating again later.'
+            ];
+        }
+        
+        $eval = $DB->get_record('ainotebook_evals', ['ainotebookid' => $ainotebookid, 'userid' => $target_userid]);
+        if ($eval) {
+            $eval->score = (int)$json['score'];
+            $eval->insight_json = json_encode($json);
+            $eval->timemodified = time();
+            $DB->update_record('ainotebook_evals', $eval);
+        } else {
+            $eval = new \stdClass();
+            $eval->ainotebookid = $ainotebookid;
+            $eval->userid = $target_userid;
+            $eval->score = (int)$json['score'];
+            $eval->insight_json = json_encode($json);
+            $eval->timecreated = time();
+            $eval->timemodified = time();
+            $DB->insert_record('ainotebook_evals', $eval);
+        }
+        
+        // Push the score to the Moodle Gradebook
+        require_once(__DIR__ . '/../lib.php');
+        $ainotebook = $DB->get_record('ainotebook', ['id' => $ainotebookid], '*', MUST_EXIST);
+        $ainotebook->cmidnumber = $cm->idnumber;
+        
+        $grade = new \stdClass();
+        $grade->userid = $target_userid;
+        $grade->rawgrade = (float)$json['score'];
+        \ainotebook_grade_item_update($ainotebook, $grade);
+        
+        return $json;
+    }
+
 
 
     // ─────────────────────────────────────────────────────────────────────────

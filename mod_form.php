@@ -1,7 +1,7 @@
 <?php
 /**
  * @package    mod_ainotebook
- * @copyright  2024 Tateta
+ * @copyright  2026 Tateta (samastanuswantara.com)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -32,6 +32,8 @@ class mod_ainotebook_mod_form extends moodleform_mod {
 
         $mform->addElement('filemanager', 'files_filemanager', get_string('files'), null, $filemanageroptions);
 
+        $this->standard_grading_coursemodule_elements();
+        
         $this->standard_coursemodule_elements();
 
         $this->add_action_buttons();

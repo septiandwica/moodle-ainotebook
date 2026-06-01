@@ -1,7 +1,7 @@
 <?php
 /**
  * @package    mod_ainotebook
- * @copyright  2024 Tateta
+ * @copyright  2026 Tateta (samastanuswantara.com)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -30,4 +30,16 @@ $capabilities = [
             'manager' => CAP_ALLOW
         ]
     ],
+
+    'mod/ainotebook:viewprogress' => [
+        'riskbitmask' => RISK_PERSONAL,
+        'captype' => 'read',
+        'contextlevel' => CONTEXT_MODULE,
+        'archetypes' => [
+            'teacher' => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+            'manager' => CAP_ALLOW
+        ]
+    ],
 ];
+

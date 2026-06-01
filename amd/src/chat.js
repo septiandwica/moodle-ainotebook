@@ -1,6 +1,6 @@
 /**
  * AI Notebook Chat JS (Standard Moodle AJAX)
- * @copyright 2024 Tateta
+ * @copyright 2026 Tateta (samastanuswantara.com)
  */
 
 define(['jquery', 'core/ajax', 'core/notification'], function($, Ajax, Notification) {

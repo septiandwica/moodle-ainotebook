@@ -1,7 +1,7 @@
 <?php
 /**
  * @package    mod_ainotebook
- * @copyright  2024 Tateta
+ * @copyright  2026 Tateta (samastanuswantara.com)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 

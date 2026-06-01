@@ -1,7 +1,7 @@
 <?php
 /**
  * @package    mod_ainotebook
- * @copyright  2024 Tateta
+ * @copyright  2026 Tateta (samastanuswantara.com)
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -14,10 +14,22 @@ $cm = get_coursemodule_from_id('ainotebook', $id, 0, false, MUST_EXIST);
 $course = $DB->get_record('course', array('id' => $cm->course), '*', MUST_EXIST);
 $ainotebook = $DB->get_record('ainotebook', array('id' => $cm->instance), '*', MUST_EXIST);
 $config = get_config('mod_ainotebook');
-$ai_name = $config->ai_name ?? 'PresMate';
+$ai_name = empty($config->ai_name) ? 'DEMI TUTOR' : $config->ai_name;
 
 require_login($course, true, $cm);
 $context = context_module::instance($cm->id);
+
+$viewself = optional_param('viewself', 0, PARAM_INT);
+$req_userid = optional_param('userid', 0, PARAM_INT);
+
+$is_teacher = has_capability('mod/ainotebook:viewprogress', $context);
+$is_readonly = false;
+$target_user = $USER;
+
+if ($is_teacher && $req_userid && $req_userid != $USER->id) {
+    $target_user = $DB->get_record('user', ['id' => $req_userid], '*', MUST_EXIST);
+    $is_readonly = true;
+}
 
 $sesskey = sesskey();
 $PAGE->set_url('/mod/ainotebook/view.php', array('id' => $id));
@@ -36,11 +48,32 @@ echo '<link rel="stylesheet" href="styles.css?v=' . time() . '">';
 echo '<script src="' . $CFG->wwwroot . '/mod/ainotebook/js/marked.min.js?v=' . time() . '"></script>';
 echo '<script src="' . $CFG->wwwroot . '/mod/ainotebook/js/mermaid.min.js?v=' . time() . '"></script>';
 
+// The teacher dashboard has been moved to report.php.
+
 // Get files.
 $fs = get_file_storage();
 $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', false);
 
 ?>
+
+<div id="ainotebook-wrapper">
+    <?php if ($is_readonly): ?>
+    <div class="readonly-banner">
+        <div class="readonly-info">
+            <i class="fa fa-eye"></i> 
+            <span><strong><?php echo get_string('readonlymode', 'mod_ainotebook'); ?></strong> - <?php echo get_string('viewingprogressfor', 'mod_ainotebook'); ?> <?php echo fullname($target_user); ?> (<?php echo s($target_user->email); ?>)</span>
+        </div>
+        <a href="?id=<?php echo $cm->id; ?>" class="btn-premium btn-small"><i class="fa fa-arrow-left"></i> <?php echo get_string('backtodashboard', 'mod_ainotebook'); ?></a>
+    </div>
+    <?php elseif ($is_teacher && $viewself): ?>
+    <div class="readonly-banner" style="background: #e0f2fe; border-color: #7dd3fc;">
+        <div class="readonly-info" style="color: #0369a1;">
+            <i class="fa fa-user"></i> 
+            <span><strong>Personal Workspace</strong> - You are currently using your own AI Notebook.</span>
+        </div>
+        <a href="?id=<?php echo $cm->id; ?>" class="btn-premium btn-small"><i class="fa fa-arrow-left"></i> <?php echo get_string('backtodashboard', 'mod_ainotebook'); ?></a>
+    </div>
+    <?php endif; ?>
 
 <div id="ainotebook-wrapper">
     <!-- Main Workspace Card: Materials + Chat -->
@@ -86,12 +119,15 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
             </div>
             <div id="chat-messages" class="chat-messages">
                 <div class="message ai">
-                    Hello <strong><?php echo s(fullname($USER)); ?></strong>! I am <strong><?php echo s($ai_name); ?></strong>, your AI Study Assistant. 
-                    I have analyzed the materials uploaded on the left. 
-                    You can ask me anything about them, or type <strong>"Make a quiz"</strong> to test your knowledge!
+                    Hi, PresUniver! I am DEMI Tutor, your course study companion. I can help you with:<br>
+                    - Explaining the lecture materials shared by your teacher.<br>
+                    - Creating quizzes for your exam practice.<br>
+                    - Summarizing long readings and complex modules.<br>
+                    - Generating mindmaps to help you visualize key concepts.<br><br>
+                    Are you ready to start? What are we studying together today?
                 </div>
                 <?php
-                $history = $DB->get_records('ainotebook_chat', ['ainotebookid' => $ainotebook->id, 'userid' => $USER->id], 'timecreated ASC');
+                $history = $DB->get_records('ainotebook_chat', ['ainotebookid' => $ainotebook->id, 'userid' => $target_user->id], 'timecreated ASC');
                 foreach ($history as $log) {
                     $clean_response = preg_replace('/```json-quiz[\s\S]*?```/', '', $log->response);
                     $clean_response = preg_replace('/```mermaid[\s\S]*?```/', '', $clean_response);
@@ -105,10 +141,10 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
                 ?>
             </div>
             <div class="input-wrapper-container">
-                <div class="input-wrapper">
-                    <input type="text" id="chat-input" placeholder="<?php echo get_string('asksomething', 'mod_ainotebook'); ?>">
+                <div class="input-wrapper" <?php if($is_readonly) echo 'style="opacity: 0.6; pointer-events: none;"'; ?>>
+                    <input type="text" id="chat-input" placeholder="<?php echo get_string('asksomething', 'mod_ainotebook'); ?>" <?php if($is_readonly) echo 'disabled'; ?>>
                     <span id="source-count" class="source-pill">0 sources</span>
-                    <button id="send-btn">
+                    <button id="send-btn" <?php if($is_readonly) echo 'disabled'; ?>>
                         <i class="fa fa-paper-plane"></i>
                     </button>
                 </div>
@@ -117,32 +153,32 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
     </div>
 
     <!-- Creator Hub Card: Separate at the bottom -->
-    <div id="creator-hub" class="creator-hub-card">
-        <div class="creator-header-action">
-            <h3>Creator</h3>
-            <button id="toggle-creator" class="btn-icon"><i class="fa fa-angle-double-up"></i></button>
+    <div id="creator-hub" class="creator-hub-card" <?php if($is_readonly) echo 'style="pointer-events: none; opacity: 0.9;"'; ?>>
+        <div class="creator-header-action" style="<?php if($is_readonly) echo 'pointer-events: auto;'; ?>">
+            <h3>Learning Tools <?php if($is_readonly) echo '<span style="font-size: 0.8rem; font-weight: normal; color: var(--pres-text-dim);">(Read-Only)</span>'; ?></h3>
+            <button id="toggle-creator" class="btn-icon" style="<?php if($is_readonly) echo 'pointer-events: auto;'; ?>"><i class="fa fa-angle-double-up"></i></button>
         </div>
-        <div id="creator-hub-content" class="creator-content collapsed">
+        <div id="creator-hub-content" class="creator-content" style="<?php if($is_readonly) echo 'pointer-events: auto;'; ?>">
             <div class="creator-grid">
                 <div class="creator-card quiz" onclick="window.sendSuggested('Generate a comprehensive quiz from my materials.', 'quiz')">
                     <div class="card-icon"><i class="fa fa-question-circle"></i></div>
                     <div class="card-info">
                         <h5>Quiz</h5>
-                        <p>Interactive test</p>
+                        <p>Practice your understanding using Interactive Quiz</p>
                     </div>
                 </div>
                 <div class="creator-card report" onclick="window.sendSuggested('Generate a detailed study report.', 'report')">
                     <div class="card-icon"><i class="fa fa-file-text-o"></i></div>
                     <div class="card-info">
-                        <h5>Report</h5>
-                        <p>Summary & Progress</p>
+                        <h5>Summary</h5>
+                        <p>Get the summary of the learning materials.</p>
                     </div>
                 </div>
                 <div class="creator-card mindmap" onclick="window.sendSuggested('Generate a mindmap structure.', 'mindmap')">
                     <div class="card-icon"><i class="fa fa-sitemap"></i></div>
                     <div class="card-info">
                         <h5>Mindmap</h5>
-                        <p>Visual Concept</p>
+                        <p>Generate a mindmap</p>
                     </div>
                 </div>
             </div>
@@ -150,7 +186,7 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
             <div class="creator-workspace">
                 <div class="creator-history-panel">
                     <div class="panel-header">
-                        <i class="fa fa-history"></i> Generated Materials
+                        <i class="fa fa-history"></i> Generated learning tools
                     </div>
                     <div id="history-list" class="history-list-items"></div>
                 </div>
@@ -172,16 +208,17 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
     </div>
 </div>
 <?php
-$saved_artifacts = $DB->get_records('ainotebook_artifacts', ['ainotebookid' => $ainotebook->id, 'userid' => $USER->id], 'timecreated DESC');
+$saved_artifacts = $DB->get_records('ainotebook_artifacts', ['ainotebookid' => $ainotebook->id, 'userid' => $target_user->id], 'timecreated DESC');
 $saved_json = json_encode(array_values($saved_artifacts));
 
 // INLINE JS INJECTION (BYPASSING AMD CACHE).
 $js = <<<'JS'
 (function() {
 JS;
-$js .= "\n    var cmid = " . $cm->id . ";\n";
+$js .= "    var cmid = " . $cm->id . ";\n";
 $js .= "    var sesskey = '" . $sesskey . "';\n";
 $js .= "    var wwwroot = '" . $CFG->wwwroot . "';\n";
+$js .= "    var activityName = " . json_encode($ainotebook->name) . ";\n";
 
     // [DYNAMIC LOGO] Check for custom uploaded logo.
     $pdf_logo_url = '';
@@ -196,8 +233,9 @@ $js .= "    var wwwroot = '" . $CFG->wwwroot . "';\n";
     }
 
     $js .= "    var pdfLogoUrl = '" . $pdf_logo_url . "';\n";
-    $js .= "    var studentName = '" . addslashes(fullname($USER)) . "';\n";
-    $js .= "    var studentId = '" . addslashes($USER->idnumber ?: $USER->id) . "';\n    var notebookName = '" . addslashes($ainotebook->name) . "';\n    var savedArtifacts = " . $saved_json . ";\n";
+    $js .= "    var studentName = '" . addslashes(fullname($target_user)) . "';\n";
+    $js .= "    var studentId = '" . addslashes($target_user->idnumber ?: $target_user->id) . "';\n    var notebookName = '" . addslashes($ainotebook->name) . "';\n    var savedArtifacts = " . $saved_json . ";\n";
+    $js .= "    var isReadonly = " . ($is_readonly ? 'true' : 'false') . ";\n";
 $js .= <<<'JS'
 
     console.log("AI Notebook JS Loaded. CMID: " + cmid);
@@ -288,8 +326,8 @@ $js .= <<<'JS'
                         <span>${art.title}</span>
                     </div>
                     <div class="history-actions">
-                        ${!art.saved ? `<button title="Save to Database" onclick="window.saveArtifact(${realIdx})"><i class="fa fa-save"></i></button>` : `<span class="saved-badge"><i class="fa fa-check-circle"></i></span>`}
-                        <button title="Delete" onclick="window.deleteArtifact(${realIdx})"><i class="fa fa-trash"></i></button>
+                        ${!art.saved && !isReadonly ? `<button title="Save to Database" onclick="window.saveArtifact(${realIdx})"><i class="fa fa-save"></i></button>` : `<span class="saved-badge"><i class="fa fa-check-circle"></i></span>`}
+                        ${!isReadonly ? `<button title="Delete" onclick="window.deleteArtifact(${realIdx})"><i class="fa fa-trash"></i></button>` : ''}
                     </div>
                 `;
                 list.appendChild(item);
@@ -473,11 +511,30 @@ $js .= <<<'JS'
             return "fa-magic";
         };
 
+        var setPrintLandscape = function(isLandscape) {
+            var styleEl = document.getElementById("print-orientation-style");
+            if (!styleEl) {
+                styleEl = document.createElement("style");
+                styleEl.id = "print-orientation-style";
+                document.head.appendChild(styleEl);
+            }
+            if (isLandscape) {
+                styleEl.innerHTML = "@media print { @page { size: landscape; margin: 0.5cm; } }";
+            } else {
+                styleEl.innerHTML = "";
+            }
+        };
+
         var renderArtifact = function(art) {
             window.lastRenderedIdx = artifactHistory.indexOf(art);
-            if (art.type === "quiz") renderQuiz(art.data);
-            if (art.type === "mindmap") renderMindmap(art.data);
-            if (art.type === "report") renderReport(art.data);
+            if (art.type === "mindmap") {
+                setPrintLandscape(true);
+                renderMindmap(art.data);
+            } else {
+                setPrintLandscape(false);
+                if (art.type === "quiz") renderQuiz(art.data);
+                if (art.type === "report") renderReport(art.data);
+            }
         };
 
         var renderQuiz = function(data) {
@@ -554,6 +611,28 @@ $js .= <<<'JS'
                                     feedback = "Good Progress!";
                                     desc = "You're on the right track. A quick review of the material should get you to the top.";
                                 }
+                                
+                                // Send score to Gradebook
+                                var formData = new FormData();
+                                formData.append("cmid", cmid);
+                                formData.append("action", "submit_quiz_grade");
+                                formData.append("score", score);
+                                formData.append("maxscore", data.questions.length);
+                                formData.append("sesskey", sesskey);
+                                fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?t=" + Date.now(), {
+                                    method: "POST",
+                                    body: formData
+                                }).then(r => r.json()).then(res => {
+                                    if(res.success) {
+                                        var p = document.createElement("p");
+                                        p.className = "gradebook-sync-msg";
+                                        p.style.color = "#00d084";
+                                        p.style.fontWeight = "bold";
+                                        p.style.marginTop = "10px";
+                                        p.innerHTML = "<i class=\'fa fa-check-circle\'></i> Score synchronized with Gradebook!";
+                                        container.querySelector(".quiz-score-container").appendChild(p);
+                                    }
+                                });
 
                                 container.innerHTML = `
                                     <div class="quiz-score-container">
@@ -602,15 +681,12 @@ $js .= <<<'JS'
                 </div>
                 
                 <div class="pdf-cover-main">
-                    <h1 class="pdf-report-title">COMPREHENSIVE STUDY REPORT:</h1>
-                    <h1 class="pdf-report-subject">${title.toUpperCase()}</h1>
+                    <h1 class="pdf-report-title">COMPREHENSIVE STUDY REPORT:<br/>${activityName.toUpperCase()}</h1>
                 </div>
 
                 <div class="pdf-cover-footer">
                     <div class="pdf-info-card">
-                        <div class="info-row"><strong>STUDENT:</strong> ${studentName}</div>
-                        <div class="info-row"><strong>STUDENT ID:</strong> ${studentId}</div>
-                        <div class="info-row"><strong>DATE:</strong> ${now}</div>
+                        <div class="info-row" style="font-weight: 800;">${studentName}</div>
                     </div>
                 </div>
             </div>
@@ -737,10 +813,10 @@ $js .= <<<'JS'
             var loadingInterval = null;
             if (!silent) {
                 var loadingMessages = [
-                    "PresMate is exploring materials...",
-                    "PresMate is analyzing context...",
-                    "PresMate is synthesizing knowledge...",
-                    "PresMate is preparing your response..."
+                    "DEMI TUTOR is exploring materials...",
+                    "DEMI TUTOR is analyzing context...",
+                    "DEMI TUTOR is synthesizing knowledge...",
+                    "DEMI TUTOR is preparing your response..."
                 ];
                 var msgIdx = 0;
                 
@@ -795,6 +871,11 @@ $js .= <<<'JS'
                             displayMsg += "\n\n*(I have also generated a " + result.type + " for you in the Creator section below)*";
                         }
                         addMessage(displayMsg, "ai");
+                    } else {
+                        if (!result.found) {
+                            resultsContainer.style.display = "block";
+                            resultsContent.innerHTML = "<div class='alert alert-warning text-center' style='margin-top:20px;'><i class='fa fa-exclamation-triangle fa-2x mb-2'></i><br><strong>Could not generate tool</strong><br>" + result.cleanText + "</div>";
+                        }
                     }
                     
                     // Clear all loading states.
@@ -818,7 +899,25 @@ $js .= <<<'JS'
                 if (typing && typing.parentNode) messages.removeChild(typing);
                 input.disabled = false;
                 sendBtn.disabled = false;
-                addMessage("I am currently receiving too many requests. Please wait a moment.", "ai");
+                var errMsg = "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
+                if (!silent) {
+                    addMessage(errMsg, "ai");
+                } else {
+                    resultsContainer.style.display = "block";
+                    resultsContent.innerHTML = "<div class='alert alert-danger text-center' style='margin-top:20px;'><i class='fa fa-exclamation-triangle fa-2x mb-2'></i><br><strong>Network Error</strong><br>" + errMsg + "</div>";
+                }
+                
+                // Clear all loading states on error as well.
+                document.querySelectorAll(".creator-card.loading").forEach(card => {
+                    card.classList.remove("loading");
+                    var icon = card.querySelector(".card-icon i");
+                    if (icon) {
+                        if (card.classList.contains("quiz")) icon.className = "fa fa-question-circle fa-3x brand-color";
+                        if (card.classList.contains("report")) icon.className = "fa fa-file-text-o fa-3x brand-success";
+                        if (card.classList.contains("mindmap")) icon.className = "fa fa-sitemap fa-3x brand-info";
+                    }
+                });
+                
                 console.error("Fetch error:", error);
             });
         };

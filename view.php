@@ -858,19 +858,27 @@ $js .= <<<'JS'
                     body: formData
                 })
                 .then(response => {
-                    if (loadingInterval) clearInterval(loadingInterval);
-                    if (typing && typing.parentNode) messages.removeChild(typing);
-                    
+                    if (!response.ok) {
+                        if (loadingInterval) clearInterval(loadingInterval);
+                        if (typing && typing.parentNode) messages.removeChild(typing);
+                        addMessage("Error: Server returned status " + response.status, "ai");
+                        input.disabled = false;
+                        sendBtn.disabled = false;
+                        input.focus();
+                        return;
+                    }
                     if (!response.body) {
+                        if (loadingInterval) clearInterval(loadingInterval);
+                        if (typing && typing.parentNode) messages.removeChild(typing);
                         addMessage("Error: Browser does not support streaming.", "ai");
+                        input.disabled = false;
+                        sendBtn.disabled = false;
+                        input.focus();
                         return;
                     }
                     
-                    var aiMsgDiv = document.createElement("div");
-                    aiMsgDiv.className = "message ai";
-                    aiMsgDiv.innerHTML = "<div class='markdown-body'></div>";
-                    messages.appendChild(aiMsgDiv);
-                    var contentDiv = aiMsgDiv.querySelector('.markdown-body');
+                    var aiMsgDiv = null;
+                    var contentDiv = null;
                     
                     var reader = response.body.getReader();
                     var decoder = new TextDecoder();
@@ -880,9 +888,17 @@ $js .= <<<'JS'
                     function read() {
                         reader.read().then(function({done, value}) {
                             if (done) {
+                                if (loadingInterval) clearInterval(loadingInterval);
+                                if (typing && typing.parentNode) messages.removeChild(typing);
+                                
                                 input.disabled = false;
                                 sendBtn.disabled = false;
                                 input.focus();
+                                
+                                if (!aiMsgDiv) {
+                                    addMessage("No response received from the AI.", "ai");
+                                    return;
+                                }
                                 
                                 var result = detectAndRenderArtifacts(fullText, "ai", true);
                                 var displayMsg = result.cleanText;
@@ -907,6 +923,17 @@ $js .= <<<'JS'
                                         var jsonStr = line.substring(6);
                                         var data = JSON.parse(jsonStr);
                                         if (data.chunk) {
+                                            if (!aiMsgDiv) {
+                                                if (loadingInterval) clearInterval(loadingInterval);
+                                                if (typing && typing.parentNode) messages.removeChild(typing);
+                                                
+                                                aiMsgDiv = document.createElement("div");
+                                                aiMsgDiv.className = "message ai";
+                                                aiMsgDiv.innerHTML = "<div class='markdown-body'></div>";
+                                                messages.appendChild(aiMsgDiv);
+                                                contentDiv = aiMsgDiv.querySelector('.markdown-body');
+                                            }
+                                            
                                             fullText += data.chunk;
                                             // Render with a typing cursor block
                                             contentDiv.innerHTML = window.marked.parse(fullText + " ▊");
@@ -923,12 +950,23 @@ $js .= <<<'JS'
                             read();
                         }).catch(function(error) {
                             console.error("Stream reading error:", error);
+                            if (loadingInterval) clearInterval(loadingInterval);
+                            if (typing && typing.parentNode) messages.removeChild(typing);
                             input.disabled = false;
                             sendBtn.disabled = false;
                             addMessage("Error reading AI stream.", "ai");
                         });
                     }
                     read();
+                })
+                .catch(error => {
+                    console.error("Fetch error:", error);
+                    if (loadingInterval) clearInterval(loadingInterval);
+                    if (typing && typing.parentNode) messages.removeChild(typing);
+                    input.disabled = false;
+                    sendBtn.disabled = false;
+                    input.focus();
+                    addMessage("Network error or connection lost. Please try again.", "ai");
                 });
             } else {
                 fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?t=" + Date.now(), {

@@ -26,7 +26,7 @@ class ai_client {
 
         $fullname         = fullname($USER);
         $material_data    = self::get_material_context($cmid, $selected_file_ids); // Still called to trigger extraction & embedding ingestion
-        $binaries         = $material_data['binaries'] ?? [];
+        $binaries         = []; // FORCE EMPTY: We use RAG now, no need to send huge base64 PDFs to Gemini directly
         $ainame           = "PresMate";
         
         // --- Smart Retrieval (RAG) & Hybrid Context Strategy ---

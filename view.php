@@ -119,7 +119,7 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
             </div>
             <div id="chat-messages" class="chat-messages">
                 <div class="message ai">
-                    Hi, PresUniver! I am DEMI Tutor, your course study companion. I can help you with:<br>
+                    Hi, <?php echo s($target_user->firstname); ?>! I am DEMI Tutor, your course study companion. I can help you with:<br>
                     - Explaining the lecture materials shared by your teacher.<br>
                     - Creating quizzes for your exam practice.<br>
                     - Summarizing long readings and complex modules.<br>

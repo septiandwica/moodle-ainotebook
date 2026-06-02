@@ -864,35 +864,69 @@ class ai_client {
                         }
                     }
 
-            if (!$provider) {
-            return ['response' => "Error: No AI provider selected in settings.", 'sources_count' => $sources_count];
+                    // Strategy 3: OCR Fallback (for scanned images)
+                    if (trim($extracted) === '' || strlen(trim($extracted)) < 50) {
+                        $imgbase = $tempdir . '/' . uniqid() . '-page';
+                        // Convert first 5 pages to images (balanced for performance/quality)
+                        exec("pdftoppm -f 1 -l 5 -r 300 " . escapeshellarg($tmpfile) . " " . escapeshellarg($imgbase) . " 2>/dev/null");
+                        
+                        $ocr_text = "";
+                        $images = glob($imgbase . "*.ppm"); 
+                        sort($images); 
+                        
+                        foreach ($images as $img) {
+                            $output_ocr = [];
+                            // Run tesseract with both English and Indonesian support.
+                            exec("tesseract -l eng+ind " . escapeshellarg($img) . " stdout 2>/dev/null", $output_ocr);
+                            $ocr_text .= implode("\n", $output_ocr) . "\n";
+                            @unlink($img); 
+                        }
+                        
+                        if (strlen(trim($ocr_text)) > 50) {
+                            $extracted = "[OCR Extracted Text (Eng+Ind)]:\n" . $ocr_text;
+                        }
+                    }
+
+                    if (trim($extracted) === '') {
+                        if (empty($binaries)) {
+                            $extracted = "[System Note: Document empty or non-extractable.]";
+                        } else {
+                            $extracted = "[System Note: Document content provided as binary attachment.]";
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $extracted = "[Error: " . $e->getMessage() . "]";
+                } finally {
+                    if (file_exists($tmpfile)) {
+                        @unlink($tmpfile);
+                    }
+                }
+            }
+
+            $content .= "--- File Source: {$filename} ---\n";
+            if (!empty($extracted)) {
+                $content    .= $extracted . "\n\n";
+                $totalchars += strlen($extracted);
+                
+                // Ingest text to embedding index
+                $cm = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
+                self::generate_embeddings_for_file($cm->instance, $file->get_id(), $extracted);
+            } else {
+                $content .= "[No content available for this file]\n\n";
+            }
         }
 
-        try {
-            $response = "";
-            if ($provider === 'core_ai') {
-                $response = self::call_core_ai($system_prompt, $user_message, $userid);
-            } elseif ($provider === 'openai') {
-                $response = self::call_openai($system_prompt, $user_message, $binaries, $config);
-            } elseif ($provider === 'gemini') {
-                $response = self::call_gemini($system_prompt, $user_message, $binaries, $config);
-            } elseif ($provider === 'groq') {
-                $response = self::call_groq($system_prompt, $user_message, $config);
-            } else {
-                $response = "Error: Invalid provider selected.";
-            }
-            
-            return [
-                'response' => $response,
-                'sources_count' => $sources_count
-            ];
-            
-        } catch (\Exception $e) {
-            return [
-                'response' => "AI Error: " . $e->getMessage(),
-                'sources_count' => 0
-            ];
+        if (strlen($content) > $maxchars) {
+            $content = substr($content, 0, $maxchars);
         }
+
+        $result = [
+            'text'     => $content,
+            'binaries' => $binaries
+        ];
+
+        $cache->set($cache_key, $result);
+        return $result;
     }
 
     /**
@@ -971,69 +1005,5 @@ class ai_client {
         });
         
         return array_slice($scored_chunks, 0, $top_k);
-    }
-                    // Strategy 3: OCR Fallback (for scanned images)
-                    if (trim($extracted) === '' || strlen(trim($extracted)) < 50) {
-                        $imgbase = $tempdir . '/' . uniqid() . '-page';
-                        // Convert first 5 pages to images (balanced for performance/quality)
-                        exec("pdftoppm -f 1 -l 5 -r 300 " . escapeshellarg($tmpfile) . " " . escapeshellarg($imgbase) . " 2>/dev/null");
-                        
-                        $ocr_text = "";
-                        $images = glob($imgbase . "*.ppm"); 
-                        sort($images); 
-                        
-                        foreach ($images as $img) {
-                            $output_ocr = [];
-                            // Run tesseract with both English and Indonesian support.
-                            exec("tesseract -l eng+ind " . escapeshellarg($img) . " stdout 2>/dev/null", $output_ocr);
-                            $ocr_text .= implode("\n", $output_ocr) . "\n";
-                            @unlink($img); 
-                        }
-                        
-                        if (strlen(trim($ocr_text)) > 50) {
-                            $extracted = "[OCR Extracted Text (Eng+Ind)]:\n" . $ocr_text;
-                        }
-                    }
-
-                    if (trim($extracted) === '') {
-                        if (empty($binaries)) {
-                            $extracted = "[System Note: Document empty or non-extractable.]";
-                        } else {
-                            $extracted = "[System Note: Document content provided as binary attachment.]";
-                        }
-                    }
-                } catch (\Exception $e) {
-                    $extracted = "[Error: " . $e->getMessage() . "]";
-                } finally {
-                    if (file_exists($tmpfile)) {
-                        @unlink($tmpfile);
-                    }
-                }
-            }
-
-            $content .= "--- File Source: {$filename} ---\n";
-            if (!empty($extracted)) {
-                $content    .= $extracted . "\n\n";
-                $totalchars += strlen($extracted);
-                
-                // Ingest text to embedding index
-                $cm = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
-                self::generate_embeddings_for_file($cm->instance, $file->get_id(), $extracted);
-            } else {
-                $content .= "[No content available for this file]\n\n";
-            }
-        }
-
-        if (strlen($content) > $maxchars) {
-            $content = substr($content, 0, $maxchars);
-        }
-
-        $result = [
-            'text'     => $content,
-            'binaries' => $binaries
-        ];
-
-        $cache->set($cache_key, $result);
-        return $result;
     }
 }

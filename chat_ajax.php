@@ -109,6 +109,12 @@ if ($action === 'chat_stream') {
     $response_text = $result['response'] ?? "";
     $sources_count = $result['sources_count'] ?? 0;
     
+    if (!\mod_ainotebook\ai_client::was_streamed()) {
+        echo "data: " . json_encode(['chunk' => $response_text]) . "\n\n";
+        @ob_flush();
+        flush();
+    }
+    
     // Send final metadata chunk
     echo "data: " . json_encode(['sources_count' => $sources_count, 'done' => true]) . "\n\n";
     @ob_flush();

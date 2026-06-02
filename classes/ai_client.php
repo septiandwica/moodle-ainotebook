@@ -14,10 +14,17 @@ use core_ai\aiactions\generate_text;
 
 class ai_client {
 
+    private static $streamed = false;
+
+    public static function was_streamed(): bool {
+        return self::$streamed;
+    }
+
     /**
      * Get a response from the AI.
      */
     public static function get_response(int $cmid, int $userid, string $user_message, array $selected_file_ids = [], array $config = [], bool $stream = false): array {
+        self::$streamed = false;
         global $DB, $USER;
 
         $cm         = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
@@ -269,6 +276,7 @@ class ai_client {
                             if (isset($json->candidates[0]->content->parts[0]->text)) {
                                 $text = $json->candidates[0]->content->parts[0]->text;
                                 $full_stream_text .= $text;
+                                self::$streamed = true;
                                 echo "data: " . json_encode(['chunk' => $text]) . "\n\n";
                                 @ob_flush();
                                 flush();
@@ -350,11 +358,15 @@ class ai_client {
             }
             $messages[] = ['role' => 'user', 'content' => $user_message];
 
-            $payload = json_encode([
+            $payload_arr = [
                 'model'       => $model,
                 'messages'    => $messages,
                 'temperature' => 0.7,
-            ]);
+            ];
+            if ($stream) {
+                $payload_arr['stream'] = true;
+            }
+            $payload = json_encode($payload_arr);
 
             // [FIX] Set headers and use CURLOPT_POSTFIELDS directly to ensure
             // Content-Type: application/json is honoured by Moodle's curl wrapper.
@@ -367,12 +379,48 @@ class ai_client {
                 'CURLOPT_POSTFIELDS' => $payload,
             ]);
 
+            $full_stream_text = "";
+            if ($stream) {
+                $curl->setopt(['CURLOPT_WRITEFUNCTION' => function($ch, $data) use (&$full_stream_text) {
+                    $lines = explode("\n", $data);
+                    foreach ($lines as $line) {
+                        $line = trim($line);
+                        if (strpos($line, 'data: ') === 0) {
+                            $json_str = trim(substr($line, 6));
+                            if ($json_str === '[DONE]') continue;
+                            $json = json_decode($json_str);
+                            if (isset($json->choices[0]->delta->content)) {
+                                $text = $json->choices[0]->delta->content;
+                                $full_stream_text .= $text;
+                                self::$streamed = true;
+                                echo "data: " . json_encode(['chunk' => $text]) . "\n\n";
+                                @ob_flush();
+                                flush();
+                            }
+                        }
+                    }
+                    return strlen($data);
+                }]);
+            }
+
             $raw_response = $curl->post($endpoint, $payload);
 
             // [FIX] Check curl transport error first.
             if ($curl->errno) {
                 debugging("ainotebook curl error ({$provider}): " . $curl->error, DEBUG_DEVELOPER);
                 return "I am having trouble connecting to the AI service. Please check your internet connection.";
+            }
+
+            if ($stream) {
+                // For stream, the full text is collected by the write callback.
+                if (strpos($full_stream_text, '```mermaid') !== false) {
+                    $full_stream_text = preg_replace_callback(
+                        '/```mermaid(.*?)```/s',
+                        fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
+                        $full_stream_text
+                    );
+                }
+                return $full_stream_text;
             }
 
             $result = json_decode($raw_response);

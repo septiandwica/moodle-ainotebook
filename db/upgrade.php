@@ -93,5 +93,28 @@ function xmldb_ainotebook_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2024051304, 'ainotebook');
     }
 
+    if ($oldversion < 2026010101) {
+        $table = new xmldb_table('ainotebook_embeddings');
+
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('ainotebookid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('fileid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('chunk_index', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('text_content', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
+        $table->add_field('embedding', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
+        $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, array('id'));
+        $table->add_key('ainotebookid', XMLDB_KEY_FOREIGN, array('ainotebookid'), 'ainotebook', array('id'));
+
+        $table->add_index('fileid', XMLDB_INDEX_NOTUNIQUE, array('fileid'));
+
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        upgrade_mod_savepoint(true, 2026010101, 'ainotebook');
+    }
+
     return true;
 }

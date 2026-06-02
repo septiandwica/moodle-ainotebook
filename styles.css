@@ -454,3 +454,7 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
 .insight-score-circle { width: 80px; height: 80px; margin: 0 auto 24px auto; border-radius: 50%; background: linear-gradient(135deg, var(--pres-primary), #3b82f6); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 900; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3); }
 .insight-section-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--pres-text-dim); margin: 0 0 8px 0; font-weight: 800; }
 .insight-modal-body p { font-size: 0.95rem; line-height: 1.6; color: var(--pres-text); margin: 0 0 20px 0; background: var(--pres-bg); padding: 16px; border-radius: 12px; border: 1px solid var(--pres-border); }
+
+/* RAG Context Transparency Badge */
+.context-source-badge { display: inline-flex; align-items: center; gap: 8px; font-size: 0.75rem; background: var(--pres-primary-soft); color: var(--pres-primary); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--pres-border); font-weight: 600; margin-top: 10px; }
+.context-source-badge i { font-size: 0.85rem; }

@@ -87,7 +87,9 @@ $file_ids = json_decode($selected_files, true) ?: [];
 $config_raw = optional_param('config', '[]', PARAM_RAW);
 $config = json_decode($config_raw, true) ?: [];
 
-$response_text = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config);
+$result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config);
+$response_text = $result['response'] ?? "Error retrieving response.";
+$sources_count = $result['sources_count'] ?? 0;
 
 $silent = optional_param('silent', 0, PARAM_INT);
 if (!$silent) {
@@ -102,5 +104,6 @@ if (!$silent) {
 
 echo json_encode([
     'success' => true,
-    'response' => $response_text
+    'response' => $response_text,
+    'sources_count' => $sources_count
 ]);

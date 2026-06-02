@@ -870,6 +870,11 @@ $js .= <<<'JS'
                         if (result.found) {
                             displayMsg += "\n\n*(I have also generated a " + result.type + " for you in the Creator section below)*";
                         }
+                        
+                        if (data.sources_count && data.sources_count > 0) {
+                            displayMsg += "\n\n<div class=\"context-source-badge\"><i class=\"fa fa-check-circle\"></i> Smart Context: Jawaban disusun berdasarkan " + data.sources_count + " bagian materi yang paling relevan.</div>";
+                        }
+                        
                         addMessage(displayMsg, "ai");
                     } else {
                         if (!result.found) {

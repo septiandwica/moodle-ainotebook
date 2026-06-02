@@ -17,7 +17,7 @@ class ai_client {
     /**
      * Get a response from the AI.
      */
-    public static function get_response(int $cmid, int $userid, string $user_message, array $selected_file_ids = [], array $config = []): string {
+    public static function get_response(int $cmid, int $userid, string $user_message, array $selected_file_ids = [], array $config = []): array {
         global $DB, $USER;
 
         $cm         = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
@@ -25,10 +25,27 @@ class ai_client {
         $ainotebook = $DB->get_record('ainotebook', ['id' => $cm->instance], '*', MUST_EXIST);
 
         $fullname         = fullname($USER);
-        $material_data    = self::get_material_context($cmid, $selected_file_ids);
-        $material_context = $material_data['text'] ?? "";
+        $material_data    = self::get_material_context($cmid, $selected_file_ids); // Still called to trigger extraction & embedding ingestion
         $binaries         = $material_data['binaries'] ?? [];
         $ainame           = "PresMate";
+        
+        // --- Smart Retrieval (RAG) & Hybrid Context Strategy ---
+        $is_generator = false;
+        $lower_msg = strtolower($user_message);
+        if (strpos($lower_msg, 'quiz') !== false || strpos($lower_msg, 'report') !== false || strpos($lower_msg, 'mindmap') !== false) {
+            $is_generator = true;
+        }
+        
+        $top_k = $is_generator ? 15 : 5; // Hybrid strategy: more chunks for generators
+        $top_chunks = self::search_knowledge($cm->instance, $selected_file_ids, $user_message, $top_k);
+        $sources_count = count($top_chunks);
+        
+        $rag_context = "";
+        if ($sources_count > 0) {
+            $texts = array_map(function($c) { return $c->text_content; }, $top_chunks);
+            $rag_context = implode("\n\n---\n\n", $texts);
+        }
+        // -------------------------------------------------------
 
         // ── Build system prompt ───────────────────────────────────────────────
         $course_context = self::get_context_material($cmid);
@@ -55,8 +72,14 @@ class ai_client {
         $system_prompt .= "If the user asks a question (e.g., general math like 2+2, or unrelated topics) that is NOT covered in the provided materials, you MUST politely refuse to answer and state that you are an exclusive assistant for this course and can only answer questions based on the provided materials.\n";
         $system_prompt .= "DO NOT provide general answers for outside topics. DO NOT say 'This is outside the materials, but here is a general answer'. You must REFUSE completely.\n";
 
-        if (!empty($material_context)) {
-            $system_prompt .= "\n[STUDY MATERIALS (OCR/TEXT FALLBACK)]: \n{$material_context}\n";
+        if (!empty($rag_context)) {
+            $system_prompt .= "\n[STUDY MATERIALS (RAG RETRIEVED CHUNKS)]: \n{$rag_context}\n";
+        } else {
+            // Fallback if no embeddings found or search failed
+            $material_context = $material_data['text'] ?? "";
+            if (!empty($material_context)) {
+                $system_prompt .= "\n[STUDY MATERIALS (OCR/TEXT FALLBACK)]: \n{$material_context}\n";
+            }
         }
 
         if (!empty($binaries)) {
@@ -113,7 +136,7 @@ class ai_client {
         $provider = get_config('mod_ainotebook', 'ai_provider');
 
         if ($provider !== 'moodle') {
-            return self::custom_provider_request($provider, $system_prompt, $user_message, $history ? array_reverse($history) : [], $binaries);
+            return ['response' => self::custom_provider_request($provider, $system_prompt, $user_message, $history ? array_reverse($history) : [], $binaries), 'sources_count' => $sources_count];
         }
 
         // Moodle AI subsystem: flatten everything into a single prompt string
@@ -145,10 +168,10 @@ class ai_client {
                     $generated
                 );
             }
-            return $generated;
+            return ['response' => $generated, 'sources_count' => $sources_count];
         }
 
-        return "Sorry, I encountered an error: " . $response->get_errormessage();
+        return ['response' => "Sorry, I encountered an error: " . $response->get_errormessage(), 'sources_count' => 0];
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -672,6 +695,84 @@ class ai_client {
         return "\n" . implode("\n", $out) . "\n";
     }
 
+    /**
+     * Generate embeddings for a file.
+     * Splits the text into chunks and uses the Gemini API to get vectors.
+     */
+    public static function generate_embeddings_for_file(int $ainotebookid, int $fileid, string $text): void {
+        global $DB, $CFG;
+        
+        // Check if already embedded
+        if ($DB->record_exists('ainotebook_embeddings', ['fileid' => $fileid])) {
+            return;
+        }
+
+        // Clean up text
+        $text = preg_replace("/\r\n|\r/", "\n", $text);
+        
+        // Simple Chunking: max 1000 characters per chunk preserving paragraph boundaries
+        $chunks = [];
+        $current_chunk = "";
+        $paragraphs = explode("\n", $text);
+        foreach ($paragraphs as $p) {
+            $p = trim($p);
+            if (empty($p)) continue;
+            
+            if (strlen($current_chunk) + strlen($p) > 1000) {
+                if (!empty($current_chunk)) {
+                    $chunks[] = $current_chunk;
+                }
+                $current_chunk = $p;
+            } else {
+                $current_chunk .= (empty($current_chunk) ? "" : "\n") . $p;
+            }
+        }
+        if (!empty($current_chunk)) {
+            $chunks[] = $current_chunk;
+        }
+
+        $apikey = get_config('mod_ainotebook', 'api_key');
+        if (empty($apikey)) return;
+
+        require_once($CFG->libdir . '/filelib.php');
+        $curl = new \curl();
+        $curl->setopt([
+            'CURLOPT_SSL_VERIFYPEER' => false,
+            'CURLOPT_SSL_VERIFYHOST' => false,
+            'CURLOPT_TIMEOUT'        => 60,
+            'CURLOPT_HTTPHEADER' => ['Content-Type: application/json']
+        ]);
+
+        $chunk_index = 0;
+        foreach ($chunks as $chunk) {
+            $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={$apikey}";
+            $data = [
+                'model' => 'models/text-embedding-004',
+                'content' => [
+                    'parts' => [['text' => $chunk]]
+                ]
+            ];
+            
+            $raw_response = $curl->post($endpoint, json_encode($data));
+            $result = json_decode($raw_response);
+            
+            if (isset($result->embedding->values)) {
+                $vector = $result->embedding->values;
+                
+                $record = new \stdClass();
+                $record->ainotebookid = $ainotebookid;
+                $record->fileid = $fileid;
+                $record->chunk_index = $chunk_index;
+                $record->text_content = $chunk;
+                $record->embedding = json_encode($vector);
+                $record->timecreated = time();
+                
+                $DB->insert_record('ainotebook_embeddings', $record);
+                $chunk_index++;
+            }
+        }
+    }
+
     protected static function get_material_context(int $cmid, array $selected_file_ids = []): array {
         global $DB;
 
@@ -763,6 +864,114 @@ class ai_client {
                         }
                     }
 
+            if (!$provider) {
+            return ['response' => "Error: No AI provider selected in settings.", 'sources_count' => $sources_count];
+        }
+
+        try {
+            $response = "";
+            if ($provider === 'core_ai') {
+                $response = self::call_core_ai($system_prompt, $user_message, $userid);
+            } elseif ($provider === 'openai') {
+                $response = self::call_openai($system_prompt, $user_message, $binaries, $config);
+            } elseif ($provider === 'gemini') {
+                $response = self::call_gemini($system_prompt, $user_message, $binaries, $config);
+            } elseif ($provider === 'groq') {
+                $response = self::call_groq($system_prompt, $user_message, $config);
+            } else {
+                $response = "Error: Invalid provider selected.";
+            }
+            
+            return [
+                'response' => $response,
+                'sources_count' => $sources_count
+            ];
+            
+        } catch (\Exception $e) {
+            return [
+                'response' => "AI Error: " . $e->getMessage(),
+                'sources_count' => 0
+            ];
+        }
+    }
+
+    /**
+     * Compute cosine similarity between two vectors.
+     */
+    public static function cosine_similarity(array $vecA, array $vecB): float {
+        $dotProduct = 0.0;
+        $normA = 0.0;
+        $normB = 0.0;
+        
+        $count = min(count($vecA), count($vecB));
+        for ($i = 0; $i < $count; $i++) {
+            $a = $vecA[$i];
+            $b = $vecB[$i];
+            $dotProduct += $a * $b;
+            $normA += $a * $a;
+            $normB += $b * $b;
+        }
+        
+        if ($normA == 0.0 || $normB == 0.0) return 0.0;
+        return $dotProduct / (sqrt($normA) * sqrt($normB));
+    }
+
+    /**
+     * Search knowledge index for relevant chunks.
+     */
+    public static function search_knowledge(int $ainotebookid, array $file_ids, string $query, int $top_k): array {
+        global $DB, $CFG;
+        
+        if (empty($file_ids)) return [];
+        
+        $apikey = get_config('mod_ainotebook', 'api_key');
+        if (empty($apikey)) return [];
+        
+        require_once($CFG->libdir . '/filelib.php');
+        $curl = new \curl();
+        $curl->setopt([
+            'CURLOPT_SSL_VERIFYPEER' => false,
+            'CURLOPT_SSL_VERIFYHOST' => false,
+            'CURLOPT_TIMEOUT'        => 60,
+            'CURLOPT_HTTPHEADER' => ['Content-Type: application/json']
+        ]);
+        
+        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={$apikey}";
+        $data = [
+            'model' => 'models/text-embedding-004',
+            'content' => [
+                'parts' => [['text' => $query]]
+            ]
+        ];
+        
+        $raw_response = $curl->post($endpoint, json_encode($data));
+        $result = json_decode($raw_response);
+        
+        if (!isset($result->embedding->values)) return [];
+        $query_vector = $result->embedding->values;
+        
+        list($in, $params) = $DB->get_in_or_equal($file_ids);
+        array_unshift($params, $ainotebookid);
+        $chunks = $DB->get_records_select('ainotebook_embeddings', "ainotebookid = ? AND fileid $in", $params);
+        
+        if (empty($chunks)) return [];
+        
+        $scored_chunks = [];
+        foreach ($chunks as $chunk) {
+            $vector = json_decode($chunk->embedding, true);
+            if (!is_array($vector)) continue;
+            
+            $score = self::cosine_similarity($query_vector, $vector);
+            $chunk->score = $score;
+            $scored_chunks[] = $chunk;
+        }
+        
+        usort($scored_chunks, function($a, $b) {
+            return $b->score <=> $a->score;
+        });
+        
+        return array_slice($scored_chunks, 0, $top_k);
+    }
                     // Strategy 3: OCR Fallback (for scanned images)
                     if (trim($extracted) === '' || strlen(trim($extracted)) < 50) {
                         $imgbase = $tempdir . '/' . uniqid() . '-page';
@@ -806,6 +1015,10 @@ class ai_client {
             if (!empty($extracted)) {
                 $content    .= $extracted . "\n\n";
                 $totalchars += strlen($extracted);
+                
+                // Ingest text to embedding index
+                $cm = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
+                self::generate_embeddings_for_file($cm->instance, $file->get_id(), $extracted);
             } else {
                 $content .= "[No content available for this file]\n\n";
             }

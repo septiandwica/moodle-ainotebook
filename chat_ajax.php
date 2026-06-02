@@ -89,10 +89,17 @@ if ($action === 'chat_stream') {
     $config = json_decode($config_raw, true) ?: [];
     
     // Disable Moodle's output buffering and set SSE headers
-    @ob_end_clean();
+    while (ob_get_level() > 0) {
+        @ob_end_flush();
+    }
     header('Content-Type: text/event-stream');
     header('Cache-Control: no-cache');
     header('Connection: keep-alive');
+    header('X-Accel-Buffering: no'); // CRITICAL: Tells Nginx not to buffer the response
+    
+    // Send 2KB of padding to force initial flush in some proxies
+    echo str_repeat(' ', 2048) . "\n";
+    flush();
     
     // Send initial metadata chunk (like sources_count)
     // We will do a quick non-streaming pre-fetch for sources? No, get_response handles sources internally.

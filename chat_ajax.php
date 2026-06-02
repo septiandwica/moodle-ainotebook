@@ -60,6 +60,53 @@ if ($action === 'evaluate_student') {
     exit;
 }
 
+if ($action === 'override_grade') {
+    $context = context_module::instance($cm->id);
+    require_capability('mod/ainotebook:viewprogress', $context);
+    
+    $target_userid = required_param('userid', PARAM_INT);
+    $score = required_param('score', PARAM_INT);
+    
+    $ainotebook = $DB->get_record('ainotebook', ['id' => $cm->instance], '*', MUST_EXIST);
+    
+    $eval = $DB->get_record('ainotebook_evals', ['ainotebookid' => $ainotebook->id, 'userid' => $target_userid]);
+    if ($eval) {
+        $eval->score = $score;
+        $insight = json_decode($eval->insight_json, true) ?: [];
+        $insight['score'] = $score;
+        $eval->insight_json = json_encode($insight);
+        $eval->timemodified = time();
+        $DB->update_record('ainotebook_evals', $eval);
+    } else {
+        $eval = new \stdClass();
+        $eval->ainotebookid = $ainotebook->id;
+        $eval->userid = $target_userid;
+        $eval->score = $score;
+        $insight = [
+            'score' => $score,
+            'understanding' => 'Manually set by teacher.',
+            'activity_summary' => 'Manually evaluated.',
+            'recommendation' => 'N/A'
+        ];
+        $eval->insight_json = json_encode($insight);
+        $eval->timecreated = time();
+        $eval->timemodified = time();
+        $DB->insert_record('ainotebook_evals', $eval);
+    }
+    
+    // Push the score to the Moodle Gradebook
+    require_once(__DIR__ . '/lib.php');
+    $ainotebook->cmidnumber = $cm->idnumber;
+    
+    $grade = new \stdClass();
+    $grade->userid = $target_userid;
+    $grade->rawgrade = (float)$score;
+    \ainotebook_grade_item_update($ainotebook, $grade);
+    
+    echo json_encode(['success' => true]);
+    exit;
+}
+
 if ($action === 'submit_quiz_grade') {
     $score = required_param('score', PARAM_INT);
     $maxscore = required_param('maxscore', PARAM_INT);

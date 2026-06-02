@@ -23,6 +23,7 @@ $string['settings_course_enable'] = 'Enable DEMI Tutor for this course';
 $string['settings_course_desc'] = 'Automatically add a DEMI Tutor activity to this course.';
 
 // Dashboard and Progress Strings
+$string['studentname'] = 'Student Name';
 $string['ainotebook:viewprogress'] = 'View student progress and chat logs';
 $string['studentprogress'] = 'Student Progress Dashboard';
 $string['overviewmetrics'] = 'Overview Metrics';

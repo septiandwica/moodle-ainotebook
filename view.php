@@ -849,41 +849,132 @@ $js .= <<<'JS'
             
             var savedConfig = localStorage.getItem("ainotebook_config") || "{}";
             formData.append("config", savedConfig);
-
-            fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?t=" + Date.now(), {
-                method: "POST",
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (loadingInterval) clearInterval(loadingInterval);
-                if (typing && typing.parentNode) messages.removeChild(typing);
-                input.disabled = false;
-                sendBtn.disabled = false;
-                input.focus();
-
-                if (data.success) {
-                    var result = detectAndRenderArtifacts(data.response, "ai", true);
+            
+            if (!silent) {
+                formData.append("action", "chat_stream");
+                
+                fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?t=" + Date.now(), {
+                    method: "POST",
+                    body: formData
+                })
+                .then(response => {
+                    if (loadingInterval) clearInterval(loadingInterval);
+                    if (typing && typing.parentNode) messages.removeChild(typing);
                     
-                    if (!silent) {
-                        var displayMsg = result.cleanText;
-                        if (result.found) {
-                            displayMsg += "\n\n*(I have also generated a " + result.type + " for you in the Creator section below)*";
-                        }
-                        
-                        if (data.sources_count && data.sources_count > 0) {
-                            displayMsg += "\n\n<div class=\"context-source-badge\"><i class=\"fa fa-check-circle\"></i> Smart Context: Jawaban disusun berdasarkan " + data.sources_count + " bagian materi yang paling relevan.</div>";
-                        }
-                        
-                        addMessage(displayMsg, "ai");
-                    } else {
+                    if (!response.body) {
+                        addMessage("Error: Browser does not support streaming.", "ai");
+                        return;
+                    }
+                    
+                    var aiMsgDiv = document.createElement("div");
+                    aiMsgDiv.className = "message ai";
+                    aiMsgDiv.innerHTML = "<div class='markdown-body'></div>";
+                    messages.appendChild(aiMsgDiv);
+                    var contentDiv = aiMsgDiv.querySelector('.markdown-body');
+                    
+                    var reader = response.body.getReader();
+                    var decoder = new TextDecoder();
+                    var fullText = "";
+                    var sourcesCount = 0;
+                    
+                    function read() {
+                        reader.read().then(function({done, value}) {
+                            if (done) {
+                                input.disabled = false;
+                                sendBtn.disabled = false;
+                                input.focus();
+                                
+                                var result = detectAndRenderArtifacts(fullText, "ai", true);
+                                var displayMsg = result.cleanText;
+                                if (result.found) {
+                                    displayMsg += "\n\n*(I have also generated a " + result.type + " for you in the Creator section below)*";
+                                }
+                                if (sourcesCount > 0) {
+                                    displayMsg += "\n\n<div class=\"context-source-badge\"><i class=\"fa fa-check-circle\"></i> Smart Context: Answer is generated using " + sourcesCount + " relevant material sources.</div>";
+                                }
+                                
+                                contentDiv.innerHTML = window.marked.parse(displayMsg);
+                                loadSuggestions();
+                                return;
+                            }
+                            
+                            var chunkStr = decoder.decode(value, {stream: true});
+                            var lines = chunkStr.split("\n");
+                            for (var i = 0; i < lines.length; i++) {
+                                var line = lines[i].trim();
+                                if (line.startsWith("data: ")) {
+                                    try {
+                                        var jsonStr = line.substring(6);
+                                        var data = JSON.parse(jsonStr);
+                                        if (data.chunk) {
+                                            fullText += data.chunk;
+                                            // Render with a typing cursor block
+                                            contentDiv.innerHTML = window.marked.parse(fullText + " ▊");
+                                            messages.scrollTop = messages.scrollHeight;
+                                        }
+                                        if (data.sources_count !== undefined) {
+                                            sourcesCount = data.sources_count;
+                                        }
+                                    } catch (e) {
+                                        // Ignore JSON parse errors for split chunks
+                                    }
+                                }
+                            }
+                            read();
+                        }).catch(function(error) {
+                            console.error("Stream reading error:", error);
+                            input.disabled = false;
+                            sendBtn.disabled = false;
+                            addMessage("Error reading AI stream.", "ai");
+                        });
+                    }
+                    read();
+                });
+            } else {
+                fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?t=" + Date.now(), {
+                    method: "POST",
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    input.disabled = false;
+                    sendBtn.disabled = false;
+                    input.focus();
+
+                    if (data.success) {
+                        var result = detectAndRenderArtifacts(data.response, "ai", true);
                         if (!result.found) {
                             resultsContainer.style.display = "block";
                             resultsContent.innerHTML = "<div class='alert alert-warning text-center' style='margin-top:20px;'><i class='fa fa-exclamation-triangle fa-2x mb-2'></i><br><strong>Could not generate tool</strong><br>" + result.cleanText + "</div>";
                         }
+                        
+                        document.querySelectorAll(".creator-card.loading").forEach(card => {
+                            card.classList.remove("loading");
+                            var icon = card.querySelector(".card-icon i");
+                            if (icon) {
+                                if (card.classList.contains("quiz")) icon.className = "fa fa-question-circle fa-3x brand-color";
+                                if (card.classList.contains("report")) icon.className = "fa fa-file-text-o fa-3x brand-success";
+                                if (card.classList.contains("mindmap")) icon.className = "fa fa-sitemap fa-3x brand-info";
+                            }
+                        });
+                    } else {
+                        addMessage("Error: " + data.error, "ai");
+                    }
+                })
+                .catch(error => {
+                    if (loadingInterval) clearInterval(loadingInterval);
+                    if (typing && typing.parentNode) messages.removeChild(typing);
+                    input.disabled = false;
+                    sendBtn.disabled = false;
+                    var errMsg = "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
+                    if (!silent) {
+                        addMessage(errMsg, "ai");
+                    } else {
+                        resultsContainer.style.display = "block";
+                        resultsContent.innerHTML = "<div class='alert alert-danger text-center' style='margin-top:20px;'><i class='fa fa-exclamation-triangle fa-2x mb-2'></i><br><strong>Network Error</strong><br>" + errMsg + "</div>";
                     }
                     
-                    // Clear all loading states.
+                    // Clear all loading states on error as well.
                     document.querySelectorAll(".creator-card.loading").forEach(card => {
                         card.classList.remove("loading");
                         var icon = card.querySelector(".card-icon i");
@@ -893,38 +984,8 @@ $js .= <<<'JS'
                             if (card.classList.contains("mindmap")) icon.className = "fa fa-sitemap fa-3x brand-info";
                         }
                     });
-
-                    loadSuggestions();
-                } else {
-                    if (!silent) addMessage("Error: " + data.error, "ai");
-                }
-            })
-            .catch(error => {
-                if (loadingInterval) clearInterval(loadingInterval);
-                if (typing && typing.parentNode) messages.removeChild(typing);
-                input.disabled = false;
-                sendBtn.disabled = false;
-                var errMsg = "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
-                if (!silent) {
-                    addMessage(errMsg, "ai");
-                } else {
-                    resultsContainer.style.display = "block";
-                    resultsContent.innerHTML = "<div class='alert alert-danger text-center' style='margin-top:20px;'><i class='fa fa-exclamation-triangle fa-2x mb-2'></i><br><strong>Network Error</strong><br>" + errMsg + "</div>";
-                }
-                
-                // Clear all loading states on error as well.
-                document.querySelectorAll(".creator-card.loading").forEach(card => {
-                    card.classList.remove("loading");
-                    var icon = card.querySelector(".card-icon i");
-                    if (icon) {
-                        if (card.classList.contains("quiz")) icon.className = "fa fa-question-circle fa-3x brand-color";
-                        if (card.classList.contains("report")) icon.className = "fa fa-file-text-o fa-3x brand-success";
-                        if (card.classList.contains("mindmap")) icon.className = "fa fa-sitemap fa-3x brand-info";
-                    }
                 });
-                
-                console.error("Fetch error:", error);
-            });
+            }
         };
 
         var loadSuggestions = function() {

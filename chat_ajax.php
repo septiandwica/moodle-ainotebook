@@ -80,7 +80,47 @@ if ($action === 'submit_quiz_grade') {
     exit;
 }
 
-// Fallback to chat action
+// --- SSE STREAMING ACTION ---
+if ($action === 'chat_stream') {
+    $message = required_param('message', PARAM_TEXT);
+    $selected_files = optional_param('selected_files', '[]', PARAM_RAW);
+    $file_ids = json_decode($selected_files, true) ?: [];
+    $config_raw = optional_param('config', '[]', PARAM_RAW);
+    $config = json_decode($config_raw, true) ?: [];
+    
+    // Disable Moodle's output buffering and set SSE headers
+    @ob_end_clean();
+    header('Content-Type: text/event-stream');
+    header('Cache-Control: no-cache');
+    header('Connection: keep-alive');
+    
+    // Send initial metadata chunk (like sources_count)
+    // We will do a quick non-streaming pre-fetch for sources? No, get_response handles sources internally.
+    // get_response with stream=true will output chunks via curl callback directly!
+    $result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config, true);
+    
+    $response_text = $result['response'] ?? "";
+    $sources_count = $result['sources_count'] ?? 0;
+    
+    // Send final metadata chunk
+    echo "data: " . json_encode(['sources_count' => $sources_count, 'done' => true]) . "\n\n";
+    @ob_flush();
+    flush();
+    
+    $silent = optional_param('silent', 0, PARAM_INT);
+    if (!$silent && !empty($response_text)) {
+        $log = new stdClass();
+        $log->ainotebookid = $cm->instance;
+        $log->userid = $USER->id;
+        $log->message = $message;
+        $log->response = $response_text;
+        $log->timecreated = time();
+        $DB->insert_record('ainotebook_chat', $log);
+    }
+    exit;
+}
+
+// Fallback to synchronous chat action
 $message = required_param('message', PARAM_TEXT);
 $selected_files = optional_param('selected_files', '[]', PARAM_RAW);
 $file_ids = json_decode($selected_files, true) ?: [];

@@ -17,7 +17,7 @@ class ai_client {
     /**
      * Get a response from the AI.
      */
-    public static function get_response(int $cmid, int $userid, string $user_message, array $selected_file_ids = [], array $config = []): array {
+    public static function get_response(int $cmid, int $userid, string $user_message, array $selected_file_ids = [], array $config = [], bool $stream = false): array {
         global $DB, $USER;
 
         $cm         = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
@@ -136,7 +136,7 @@ class ai_client {
         $provider = get_config('mod_ainotebook', 'ai_provider');
 
         if ($provider !== 'moodle') {
-            return ['response' => self::custom_provider_request($provider, $system_prompt, $user_message, $history ? array_reverse($history) : [], $binaries), 'sources_count' => $sources_count];
+            return ['response' => self::custom_provider_request($provider, $system_prompt, $user_message, $history ? array_reverse($history) : [], $binaries, $stream), 'sources_count' => $sources_count];
         }
 
         // Moodle AI subsystem: flatten everything into a single prompt string
@@ -187,7 +187,8 @@ class ai_client {
         string $system_prompt,
         string $user_message,
         array  $history = [],
-        array  $binaries = []
+        array  $binaries = [],
+        bool   $stream = false
     ): string {
         $apikey = get_config('mod_ainotebook', 'api_key');
         $model  = get_config('mod_ainotebook', 'model_' . $provider);
@@ -220,7 +221,11 @@ class ai_client {
 
         // ── Gemini ────────────────────────────────────────────────────────────
         if ($provider === 'gemini') {
-            $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apikey}";
+            if ($stream) {
+                $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:streamGenerateContent?alt=sse&key={$apikey}";
+            } else {
+                $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apikey}";
+            }
 
             // Build Gemini contents array from history + current message.
             $contents = [];
@@ -250,12 +255,40 @@ class ai_client {
             ];
 
             $curl->setopt(['CURLOPT_HTTPHEADER' => ['Content-Type: application/json']]);
+            
+            $full_stream_text = "";
+            if ($stream) {
+                $curl->setopt(['CURLOPT_WRITEFUNCTION' => function($ch, $data) use (&$full_stream_text) {
+                    $lines = explode("\n", $data);
+                    foreach ($lines as $line) {
+                        if (strpos($line, 'data: ') === 0) {
+                            $json_str = trim(substr($line, 6));
+                            if ($json_str === '[DONE]') continue;
+                            $json = json_decode($json_str);
+                            if (isset($json->candidates[0]->content->parts[0]->text)) {
+                                $text = $json->candidates[0]->content->parts[0]->text;
+                                $full_stream_text .= $text;
+                                echo "data: " . json_encode(['chunk' => $text]) . "\n\n";
+                                @ob_flush();
+                                flush();
+                            }
+                        }
+                    }
+                    return strlen($data);
+                }]);
+            }
+
             $raw_response = $curl->post($endpoint, json_encode($data));
 
             // [FIX] Check transport error first.
             if ($curl->errno) {
                 debugging("ainotebook curl error (gemini): " . $curl->error, DEBUG_DEVELOPER);
                 return "I am having trouble connecting to the AI service. Please check your internet connection.";
+            }
+
+            if ($stream) {
+                // For stream, the full text is collected by the write callback.
+                return $full_stream_text;
             }
 
             $result = json_decode($raw_response);

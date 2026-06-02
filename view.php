@@ -884,6 +884,7 @@ $js .= <<<'JS'
                     var decoder = new TextDecoder();
                     var fullText = "";
                     var sourcesCount = 0;
+                    var streamBuffer = "";
                     
                     function read() {
                         reader.read().then(function({done, value}) {
@@ -914,11 +915,13 @@ $js .= <<<'JS'
                                 return;
                             }
                             
-                            var chunkStr = decoder.decode(value, {stream: true});
-                            var lines = chunkStr.split("\n");
-                            for (var i = 0; i < lines.length; i++) {
-                                var line = lines[i].trim();
-                                if (line.startsWith("data: ")) {
+                            streamBuffer += decoder.decode(value, {stream: true});
+                            var pos;
+                            while ((pos = streamBuffer.indexOf("\n")) !== -1) {
+                                var line = streamBuffer.substring(0, pos).trim();
+                                streamBuffer = streamBuffer.substring(pos + 1);
+                                
+                                if (line.indexOf("data: ") === 0) {
                                     try {
                                         var jsonStr = line.substring(6);
                                         var data = JSON.parse(jsonStr);
@@ -943,7 +946,7 @@ $js .= <<<'JS'
                                             sourcesCount = data.sources_count;
                                         }
                                     } catch (e) {
-                                        // Ignore JSON parse errors for split chunks
+                                        console.error("JSON parse error on line: ", line, e);
                                     }
                                 }
                             }
@@ -1128,10 +1131,10 @@ $js .= <<<'JS'
             var a = e.target.closest("a");
             if (a && a.getAttribute("href")) {
                 var href = a.getAttribute("href");
-                var prefix = "#citation-";
-                if (href.indexOf(prefix) === 0) {
+                var hashIndex = href.indexOf("#citation-");
+                if (hashIndex !== -1) {
                     e.preventDefault();
-                    var citationStr = href.substring(prefix.length);
+                    var citationStr = href.substring(hashIndex + 10); // 10 is length of "#citation-"
                     var pageIndex = citationStr.lastIndexOf("-page-");
                     if (pageIndex !== -1) {
                         var filename = decodeURIComponent(citationStr.substring(0, pageIndex));
@@ -1140,7 +1143,13 @@ $js .= <<<'JS'
                         if (baseUrl) {
                             window.open(baseUrl + "#page=" + page, "_blank");
                         } else {
-                            alert("File not found: " + filename);
+                            // Fallback try in case name contains spaces or special characters
+                            var matchedKey = Object.keys(fileUrls).find(k => k.toLowerCase() === filename.toLowerCase());
+                            if (matchedKey && fileUrls[matchedKey]) {
+                                window.open(fileUrls[matchedKey] + "#page=" + page, "_blank");
+                            } else {
+                                alert("File not found: " + filename);
+                            }
                         }
                     }
                 }

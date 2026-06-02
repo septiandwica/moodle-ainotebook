@@ -264,16 +264,22 @@ class ai_client {
 
             $curl->setopt(['CURLOPT_HTTPHEADER' => ['Content-Type: application/json']]);
             
+            $raw_body = "";
             $full_stream_text = "";
             if ($stream) {
-                $curl->setopt(['CURLOPT_WRITEFUNCTION' => function($ch, $data) use (&$full_stream_text) {
-                    $lines = explode("\n", $data);
-                    foreach ($lines as $line) {
+                $buffer = "";
+                $curl->setopt(['CURLOPT_WRITEFUNCTION' => function($ch, $data) use (&$full_stream_text, &$buffer, &$raw_body) {
+                    $raw_body .= $data;
+                    $buffer .= $data;
+                    while (($pos = strpos($buffer, "\n")) !== false) {
+                        $line = substr($buffer, 0, $pos);
+                        $buffer = substr($buffer, $pos + 1);
+                        $line = trim($line);
                         if (strpos($line, 'data: ') === 0) {
                             $json_str = trim(substr($line, 6));
                             if ($json_str === '[DONE]') continue;
                             $json = json_decode($json_str);
-                            if (isset($json->candidates[0]->content->parts[0]->text)) {
+                            if ($json && isset($json->candidates[0]->content->parts[0]->text)) {
                                 $text = $json->candidates[0]->content->parts[0]->text;
                                 $full_stream_text .= $text;
                                 self::$streamed = true;
@@ -296,7 +302,18 @@ class ai_client {
             }
 
             if ($stream) {
-                // For stream, the full text is collected by the write callback.
+                if (!self::$streamed) {
+                    $result = json_decode($raw_body);
+                    if ($result && isset($result->error)) {
+                        $error_msg = $result->error->message ?? 'Unknown error';
+                        debugging("ainotebook Gemini API Error (Stream): " . $error_msg, DEBUG_DEVELOPER);
+                        if (stripos($error_msg, 'quota') !== false || stripos($error_msg, 'rate limit') !== false || stripos($error_msg, '429') !== false) {
+                            return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
+                        }
+                        return "AI Error: " . $error_msg;
+                    }
+                    return "No response received from the AI.";
+                }
                 return $full_stream_text;
             }
 
@@ -327,17 +344,6 @@ class ai_client {
                     );
                 }
                 return $text;
-            }
-
-            if (isset($result->error)) {
-                $err      = $result->error->message ?? "Unknown Gemini Error";
-                $err_code = $result->error->code    ?? 0;
-                debugging("ainotebook API error (gemini) [HTTP {$err_code}]: {$err}", DEBUG_DEVELOPER);
-
-                if ($err_code === 429 || stripos($err, 'rate limit') !== false || stripos($err, 'quota') !== false) {
-                    return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
-                }
-                return "The AI service is currently unavailable. Please try again later.";
             }
 
             debugging("ainotebook: unexpected response shape from gemini: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);
@@ -379,17 +385,22 @@ class ai_client {
                 'CURLOPT_POSTFIELDS' => $payload,
             ]);
 
+            $raw_body = "";
             $full_stream_text = "";
             if ($stream) {
-                $curl->setopt(['CURLOPT_WRITEFUNCTION' => function($ch, $data) use (&$full_stream_text) {
-                    $lines = explode("\n", $data);
-                    foreach ($lines as $line) {
+                $buffer = "";
+                $curl->setopt(['CURLOPT_WRITEFUNCTION' => function($ch, $data) use (&$full_stream_text, &$buffer, &$raw_body) {
+                    $raw_body .= $data;
+                    $buffer .= $data;
+                    while (($pos = strpos($buffer, "\n")) !== false) {
+                        $line = substr($buffer, 0, $pos);
+                        $buffer = substr($buffer, $pos + 1);
                         $line = trim($line);
                         if (strpos($line, 'data: ') === 0) {
                             $json_str = trim(substr($line, 6));
                             if ($json_str === '[DONE]') continue;
                             $json = json_decode($json_str);
-                            if (isset($json->choices[0]->delta->content)) {
+                            if ($json && isset($json->choices[0]->delta->content)) {
                                 $text = $json->choices[0]->delta->content;
                                 $full_stream_text .= $text;
                                 self::$streamed = true;
@@ -412,6 +423,19 @@ class ai_client {
             }
 
             if ($stream) {
+                if (!self::$streamed) {
+                    $result = json_decode($raw_body);
+                    if ($result && isset($result->error)) {
+                        $err = $result->error->message ?? "Unknown Error";
+                        $err_type = $result->error->type ?? "";
+                        debugging("ainotebook API error ({$provider}) (Stream): {$err}", DEBUG_DEVELOPER);
+                        if (stripos($err_type, 'rate_limit') !== false || stripos($err, 'rate limit') !== false || stripos($err, 'quota') !== false) {
+                            return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
+                        }
+                        return "AI Error: " . $err;
+                    }
+                    return "No response received from the AI.";
+                }
                 // For stream, the full text is collected by the write callback.
                 if (strpos($full_stream_text, '```mermaid') !== false) {
                     $full_stream_text = preg_replace_callback(
@@ -782,18 +806,7 @@ class ai_client {
      * Splits the text into chunks and uses the Gemini API to get vectors.
      */
     public static function generate_embeddings_for_file(int $ainotebookid, int $fileid, string $text): void {
-        global $DB, $CFG;
-        
-        // Check if already embedded
-        $exists = $DB->get_record('ainotebook_embeddings', ['fileid' => $fileid], 'id, text_content', IGNORE_MULTIPLE);
-        if ($exists) {
-            // If it exists, but does not have our source citation metadata, delete and re-embed
-            if (strpos($exists->text_content, '[Source:') === false) {
-                $DB->delete_records('ainotebook_embeddings', ['fileid' => $fileid]);
-            } else {
-                return;
-            }
-        }
+        global $DB;
 
         // Retrieve the filename from Moodle file storage
         $fs = get_file_storage();
@@ -806,6 +819,8 @@ class ai_client {
         // Split text by page break character (\f)
         $pages = explode("\f", $text);
         $chunk_index = 0;
+
+        $all_chunks = [];
 
         foreach ($pages as $page_idx => $page_content) {
             $page_num = $page_idx + 1;
@@ -834,19 +849,69 @@ class ai_client {
             foreach ($chunks as $chunk_text) {
                 // Add page metadata block to the text chunk content
                 $formatted_text = "[Source: {$filename} - Page {$page_num}]\n" . $chunk_text;
+                $all_chunks[] = [
+                    'chunk_index' => $chunk_index,
+                    'text_content' => $formatted_text
+                ];
+                $chunk_index++;
+            }
+        }
 
-                $vector = self::generate_embedding_for_text($formatted_text);
-                if ($vector) {
+        if (empty($all_chunks)) {
+            return;
+        }
+
+        // Fetch existing chunk indexes for this file
+        $existing_chunks = $DB->get_fieldset_select('ainotebook_embeddings', 'chunk_index', 'fileid = ?', [$fileid]);
+        $existing_set = array_flip($existing_chunks);
+
+        // Filter out already embedded chunks
+        $missing_chunks = [];
+        foreach ($all_chunks as $c) {
+            if (!isset($existing_set[$c['chunk_index']])) {
+                $missing_chunks[] = $c;
+            }
+        }
+
+        if (empty($missing_chunks)) {
+            return;
+        }
+
+        // Batch embed the missing chunks in groups of 50
+        $batch_size = 50;
+        $chunks_count = count($missing_chunks);
+        for ($i = 0; $i < $chunks_count; $i += $batch_size) {
+            $batch = array_slice($missing_chunks, $i, $batch_size);
+            $texts = array_map(function($c) { return $c['text_content']; }, $batch);
+            
+            $vectors = self::generate_embeddings_batch($texts);
+            if ($vectors && count($vectors) === count($batch)) {
+                foreach ($batch as $idx => $c) {
                     $record = new \stdClass();
                     $record->ainotebookid = $ainotebookid;
                     $record->fileid = $fileid;
-                    $record->chunk_index = $chunk_index;
-                    $record->text_content = $formatted_text;
-                    $record->embedding = json_encode($vector);
+                    $record->chunk_index = $c['chunk_index'];
+                    $record->text_content = $c['text_content'];
+                    $record->embedding = json_encode($vectors[$idx]);
                     $record->timecreated = time();
                     
                     $DB->insert_record('ainotebook_embeddings', $record);
-                    $chunk_index++;
+                }
+            } else {
+                // Fallback to single requests if batching fails or is not supported
+                foreach ($batch as $c) {
+                    $vector = self::generate_embedding_for_text($c['text_content']);
+                    if ($vector) {
+                        $record = new \stdClass();
+                        $record->ainotebookid = $ainotebookid;
+                        $record->fileid = $fileid;
+                        $record->chunk_index = $c['chunk_index'];
+                        $record->text_content = $c['text_content'];
+                        $record->embedding = json_encode($vector);
+                        $record->timecreated = time();
+                        
+                        $DB->insert_record('ainotebook_embeddings', $record);
+                    }
                 }
             }
         }
@@ -1143,6 +1208,88 @@ class ai_client {
             $result = json_decode($raw_response);
             if (isset($result->data[0]->embedding)) {
                 return $result->data[0]->embedding;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Generate embeddings for multiple texts in a single batch request.
+     * @param array $texts Array of strings.
+     * @return array|null Array of embedding arrays, or null on failure.
+     */
+    public static function generate_embeddings_batch(array $texts): ?array {
+        if (empty($texts)) {
+            return [];
+        }
+
+        $provider = get_config('mod_ainotebook', 'ai_provider') ?: 'gemini';
+        $apikey = get_config('mod_ainotebook', 'api_key');
+        if (empty($apikey)) {
+            return null;
+        }
+
+        if ($provider !== 'gemini' && $provider !== 'openai') {
+            return null;
+        }
+
+        global $CFG;
+        require_once($CFG->libdir . '/filelib.php');
+        $curl = new \curl();
+        $curl->setopt([
+            'CURLOPT_SSL_VERIFYPEER' => false,
+            'CURLOPT_SSL_VERIFYHOST' => false,
+            'CURLOPT_TIMEOUT'        => 60,
+        ]);
+
+        if ($provider === 'gemini') {
+            $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:batchEmbedContents?key={$apikey}";
+            $requests = [];
+            foreach ($texts as $text) {
+                $requests[] = [
+                    'model' => 'models/text-embedding-004',
+                    'content' => [
+                        'parts' => [['text' => $text]]
+                    ]
+                ];
+            }
+            $data = ['requests' => $requests];
+            $curl->setopt(['CURLOPT_HTTPHEADER' => ['Content-Type: application/json']]);
+            $raw_response = $curl->post($endpoint, json_encode($data));
+            $result = json_decode($raw_response);
+            if (isset($result->embeddings) && is_array($result->embeddings)) {
+                $vectors = [];
+                foreach ($result->embeddings as $emb) {
+                    if (isset($emb->values)) {
+                        $vectors[] = $emb->values;
+                    }
+                }
+                return $vectors;
+            }
+        } elseif ($provider === 'openai') {
+            $endpoint = "https://api.openai.com/v1/embeddings";
+            $data = [
+                'model' => 'text-embedding-3-small',
+                'input' => $texts
+            ];
+            $curl->setopt([
+                'CURLOPT_HTTPHEADER' => [
+                    'Authorization: Bearer ' . $apikey,
+                    'Content-Type: application/json'
+                ]
+            ]);
+            $raw_response = $curl->post($endpoint, json_encode($data));
+            $result = json_decode($raw_response);
+            if (isset($result->data) && is_array($result->data)) {
+                usort($result->data, function($a, $b) {
+                    return $a->index <=> $b->index;
+                });
+                $vectors = [];
+                foreach ($result->data as $item) {
+                    $vectors[] = $item->embedding;
+                }
+                return $vectors;
             }
         }
 

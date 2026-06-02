@@ -469,3 +469,34 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
 /* RAG Context Transparency Badge */
 .context-source-badge { display: inline-flex; align-items: center; gap: 8px; font-size: 0.75rem; background: var(--pres-primary-soft); color: var(--pres-primary); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--pres-border); font-weight: 600; margin-top: 10px; }
 .context-source-badge i { font-size: 0.85rem; }
+
+/* Inline Citation Link Styling */
+.message.ai a[href^="#citation-"] {
+    background-color: var(--pres-primary-soft);
+    color: var(--pres-text);
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-decoration: none !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--pres-border);
+    margin: 0 4px;
+    transition: all 0.2s ease;
+}
+.message.ai a[href^="#citation-"]::before {
+    content: "\f0c1"; /* FontAwesome link icon */
+    font-family: "FontAwesome";
+    font-size: 0.75rem;
+    color: var(--pres-text-dim);
+}
+.message.ai a[href^="#citation-"]:hover {
+    background-color: var(--pres-primary);
+    color: #fff !important;
+    border-color: var(--pres-primary);
+}
+.message.ai a[href^="#citation-"]:hover::before {
+    color: #fff;
+}

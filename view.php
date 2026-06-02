@@ -1116,6 +1116,37 @@ $js .= <<<'JS'
             };
         }
 
+        // Build file mapping for inline citations
+        var fileUrls = {};
+        document.querySelectorAll("#ainotebook-sidebar-nav .material-file-item a").forEach(function(a) {
+            var filename = a.innerText.trim();
+            fileUrls[filename] = a.getAttribute("href");
+        });
+
+        // Intercept inline citations (#citation-) clicks
+        document.addEventListener("click", function(e) {
+            var a = e.target.closest("a");
+            if (a && a.getAttribute("href")) {
+                var href = a.getAttribute("href");
+                var prefix = "#citation-";
+                if (href.indexOf(prefix) === 0) {
+                    e.preventDefault();
+                    var citationStr = href.substring(prefix.length);
+                    var pageIndex = citationStr.lastIndexOf("-page-");
+                    if (pageIndex !== -1) {
+                        var filename = decodeURIComponent(citationStr.substring(0, pageIndex));
+                        var page = citationStr.substring(pageIndex + 6);
+                        var baseUrl = fileUrls[filename];
+                        if (baseUrl) {
+                            window.open(baseUrl + "#page=" + page, "_blank");
+                        } else {
+                            alert("File not found: " + filename);
+                        }
+                    }
+                }
+            }
+        });
+
         // Settings Modal.
         var modal = document.getElementById("settings-modal");
         var openBtn = document.getElementById("open-settings");

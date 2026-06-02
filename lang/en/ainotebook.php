@@ -54,3 +54,7 @@ $string['activitysummary'] = 'Activity Summary';
 $string['recommendation'] = 'Recommendation';
 $string['evaluating'] = 'Evaluating...';
 $string['quizgrade'] = 'Quiz Score';
+
+$string['files_filemanager'] = 'Supported Materials';
+$string['files_filemanager_help'] = 'Supported file types: PDF (.pdf), Text (.txt), Word (.docx), and PowerPoint (.pptx).';
+$string['files_instruction'] = 'Supported file types: PDF, TXT, DOCX, and PPTX.';

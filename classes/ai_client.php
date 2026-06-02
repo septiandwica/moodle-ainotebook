@@ -121,6 +121,7 @@ class ai_client {
         $system_prompt .= "9. FORMATTING: Always ensure the artifact wrappers (```json-quiz, ```mermaid, [REPORT_START]) are present so the system can detect them.\n";
         $system_prompt .= "10. BEHAVIOR: ONLY generate a 'quiz', 'report', or 'mindmap' if the user explicitly asks for it by name. For all other questions, respond with standard text only.\n";
         $system_prompt .= "11. ADAPTIVE LEARNING: Monitor the student's understanding. If the student answers questions incorrectly or shows confusion on a specific topic, proactively recommend specific pages or sections from the uploaded study materials (e.g., 'Sepertinya kamu kurang paham di Bab 3, saya sarankan baca kembali halaman 12-15 dari dokumen dosen.').\n";
+        $system_prompt .= "12. CITATIONS: [STRICT RULE] When you use information from a specific study material chunk to answer a question, you MUST cite the source. Use the exact format: `[Source: Filename - Page X](#citation-Filename-page-X)` if replying in English, or `[Sumber: Filename - Halaman X](#citation-Filename-page-X)` if replying in Indonesian. Replace 'Filename' with the actual filename and 'X' with the exact page number from the source context (e.g. `[Sumber: React_Module.pdf - Halaman 12](#citation-React_Module.pdf-page-12)`). Do not modify the `#citation-` format. It must match this exact syntax so the user can click it to open the page. Place citations inline at the end of the sentence or paragraph referencing the fact.\n";
 
         // ── Fetch conversation history ─────────────────────────────────────────
         $history = $DB->get_records(
@@ -736,72 +737,69 @@ class ai_client {
         global $DB, $CFG;
         
         // Check if already embedded
-        if ($DB->record_exists('ainotebook_embeddings', ['fileid' => $fileid])) {
-            return;
+        $exists = $DB->get_record('ainotebook_embeddings', ['fileid' => $fileid], 'id, text_content', IGNORE_MULTIPLE);
+        if ($exists) {
+            // If it exists, but does not have our source citation metadata, delete and re-embed
+            if (strpos($exists->text_content, '[Source:') === false) {
+                $DB->delete_records('ainotebook_embeddings', ['fileid' => $fileid]);
+            } else {
+                return;
+            }
         }
+
+        // Retrieve the filename from Moodle file storage
+        $fs = get_file_storage();
+        $file = $fs->get_file_by_id($fileid);
+        $filename = $file ? $file->get_filename() : "document.pdf";
 
         // Clean up text
         $text = preg_replace("/\r\n|\r/", "\n", $text);
         
-        // Simple Chunking: max 1000 characters per chunk preserving paragraph boundaries
-        $chunks = [];
-        $current_chunk = "";
-        $paragraphs = explode("\n", $text);
-        foreach ($paragraphs as $p) {
-            $p = trim($p);
-            if (empty($p)) continue;
-            
-            if (strlen($current_chunk) + strlen($p) > 1000) {
-                if (!empty($current_chunk)) {
-                    $chunks[] = $current_chunk;
-                }
-                $current_chunk = $p;
-            } else {
-                $current_chunk .= (empty($current_chunk) ? "" : "\n") . $p;
-            }
-        }
-        if (!empty($current_chunk)) {
-            $chunks[] = $current_chunk;
-        }
-
-        $apikey = get_config('mod_ainotebook', 'api_key');
-        if (empty($apikey)) return;
-
-        require_once($CFG->libdir . '/filelib.php');
-        $curl = new \curl();
-        $curl->setopt([
-            'CURLOPT_SSL_VERIFYPEER' => false,
-            'CURLOPT_SSL_VERIFYHOST' => false,
-            'CURLOPT_TIMEOUT'        => 60,
-            'CURLOPT_HTTPHEADER' => ['Content-Type: application/json']
-        ]);
-
+        // Split text by page break character (\f)
+        $pages = explode("\f", $text);
         $chunk_index = 0;
-        foreach ($chunks as $chunk) {
-            $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={$apikey}";
-            $data = [
-                'model' => 'models/text-embedding-004',
-                'content' => [
-                    'parts' => [['text' => $chunk]]
-                ]
-            ];
+
+        foreach ($pages as $page_idx => $page_content) {
+            $page_num = $page_idx + 1;
             
-            $raw_response = $curl->post($endpoint, json_encode($data));
-            $result = json_decode($raw_response);
-            
-            if (isset($result->embedding->values)) {
-                $vector = $result->embedding->values;
+            // Chunking per page: max 1000 characters preserving paragraph boundaries
+            $chunks = [];
+            $current_chunk = "";
+            $paragraphs = explode("\n", $page_content);
+            foreach ($paragraphs as $p) {
+                $p = trim($p);
+                if (empty($p)) continue;
                 
-                $record = new \stdClass();
-                $record->ainotebookid = $ainotebookid;
-                $record->fileid = $fileid;
-                $record->chunk_index = $chunk_index;
-                $record->text_content = $chunk;
-                $record->embedding = json_encode($vector);
-                $record->timecreated = time();
-                
-                $DB->insert_record('ainotebook_embeddings', $record);
-                $chunk_index++;
+                if (strlen($current_chunk) + strlen($p) > 1000) {
+                    if (!empty($current_chunk)) {
+                        $chunks[] = $current_chunk;
+                    }
+                    $current_chunk = $p;
+                } else {
+                    $current_chunk .= (empty($current_chunk) ? "" : "\n") . $p;
+                }
+            }
+            if (!empty($current_chunk)) {
+                $chunks[] = $current_chunk;
+            }
+
+            foreach ($chunks as $chunk_text) {
+                // Add page metadata block to the text chunk content
+                $formatted_text = "[Source: {$filename} - Page {$page_num}]\n" . $chunk_text;
+
+                $vector = self::generate_embedding_for_text($formatted_text);
+                if ($vector) {
+                    $record = new \stdClass();
+                    $record->ainotebookid = $ainotebookid;
+                    $record->fileid = $fileid;
+                    $record->chunk_index = $chunk_index;
+                    $record->text_content = $formatted_text;
+                    $record->embedding = json_encode($vector);
+                    $record->timecreated = time();
+                    
+                    $DB->insert_record('ainotebook_embeddings', $record);
+                    $chunk_index++;
+                }
             }
         }
     }
@@ -885,18 +883,18 @@ class ai_client {
                     // Strategy 1: Layout-aware extraction (best for AI context)
                     $output     = [];
                     $return_var = 0;
-                    exec("pdftotext -layout -nopgbrk " . escapeshellarg($tmpfile) . " - 2>/dev/null", $output, $return_var);
+                    exec("pdftotext -layout " . escapeshellarg($tmpfile) . " - 2>/dev/null", $output, $return_var);
                     $extracted = implode("\n", $output);
-
+ 
                     // Strategy 2: If layout failed or returned empty, try raw extraction
                     if ($return_var !== 0 || trim($extracted) === '') {
                         $output = [];
-                        exec("pdftotext -raw -nopgbrk " . escapeshellarg($tmpfile) . " - 2>/dev/null", $output, $return_var);
+                        exec("pdftotext -raw " . escapeshellarg($tmpfile) . " - 2>/dev/null", $output, $return_var);
                         if ($return_var === 0) {
                             $extracted = implode("\n", $output);
                         }
                     }
-
+ 
                     // Strategy 3: OCR Fallback (for scanned images)
                     if (trim($extracted) === '' || strlen(trim($extracted)) < 50) {
                         $imgbase = $tempdir . '/' . uniqid() . '-page';
@@ -911,7 +909,7 @@ class ai_client {
                             $output_ocr = [];
                             // Run tesseract with both English and Indonesian support.
                             exec("tesseract -l eng+ind " . escapeshellarg($img) . " stdout 2>/dev/null", $output_ocr);
-                            $ocr_text .= implode("\n", $output_ocr) . "\n";
+                            $ocr_text .= implode("\n", $output_ocr) . "\f";
                             @unlink($img); 
                         }
                         
@@ -927,6 +925,32 @@ class ai_client {
                             $extracted = "[System Note: Document content provided as binary attachment.]";
                         }
                     }
+                } catch (\Exception $e) {
+                    $extracted = "[Error: " . $e->getMessage() . "]";
+                } finally {
+                    if (file_exists($tmpfile)) {
+                        @unlink($tmpfile);
+                    }
+                }
+            } elseif ($mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'docx') {
+                $tempdir = make_temp_directory('mod_ainotebook');
+                $tmpfile = $tempdir . '/' . uniqid() . '.docx';
+                try {
+                    $file->copy_content_to($tmpfile);
+                    $extracted = self::extract_docx_text($tmpfile);
+                } catch (\Exception $e) {
+                    $extracted = "[Error: " . $e->getMessage() . "]";
+                } finally {
+                    if (file_exists($tmpfile)) {
+                        @unlink($tmpfile);
+                    }
+                }
+            } elseif ($mimetype === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' || strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'pptx') {
+                $tempdir = make_temp_directory('mod_ainotebook');
+                $tmpfile = $tempdir . '/' . uniqid() . '.pptx';
+                try {
+                    $file->copy_content_to($tmpfile);
+                    $extracted = self::extract_pptx_text($tmpfile);
                 } catch (\Exception $e) {
                     $extracted = "[Error: " . $e->getMessage() . "]";
                 } finally {
@@ -987,35 +1011,12 @@ class ai_client {
      * Search knowledge index for relevant chunks.
      */
     public static function search_knowledge(int $ainotebookid, array $file_ids, string $query, int $top_k): array {
-        global $DB, $CFG;
+        global $DB;
         
         if (empty($file_ids)) return [];
         
-        $apikey = get_config('mod_ainotebook', 'api_key');
-        if (empty($apikey)) return [];
-        
-        require_once($CFG->libdir . '/filelib.php');
-        $curl = new \curl();
-        $curl->setopt([
-            'CURLOPT_SSL_VERIFYPEER' => false,
-            'CURLOPT_SSL_VERIFYHOST' => false,
-            'CURLOPT_TIMEOUT'        => 60,
-            'CURLOPT_HTTPHEADER' => ['Content-Type: application/json']
-        ]);
-        
-        $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={$apikey}";
-        $data = [
-            'model' => 'models/text-embedding-004',
-            'content' => [
-                'parts' => [['text' => $query]]
-            ]
-        ];
-        
-        $raw_response = $curl->post($endpoint, json_encode($data));
-        $result = json_decode($raw_response);
-        
-        if (!isset($result->embedding->values)) return [];
-        $query_vector = $result->embedding->values;
+        $query_vector = self::generate_embedding_for_text($query);
+        if (empty($query_vector)) return [];
         
         list($in, $params) = $DB->get_in_or_equal($file_ids);
         array_unshift($params, $ainotebookid);
@@ -1038,5 +1039,100 @@ class ai_client {
         });
         
         return array_slice($scored_chunks, 0, $top_k);
+    }
+
+    /**
+     * Generate embeddings for a given text using the configured provider.
+     */
+    public static function generate_embedding_for_text(string $text): ?array {
+        $provider = get_config('mod_ainotebook', 'ai_provider') ?: 'gemini';
+        $apikey = get_config('mod_ainotebook', 'api_key');
+        if (empty($apikey)) {
+            return null;
+        }
+
+        // We only support embeddings for gemini and openai.
+        if ($provider !== 'gemini' && $provider !== 'openai') {
+            return null;
+        }
+
+        global $CFG;
+        require_once($CFG->libdir . '/filelib.php');
+        $curl = new \curl();
+        $curl->setopt([
+            'CURLOPT_SSL_VERIFYPEER' => false,
+            'CURLOPT_SSL_VERIFYHOST' => false,
+            'CURLOPT_TIMEOUT'        => 30,
+        ]);
+
+        if ($provider === 'gemini') {
+            $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={$apikey}";
+            $data = [
+                'model' => 'models/text-embedding-004',
+                'content' => [
+                    'parts' => [['text' => $text]]
+                ]
+            ];
+            $curl->setopt(['CURLOPT_HTTPHEADER' => ['Content-Type: application/json']]);
+            $raw_response = $curl->post($endpoint, json_encode($data));
+            $result = json_decode($raw_response);
+            if (isset($result->embedding->values)) {
+                return $result->embedding->values;
+            }
+        } elseif ($provider === 'openai') {
+            $endpoint = "https://api.openai.com/v1/embeddings";
+            $data = [
+                'model' => 'text-embedding-3-small',
+                'input' => $text
+            ];
+            $curl->setopt([
+                'CURLOPT_HTTPHEADER' => [
+                    'Authorization: Bearer ' . $apikey,
+                    'Content-Type: application/json'
+                ]
+            ]);
+            $raw_response = $curl->post($endpoint, json_encode($data));
+            $result = json_decode($raw_response);
+            if (isset($result->data[0]->embedding)) {
+                return $result->data[0]->embedding;
+            }
+        }
+
+        return null;
+    }
+
+    public static function extract_docx_text(string $filepath): string {
+        $zip = new \ZipArchive();
+        if ($zip->open($filepath) === true) {
+            $xml = $zip->getFromName('word/document.xml');
+            $zip->close();
+            if ($xml) {
+                $xml = str_replace(['</w:p>', '</w:r>', '<w:tab/>'], ["\n", " ", "    "], $xml);
+                $text = strip_tags($xml);
+                return html_entity_decode(trim($text));
+            }
+        }
+        return "";
+    }
+
+    public static function extract_pptx_text(string $filepath): string {
+        $zip = new \ZipArchive();
+        if ($zip->open($filepath) === true) {
+            $slides_text = [];
+            for ($i = 1; $i <= 1000; $i++) {
+                $slide_xml = $zip->getFromName("ppt/slides/slide{$i}.xml");
+                if (!$slide_xml) {
+                    break;
+                }
+                $slide_xml = str_replace(['</a:p>', '</a:t>'], ["\n", " "], $slide_xml);
+                $text = strip_tags($slide_xml);
+                $slides_text[] = html_entity_decode(trim($text));
+            }
+            $zip->close();
+            if (!empty($slides_text)) {
+                return implode("\f", $slides_text);
+            }
+        }
+        return "";
     }
 }

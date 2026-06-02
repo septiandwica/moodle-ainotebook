@@ -24,13 +24,16 @@ class mod_ainotebook_mod_form extends moodleform_mod {
 
         $mform->addElement('header', 'materialhdr', get_string('material', 'mod_ainotebook'));
         
+        $mform->addElement('static', 'files_instruction', '', '<span class="text-info"><i class="fa fa-info-circle"></i> ' . get_string('files_instruction', 'mod_ainotebook') . '</span>');
+        
         $filemanageroptions = array();
-        $filemanageroptions['accepted_types'] = array('.pdf', '.txt', '.doc', '.docx');
+        $filemanageroptions['accepted_types'] = array('.pdf', '.txt', '.docx', '.pptx');
         $filemanageroptions['maxbytes'] = 0;
         $filemanageroptions['maxfiles'] = 5;
         $filemanageroptions['mainfile'] = true;
 
         $mform->addElement('filemanager', 'files_filemanager', get_string('files'), null, $filemanageroptions);
+        $mform->addHelpButton('files_filemanager', 'files_filemanager', 'mod_ainotebook');
 
         $this->standard_grading_coursemodule_elements();
         

@@ -665,19 +665,29 @@ class ai_client {
             $response = self::custom_provider_request($provider, $system_prompt, $user_prompt);
         }
         
-        $response = preg_replace('/^```json\s*/', '', $response);
-        $response = preg_replace('/```$/', '', trim($response));
+        $json_text = trim($response);
+        $first_brace = strpos($json_text, '{');
+        $last_brace = strrpos($json_text, '}');
+        if ($first_brace !== false && $last_brace !== false && $last_brace > $first_brace) {
+            $json_text = substr($json_text, $first_brace, $last_brace - $first_brace + 1);
+        }
         
-        $json = json_decode($response, true);
+        $json = json_decode($json_text, true);
         if (!$json || !isset($json['score'])) {
-            $is_rate_limit = (stripos($response, 'DEMI Tutor is currently assisting') !== false || stripos($response, 'AI service is currently unavailable') !== false);
-            
-            $json = [
-                'score' => 0,
-                'understanding' => $is_rate_limit ? 'DEMI Tutor is currently assisting many students. Please wait a few moments and try again.' : 'Error parsing AI evaluation.',
-                'activity_summary' => $is_rate_limit ? 'Evaluation paused due to high system load.' : 'Could not generate summary.',
-                'recommendation' => 'Try generating again later.'
-            ];
+            // Check if response starts with "Error" or looks like a known error message
+            if (strpos($response, 'Error:') === 0 || strpos($response, 'AI Error:') === 0 || strpos($response, 'I am having trouble') === 0 || strpos($response, 'The AI service') === 0 || strpos($response, 'I encountered') === 0) {
+                throw new \Exception($response);
+            }
+            // Check for rate limits specifically
+            if (stripos($response, 'DEMI Tutor is currently assisting') !== false || stripos($response, 'AI service is currently unavailable') !== false) {
+                throw new \Exception('DEMI Tutor is currently assisting many students. Please wait a few moments and try again.');
+            }
+            // Generic parse error, append first 200 chars of response for context
+            $debug_response = substr(trim(strip_tags($response)), 0, 200);
+            if (empty($debug_response)) {
+                $debug_response = 'Empty response received from the AI service.';
+            }
+            throw new \Exception('Failed to parse AI evaluation response. Response received: ' . $debug_response);
         }
         
         $eval = $DB->get_record('ainotebook_evals', ['ainotebookid' => $ainotebookid, 'userid' => $target_userid]);

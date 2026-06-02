@@ -246,6 +246,33 @@ echo '<script>
         });
     };
     
+    window.updateEvalDisplay = function(userId, evaluation) {
+        var el = document.getElementById("eval-display-" + userId);
+        if (!el) return;
+        
+        var score = evaluation.score;
+        var insightStr = JSON.stringify(evaluation);
+        var escapedInsight = insightStr.replace(/`/g, "\\`").replace(/"/g, "&quot;");
+        
+        var html = "";
+        html += "<span class=\'score-val-container\' style=\'display: inline-flex; align-items: center; gap: 5px;\'>";
+        html += "<strong class=\'score-text\'>" + score + "</strong><span class=\'score-max\' style=\'color: #64748b; font-size: 0.85rem;\'>/100</span>";
+        html += " <button class=\'btn-icon-inline\' onclick=\'window.startEditGrade(" + userId + ", " + score + ")\' title=\'Override Grade\' style=\'background:none; border:none; color:#1e40af; cursor:pointer; padding: 2px 4px; font-size: 0.9rem;\'><i class=\'fa fa-pencil\'></i></button>";
+        html += "</span>";
+        
+        html += "<span class=\'score-edit-container\' style=\'display:none; align-items: center; gap: 4px;\'>";
+        html += "<input type=\'number\' class=\'score-input\' min=\'0\' max=\'100\' style=\'width: 55px; padding: 2px 4px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.85rem;\' value=\'" + score + "\'>";
+        html += " <button class=\'btn-premium btn-small\' onclick=\'window.saveGradeOverride(" + userId + ", this)\' style=\'padding: 2px 6px; font-size: 0.8rem; background: #00d084; border-color: #00d084; color: white;\'><i class=\'fa fa-check\'></i></button>";
+        html += " <button class=\'btn-premium btn-small\' onclick=\'window.cancelEditGrade(" + userId + ")\' style=\'padding: 2px 6px; font-size: 0.8rem; background: #ef4444; border-color: #ef4444; color: white;\'><i class=\'fa fa-times\'></i></button>";
+        html += "</span>";
+        
+        html += "<br/>";
+        html += "<button class=\'btn-premium btn-small\' onclick=\'window.showInsightModal(`" + escapedInsight + "`)\' style=\'margin-top: 4px;\'><i class=\'fa fa-lightbulb-o\'></i> " + "'.get_string('viewinsight', 'mod_ainotebook').'" + "</button>";
+        html += " <button class=\'btn-premium btn-small\' onclick=\'window.evaluateStudent(" + userId + ", this)\' title=\'Re-evaluate Student\' style=\'margin-top: 4px;\'><i class=\'fa fa-refresh\'></i></button>";
+        
+        el.innerHTML = html;
+    };
+
     window.evaluateStudent = function(userId, btnElement) {
         var originalHtml = btnElement.innerHTML;
         btnElement.disabled = true;
@@ -262,9 +289,9 @@ echo '<script>
             body: fd
         }).then(r => r.json()).then(res => {
             if(res.success && res.evaluation) {
-                location.reload(); 
+                window.updateEvalDisplay(userId, res.evaluation);
             } else {
-                alert("Evaluation failed.");
+                alert("Evaluation failed: " + (res.error || "Unknown error"));
                 btnElement.disabled = false;
                 btnElement.innerHTML = originalHtml;
             }
@@ -320,8 +347,8 @@ echo '<script>
             method: "POST",
             body: fd
         }).then(r => r.json()).then(res => {
-            if(res.success) {
-                location.reload();
+            if(res.success && res.evaluation) {
+                window.updateEvalDisplay(userId, res.evaluation);
             } else {
                 alert("Failed to override grade.");
                 btnElement.disabled = false;

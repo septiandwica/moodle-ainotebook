@@ -51,12 +51,18 @@ if ($action === 'evaluate_student') {
     require_capability('mod/ainotebook:viewprogress', $context);
     
     $target_userid = required_param('userid', PARAM_INT);
-    $result = \mod_ainotebook\ai_client::evaluate_student($cmid, $target_userid);
-    
-    echo json_encode([
-        'success' => true,
-        'evaluation' => $result
-    ]);
+    try {
+        $result = \mod_ainotebook\ai_client::evaluate_student($cmid, $target_userid);
+        echo json_encode([
+            'success' => true,
+            'evaluation' => $result
+        ]);
+    } catch (\Exception $e) {
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
     exit;
 }
 
@@ -101,9 +107,13 @@ if ($action === 'override_grade') {
     $grade = new \stdClass();
     $grade->userid = $target_userid;
     $grade->rawgrade = (float)$score;
-    \ainotebook_grade_item_update($ainotebook, $grade);
+    ainotebook_grade_item_update($ainotebook, $grade);
     
-    echo json_encode(['success' => true]);
+    $eval_record = $DB->get_record('ainotebook_evals', ['ainotebookid' => $ainotebook->id, 'userid' => $target_userid]);
+    echo json_encode([
+        'success' => true,
+        'evaluation' => json_decode($eval_record->insight_json, true)
+    ]);
     exit;
 }
 

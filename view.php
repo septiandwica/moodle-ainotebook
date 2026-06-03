@@ -128,15 +128,39 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
                 </div>
                 <?php
                 $history = $DB->get_records('ainotebook_chat', ['ainotebookid' => $ainotebook->id, 'userid' => $target_user->id], 'timecreated ASC');
-                foreach ($history as $log) {
+                $hist_array = array_values($history);
+                $total_hist = count($hist_array);
+                
+                foreach ($hist_array as $index => $log) {
                     $clean_response = preg_replace('/```json-quiz[\s\S]*?```/', '', $log->response);
                     $clean_response = preg_replace('/```mermaid[\s\S]*?```/', '', $clean_response);
                     $clean_response = preg_replace('/\[REPORT_START\][\s\S]*?\[REPORT_END\]/', '', $clean_response);
+                    
+                    // Extract suggestions
+                    $sug_match = [];
+                    $suggestions_html = '';
+                    if (preg_match('/<suggestions>([\s\S]*?)<\/suggestions>/i', $clean_response, $sug_match)) {
+                        $clean_response = str_replace($sug_match[0], '', $clean_response);
+                        
+                        // Only render suggestions for the very last message in the chat
+                        if ($index === $total_hist - 1 && !$is_readonly) {
+                            $suggestions = array_filter(array_map('trim', explode('|', $sug_match[1])));
+                            if (!empty($suggestions)) {
+                                $suggestions_html .= '<div class="suggestion-container">';
+                                foreach ($suggestions as $s) {
+                                    $s_escaped = s($s);
+                                    $suggestions_html .= '<button class="suggestion-btn" onclick="sendSuggested(\''.$s_escaped.'\')">' . $s_escaped . '</button>';
+                                }
+                                $suggestions_html .= '</div>';
+                            }
+                        }
+                    }
+                    
                     $clean_response = trim($clean_response);
                     if (empty($clean_response)) $clean_response = "I have generated the requested material below.";
 
                     echo '<div class="message user">' . nl2br(s($log->message)) . '</div>';
-                    echo '<div class="message ai">' . nl2br($clean_response) . '</div>';
+                    echo '<div class="message ai"><div class="markdown-body">' . nl2br($clean_response) . '</div>' . $suggestions_html . '</div>';
                 }
                 ?>
             </div>

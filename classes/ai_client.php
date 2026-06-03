@@ -79,7 +79,9 @@ class ai_client {
         $system_prompt .= "DO NOT provide general answers for outside topics. DO NOT say 'This is outside the materials, but here is a general answer'. You must REFUSE completely.\n";
 
         if (!empty($rag_context)) {
-            $system_prompt .= "\n[STUDY MATERIALS (RAG RETRIEVED CHUNKS)]: \n{$rag_context}\n";
+            $system_prompt .= "\n[STUDY MATERIALS (RAG RETRIEVED CHUNKS)]:\n";
+            $system_prompt .= "CRITICAL INSTRUCTION: You MUST ONLY use the facts provided in the chunks below. If the answer is not explicitly stated in these chunks, you MUST say 'Maaf, informasi tersebut tidak ada di dalam materi yang diberikan.' and STOP. Do NOT guess. Do NOT use outside knowledge. Do NOT hallucinate citations.\n\n";
+            $system_prompt .= "{$rag_context}\n";
         } else {
             // Fallback if no embeddings found or search failed
             $system_prompt .= "\n[SYSTEM NOTE: No relevant material context found. Please politely inform the user that you cannot find information on that in the provided documents.]\n";
@@ -1096,19 +1098,23 @@ class ai_client {
                     $vector = json_decode($chunk->embedding, true);
                     if (!is_array($vector)) continue;
                     
-                    $chunk->vector = $vector; // store decoded array
-                    unset($chunk->embedding); // remove heavy JSON string
-                    $cached_chunks[] = $chunk;
+                    $chunk_arr = (array)$chunk;
+                    $chunk_arr['vector'] = $vector; // store decoded array
+                    unset($chunk_arr['embedding']); // remove heavy JSON string
+                    $cached_chunks[] = $chunk_arr; // Must be array for simpledata=true cache
                 }
                 $cache->set($cache_key, $cached_chunks);
             }
             
             // Calculate cosine similarity using the cached decoded arrays
-            foreach ($cached_chunks as $chunk) {
-                $c = clone $chunk; // clone to avoid modifying cached object
+            foreach ($cached_chunks as $chunk_arr) {
+                $c = (object)$chunk_arr; // cast back to object for downstream code
                 $score = self::cosine_similarity($query_vector, $c->vector);
-                $c->score = $score;
-                $scored_chunks[] = $c;
+                // Only include chunks that are somewhat relevant
+                if ($score >= 0.3) {
+                    $c->score = $score;
+                    $scored_chunks[] = $c;
+                }
             }
         }
         

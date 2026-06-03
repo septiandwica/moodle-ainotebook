@@ -1069,7 +1069,7 @@ $js .= <<<'JS'
             }
         };
 
-        var renderSuggestions = function(suggestionsArray, parentMsgNode) {
+        function renderSuggestions(suggestionsArray, parentMsgNode) {
             // Remove existing container if any
             var existingContainer = document.querySelector(".suggestion-container");
             if (existingContainer) existingContainer.parentNode.removeChild(existingContainer);

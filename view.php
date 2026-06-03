@@ -1092,8 +1092,10 @@ $js .= <<<'JS'
             } else {
                 messages.appendChild(container);
             }
-            scrollToBottom();
-        };
+            if (typeof messages !== 'undefined' && messages) {
+                messages.scrollTop = messages.scrollHeight;
+            }
+        }
 
         // Suggestion loader.
 

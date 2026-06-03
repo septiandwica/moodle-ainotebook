@@ -910,12 +910,23 @@ $js .= <<<'JS'
                     var reader = response.body.getReader();
                     var decoder = new TextDecoder();
                     var fullText = "";
+                    var displayedText = "";
                     var sourcesCount = 0;
                     var streamBuffer = "";
+                    
+                    var typeInterval = setInterval(function() {
+                        if (contentDiv && displayedText.length < fullText.length) {
+                            var charsToAdd = Math.max(1, Math.floor((fullText.length - displayedText.length) / 3));
+                            displayedText += fullText.substring(displayedText.length, displayedText.length + charsToAdd);
+                            contentDiv.innerHTML = window.marked.parse(displayedText + " ▊");
+                            messages.scrollTop = messages.scrollHeight;
+                        }
+                    }, 30);
                     
                     function read() {
                         reader.read().then(function({done, value}) {
                             if (done) {
+                                clearInterval(typeInterval);
                                 if (loadingInterval) clearInterval(loadingInterval);
                                 if (typing && typing.parentNode) messages.removeChild(typing);
                                 
@@ -978,9 +989,6 @@ $js .= <<<'JS'
                                             }
                                             
                                             fullText += data.chunk;
-                                            // Render with a typing cursor block
-                                            contentDiv.innerHTML = window.marked.parse(fullText + " ▊");
-                                            messages.scrollTop = messages.scrollHeight;
                                         }
                                         if (data.sources_count !== undefined) {
                                             sourcesCount = data.sources_count;
@@ -993,6 +1001,7 @@ $js .= <<<'JS'
                             read();
                         }).catch(function(error) {
                             console.error("Stream reading error:", error);
+                            clearInterval(typeInterval);
                             if (loadingInterval) clearInterval(loadingInterval);
                             if (typing && typing.parentNode) messages.removeChild(typing);
                             input.disabled = false;

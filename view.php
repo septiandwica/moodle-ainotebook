@@ -75,7 +75,7 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
     </div>
     <?php endif; ?>
 
-<div id="ainotebook-wrapper">
+
     <!-- Main Workspace Card: Materials + Chat -->
     <div class="main-dashboard-card">
         <!-- Sidebar Panel: Material List -->
@@ -155,7 +155,7 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
     <!-- Creator Hub Card: Separate at the bottom -->
     <div id="creator-hub" class="creator-hub-card" <?php if($is_readonly) echo 'style="pointer-events: none; opacity: 0.9;"'; ?>>
         <div class="creator-header-action" style="<?php if($is_readonly) echo 'pointer-events: auto;'; ?>">
-            <h3>Learning Tools <?php if($is_readonly) echo '<span style="font-size: 0.8rem; font-weight: normal; color: var(--pres-text-dim);">(Read-Only)</span>'; ?></h3>
+            <h3>Learning Activities <?php if($is_readonly) echo '<span style="font-size: 0.8rem; font-weight: normal; color: var(--pres-text-dim);">(Read-Only)</span>'; ?></h3>
             <button id="toggle-creator" class="btn-icon" style="<?php if($is_readonly) echo 'pointer-events: auto;'; ?>"><i class="fa fa-angle-double-up"></i></button>
         </div>
         <div id="creator-hub-content" class="creator-content" style="<?php if($is_readonly) echo 'pointer-events: auto;'; ?>">
@@ -186,7 +186,7 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
             <div class="creator-workspace">
                 <div class="creator-history-panel">
                     <div class="panel-header">
-                        <i class="fa fa-history"></i> Generated learning tools
+                        <i class="fa fa-history"></i> Generated learning activities
                     </div>
                     <div id="history-list" class="history-list-items"></div>
                 </div>
@@ -903,6 +903,16 @@ $js .= <<<'JS'
                                 
                                 var result = detectAndRenderArtifacts(fullText, "ai", true);
                                 var displayMsg = result.cleanText;
+                                
+                                // Extract suggestions tag from AI response
+                                var sugMatch = displayMsg.match(/<suggestions>([\s\S]*?)<\/suggestions>/i);
+                                var extractedSuggestions = [];
+                                if (sugMatch) {
+                                    var suggestionsStr = sugMatch[1];
+                                    extractedSuggestions = suggestionsStr.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+                                    displayMsg = displayMsg.replace(sugMatch[0], "").trim();
+                                }
+                                
                                 if (result.found) {
                                     displayMsg += "\n\n*(I have also generated a " + result.type + " for you in the Creator section below)*";
                                 }
@@ -911,7 +921,10 @@ $js .= <<<'JS'
                                 }
                                 
                                 contentDiv.innerHTML = window.marked.parse(displayMsg);
-                                loadSuggestions();
+                                
+                                if (extractedSuggestions.length > 0) {
+                                    renderSuggestions(extractedSuggestions, aiMsgDiv);
+                                }
                                 return;
                             }
                             
@@ -1029,54 +1042,30 @@ $js .= <<<'JS'
             }
         };
 
-        var loadSuggestions = function() {
-            var aiMessages = document.querySelectorAll(".message.ai");
-            var lastAi = aiMessages[aiMessages.length - 1];
-            if (!lastAi) return;
+        var renderSuggestions = function(suggestionsArray, parentMsgNode) {
+            // Remove existing container if any
+            var existingContainer = document.querySelector(".suggestion-container");
+            if (existingContainer) existingContainer.parentNode.removeChild(existingContainer);
 
-            // Remove previous smart suggestions to keep chat clean.
-            document.querySelectorAll(".suggestion-container").forEach(el => el.remove());
+            if (!suggestionsArray || suggestionsArray.length === 0) return;
 
             var container = document.createElement("div");
             container.className = "suggestion-container";
-            container.innerHTML = "<div class='loading-suggestions'><i class='fa fa-circle-o-notch fa-spin'></i> Thinking...</div>";
-            lastAi.parentNode.insertBefore(container, lastAi.nextSibling);
-
-            var selectedFiles = [];
-            document.querySelectorAll(".file-checkbox:checked").forEach(function(cb) {
-                selectedFiles.push(cb.value);
+            
+            suggestionsArray.forEach(function(s) {
+                var btn = document.createElement("button");
+                btn.className = "suggestion-btn";
+                btn.innerText = s;
+                btn.onclick = function() { sendSuggested(s); };
+                container.appendChild(btn);
             });
-
-            var formData = new FormData();
-            formData.append("cmid", cmid);
-            formData.append("sesskey", sesskey);
-            formData.append("selected_files", JSON.stringify(selectedFiles));
-
-            fetch(wwwroot + "/mod/ainotebook/suggestions_ajax.php?t=" + Date.now(), {
-                method: "POST",
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.suggestions && container) {
-                    container.innerHTML = "";
-                    data.suggestions.forEach(function(s) {
-                        var btn = document.createElement("button");
-                        btn.className = "suggestion-btn";
-                        
-                        // Suggestions are limited to 10 words by the AI/Backend.
-                        btn.innerText = s;
-                        btn.onclick = function() { sendSuggested(s); };
-                        container.appendChild(btn);
-                    });
-                } else {
-                    container.innerHTML = "";
-                }
-            })
-            .catch(e => {
-                console.error("Suggestions error:", e);
-                container.innerHTML = "";
-            });
+            
+            if (parentMsgNode && parentMsgNode.parentNode) {
+                parentMsgNode.parentNode.insertBefore(container, parentMsgNode.nextSibling);
+            } else {
+                messages.appendChild(container);
+            }
+            scrollToBottom();
         };
 
         // Suggestion loader.
@@ -1163,7 +1152,7 @@ $js .= <<<'JS'
         var saveBtn = document.getElementById("save-settings");
 
         var resultsContainer = document.getElementById("creator-results");
-        loadSuggestions();
+        // Initial suggestions load removed to save API calls. Suggestions appear after chat.
         messages.scrollTop = messages.scrollHeight;
         
         var scanHistoryForArtifacts = function() {

@@ -32,7 +32,6 @@ class ai_client {
         $ainotebook = $DB->get_record('ainotebook', ['id' => $cm->instance], '*', MUST_EXIST);
 
         $fullname         = fullname($USER);
-        $material_data    = self::get_material_context($cmid, $selected_file_ids); // Still called to trigger extraction & embedding ingestion
         $binaries         = []; // FORCE EMPTY: We use RAG now, no need to send huge base64 PDFs to Gemini directly
         $ainame           = "PresMate";
         
@@ -83,10 +82,7 @@ class ai_client {
             $system_prompt .= "\n[STUDY MATERIALS (RAG RETRIEVED CHUNKS)]: \n{$rag_context}\n";
         } else {
             // Fallback if no embeddings found or search failed
-            $material_context = $material_data['text'] ?? "";
-            if (!empty($material_context)) {
-                $system_prompt .= "\n[STUDY MATERIALS (OCR/TEXT FALLBACK)]: \n{$material_context}\n";
-            }
+            $system_prompt .= "\n[SYSTEM NOTE: No relevant material context found. Please politely inform the user that you cannot find information on that in the provided documents.]\n";
         }
 
         if (!empty($binaries)) {
@@ -129,6 +125,7 @@ class ai_client {
         $system_prompt .= "10. BEHAVIOR: ONLY generate a 'quiz', 'report', or 'mindmap' if the user explicitly asks for it by name. For all other questions, respond with standard text only.\n";
         $system_prompt .= "11. ADAPTIVE LEARNING: Monitor the student's understanding. If the student answers questions incorrectly or shows confusion on a specific topic, proactively recommend specific pages or sections from the uploaded study materials (e.g., 'Sepertinya kamu kurang paham di Bab 3, saya sarankan baca kembali halaman 12-15 dari dokumen dosen.').\n";
         $system_prompt .= "12. CITATIONS: [STRICT RULE] When you use information from a specific study material chunk to answer a question, you MUST cite the source. Use the exact format: [Source: Filename - Page X](#citation-Filename-page-X) if replying in English, or [Sumber: Filename - Halaman X](#citation-Filename-page-X) if replying in Indonesian. Replace 'Filename' with the actual filename and 'X' with the exact page number from the source context (e.g. [Sumber: React_Module.pdf - Halaman 12](#citation-React_Module.pdf-page-12)). DO NOT wrap the citation link in backticks, quote marks, or code blocks; it must be written directly as a standard markdown hyperlink in the text. Place citations inline at the end of the sentence or paragraph referencing the fact.\n";
+        $system_prompt .= "13. SUGGESTIONS: At the very end of your response, you MUST provide 3 brief follow-up questions the student might ask next. Each question must be no longer than 10 words. Wrap them exactly inside `<suggestions>Q1|Q2|Q3</suggestions>`. Do not include these suggestions in the main text body.\n";
 
         // ── Fetch conversation history ─────────────────────────────────────────
         $history = $DB->get_records(
@@ -139,6 +136,14 @@ class ai_client {
             0,
             5
         );
+        
+        // Clean history artifacts to save tokens
+        if ($history) {
+            foreach ($history as $h) {
+                $h->response = preg_replace('/```(?:json-quiz|json|mermaid)[\s\S]*?```/', '[AI Generated Artifact Hidden]', $h->response);
+                $h->response = preg_replace('/\[REPORT_START\][\s\S]*?\[REPORT_END\]/', '[AI Generated Report Hidden]', $h->response);
+            }
+        }
 
         // ── Route to provider ─────────────────────────────────────────────────
         $provider = get_config('mod_ainotebook', 'ai_provider');
@@ -225,6 +230,10 @@ class ai_client {
             'CURLOPT_SSL_VERIFYHOST' => false,
             'CURLOPT_TIMEOUT'        => 60,
             'CURLOPT_CONNECTTIMEOUT' => 10,
+            // Phase 6: Connection Optimization (Keep-Alive)
+            'CURLOPT_TCP_KEEPALIVE'  => 1,
+            'CURLOPT_TCP_FASTOPEN'   => 1,
+            'CURLOPT_FORBID_REUSE'   => false,
         ]);
 
         // ── Gemini ────────────────────────────────────────────────────────────
@@ -505,6 +514,14 @@ class ai_client {
             0,
             5
         );
+        
+        // Clean history artifacts to save tokens
+        if ($history) {
+            foreach ($history as $h) {
+                $h->response = preg_replace('/```(?:json-quiz|json|mermaid)[\s\S]*?```/', '[AI Generated Artifact Hidden]', $h->response);
+                $h->response = preg_replace('/\[REPORT_START\][\s\S]*?\[REPORT_END\]/', '[AI Generated Report Hidden]', $h->response);
+            }
+        }
 
         $history_context = "";
         $history_hash    = "";
@@ -522,11 +539,8 @@ class ai_client {
             return $cached;
         }
 
-        $material_data = self::get_material_context($cmid, $selected_file_ids);
-        $material      = $material_data['text'] ?? "";
-        if (empty($material)) {
-            return [];
-        }
+        // Fallback for suggestions if no RAG is available or empty prompt
+        $material = "Please suggest questions based on the course topic.";
 
         $system_prompt = "You are a helpful academic assistant. Suggest 3 brief follow-up questions a student might ask next. STRICT RULES: Each suggestion MUST NOT EXCEED 10 WORDS. Each suggestion MUST be in English. Reply ONLY with the questions, one per line. No numbers, no bullet points, no preamble.";
 
@@ -907,7 +921,7 @@ class ai_client {
         }
     }
 
-    protected static function get_material_context(int $cmid, array $selected_file_ids = []): array {
+    public static function process_all_materials(int $cmid): void {
         global $DB;
 
         $context = \context_module::instance($cmid);
@@ -915,52 +929,18 @@ class ai_client {
         $files   = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', false);
 
         if (empty($files)) {
-            return ['text' => "", 'binaries' => []];
+            return;
         }
 
-        // Fallback: if nothing selected, pick the first non-directory file.
-        if (empty($selected_file_ids)) {
-            foreach ($files as $file) {
-                if (!$file->is_directory()) {
-                    $selected_file_ids = [$file->get_id()];
-                    break;
-                }
-            }
-        }
-
-        // Build cache key from selected file IDs + modification times.
-        $cache_key_parts = [$cmid];
-        $max_time        = 0;
         foreach ($files as $file) {
             if ($file->is_directory()) {
                 continue;
             }
-            if (!empty($selected_file_ids) && !in_array($file->get_id(), $selected_file_ids)) {
-                continue;
-            }
-            $cache_key_parts[] = $file->get_id();
-            $max_time          = max($max_time, $file->get_timemodified());
-        }
-        $cache_key_parts[] = $max_time;
-        $cache_key         = md5(implode('_', $cache_key_parts));
 
-        $cache  = \cache::make('mod_ainotebook', 'material_context');
-        $cached = $cache->get($cache_key);
-        if ($cached !== false) {
-            return $cached;
-        }
-
-        $content    = "";
-        $binaries   = [];
-        $totalchars = 0;
-        $maxchars   = 40000;
-
-        foreach ($files as $file) {
-            if ($file->is_directory() || $totalchars > $maxchars) {
-                continue;
-            }
-            if (!empty($selected_file_ids) && !in_array($file->get_id(), $selected_file_ids)) {
-                continue;
+            // Check if file is already embedded
+            $existing = $DB->get_record('ainotebook_embeddings', ['fileid' => $file->get_id()], '*', IGNORE_MULTIPLE);
+            if ($existing) {
+                continue; // Already processed
             }
 
             $mimetype  = $file->get_mimetype();
@@ -1022,11 +1002,7 @@ class ai_client {
                     }
 
                     if (trim($extracted) === '') {
-                        if (empty($binaries)) {
-                            $extracted = "[System Note: Document empty or non-extractable.]";
-                        } else {
-                            $extracted = "[System Note: Document content provided as binary attachment.]";
-                        }
+                        $extracted = "[System Note: Document empty or non-extractable.]";
                     }
                 } catch (\Exception $e) {
                     $extracted = "[Error: " . $e->getMessage() . "]";
@@ -1063,30 +1039,12 @@ class ai_client {
                 }
             }
 
-            $content .= "--- File Source: {$filename} ---\n";
             if (!empty($extracted)) {
-                $content    .= $extracted . "\n\n";
-                $totalchars += strlen($extracted);
-                
                 // Ingest text to embedding index
                 $cm = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
                 self::generate_embeddings_for_file($cm->instance, $file->get_id(), $extracted);
-            } else {
-                $content .= "[No content available for this file]\n\n";
             }
         }
-
-        if (strlen($content) > $maxchars) {
-            $content = substr($content, 0, $maxchars);
-        }
-
-        $result = [
-            'text'     => $content,
-            'binaries' => $binaries
-        ];
-
-        $cache->set($cache_key, $result);
-        return $result;
     }
 
     /**
@@ -1121,20 +1079,37 @@ class ai_client {
         $query_vector = self::generate_embedding_for_text($query);
         if (empty($query_vector)) return [];
         
-        list($in, $params) = $DB->get_in_or_equal($file_ids);
-        array_unshift($params, $ainotebookid);
-        $chunks = $DB->get_records_select('ainotebook_embeddings', "ainotebookid = ? AND fileid $in", $params);
-        
-        if (empty($chunks)) return [];
-        
         $scored_chunks = [];
-        foreach ($chunks as $chunk) {
-            $vector = json_decode($chunk->embedding, true);
-            if (!is_array($vector)) continue;
+        $cache = \cache::make('mod_ainotebook', 'material_context');
+        
+        foreach ($file_ids as $file_id) {
+            $cache_key = "file_embeddings_" . $file_id;
+            $cached_chunks = $cache->get($cache_key);
             
-            $score = self::cosine_similarity($query_vector, $vector);
-            $chunk->score = $score;
-            $scored_chunks[] = $chunk;
+            if ($cached_chunks === false) {
+                // Fetch from DB if not in cache
+                $chunks = $DB->get_records('ainotebook_embeddings', ['fileid' => $file_id]);
+                if (empty($chunks)) continue;
+                
+                $cached_chunks = [];
+                foreach ($chunks as $chunk) {
+                    $vector = json_decode($chunk->embedding, true);
+                    if (!is_array($vector)) continue;
+                    
+                    $chunk->vector = $vector; // store decoded array
+                    unset($chunk->embedding); // remove heavy JSON string
+                    $cached_chunks[] = $chunk;
+                }
+                $cache->set($cache_key, $cached_chunks);
+            }
+            
+            // Calculate cosine similarity using the cached decoded arrays
+            foreach ($cached_chunks as $chunk) {
+                $c = clone $chunk; // clone to avoid modifying cached object
+                $score = self::cosine_similarity($query_vector, $c->vector);
+                $c->score = $score;
+                $scored_chunks[] = $c;
+            }
         }
         
         usort($scored_chunks, function($a, $b) {

@@ -29,12 +29,12 @@ $string['studentprogress'] = 'Student Progress Dashboard';
 $string['overviewmetrics'] = 'Overview Metrics';
 $string['totalstudents'] = 'Active Students';
 $string['totalchats'] = 'Total Chats';
-$string['totalmaterials'] = 'Generated Learning Tools';
+$string['totalmaterials'] = 'Generated Learning Activities';
 $string['sendnotify'] = 'Send Notify';
 $string['task_weekly_teacher_alert'] = 'Weekly AI Teacher Alert';
 $string['email_weekly_alert_subject'] = 'Weekly Class Insight from DEMI Tutor: {$a}';
 $string['chatsent'] = 'Chats Sent';
-$string['materialsgenerated'] = 'Generated Learning Tools';
+$string['materialsgenerated'] = 'Generated Learning Activities';
 $string['lastactive'] = 'Last Active';
 $string['viewworkspace'] = 'View Workspace';
 $string['searchstudents'] = 'Search students...';
@@ -43,6 +43,7 @@ $string['backtodashboard'] = 'Back to Student List';
 $string['readonlymode'] = 'Read-Only Preview Mode';
 $string['viewingprogressfor'] = 'Viewing progress for:';
 $string['neveractive'] = 'Never';
+$string['process_materials_task'] = 'Process AI Notebook Materials (OCR & Embeddings)';
 
 // AI Evaluation Strings
 $string['aiscore'] = 'AI Score';

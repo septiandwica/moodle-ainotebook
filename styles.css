@@ -59,7 +59,7 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
 .ainotebook-chat { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 .chat-header { padding: 20px 32px; border-bottom: 1px solid var(--pres-border); display: flex; justify-content: space-between; align-items: center; height: 80px; box-sizing: border-box; }
 .chat-header h2 { margin: 0; font-size: 1.4rem; font-weight: 900; color: var(--pres-primary); }
-.chat-messages { flex: 1; overflow-y: auto; padding: 32px; background: var(--pres-bg); }
+.chat-messages { flex: 1; min-height: 0; overflow-y: auto; padding: 32px; background: var(--pres-bg); }
 .message { max-width: 85%; width: fit-content; margin-bottom: 24px; padding: 16px 20px; border-radius: 14px; font-size: 0.95rem; line-height: 1.5; word-wrap: break-word; border: 1px solid transparent; }
 .message.user { margin-left: auto; background: var(--pres-primary); color: #fff; border-bottom-right-radius: 4px; }
 .message.ai { margin-right: auto; background: var(--pres-surface); border-color: var(--pres-border); border-bottom-left-radius: 4px; }

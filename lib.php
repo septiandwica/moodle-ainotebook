@@ -25,6 +25,10 @@ function ainotebook_add_instance($ainotebook, $mform) {
     if ($mform) {
         $context = context_module::instance($ainotebook->coursemodule);
         file_postupdate_standard_filemanager($ainotebook, 'files', array('subdirs' => 0, 'maxfiles' => 5), $context, 'mod_ainotebook', 'files', 0);
+        
+        $task = new \mod_ainotebook\task\process_materials_task();
+        $task->set_custom_data(['ainotebookid' => $ainotebook->id]);
+        \core\task\manager::queue_adhoc_task($task);
     }
 
     return $id;
@@ -46,6 +50,10 @@ function ainotebook_update_instance($ainotebook, $mform) {
 
     if ($mform) {
         file_postupdate_standard_filemanager($ainotebook, 'files', array('subdirs' => 0, 'maxfiles' => 5), $mform->get_context(), 'mod_ainotebook', 'files', 0);
+        
+        $task = new \mod_ainotebook\task\process_materials_task();
+        $task->set_custom_data(['ainotebookid' => $ainotebook->id]);
+        \core\task\manager::queue_adhoc_task($task);
     }
 
     return true;

@@ -305,7 +305,8 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: '
     .report-markdown li { font-size: 11pt; line-height: 1.8; color: #334155; margin-bottom: 12px; }
     .report-markdown li::marker { color: #003366; font-weight: 900; }
 
-    .mermaid { page-break-inside: avoid; margin: 40px 0; text-align: center; background: #f8fafc; padding: 20px; border-radius: 12px; }
+    .mermaid { page-break-inside: avoid; margin: 40px 0; text-align: center; background: transparent; padding: 0; }
+    .mermaid svg { max-width: 100% !important; max-height: 90vh !important; height: auto !important; object-fit: contain; }
 
     @page { margin: 0.5cm; }
     

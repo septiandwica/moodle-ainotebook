@@ -80,7 +80,7 @@ class ai_client {
 
         if (!empty($rag_context)) {
             $system_prompt .= "\n[STUDY MATERIALS (RAG RETRIEVED CHUNKS)]:\n";
-            $system_prompt .= "CRITICAL INSTRUCTION: You MUST ONLY use the facts provided in the chunks below. If the answer is not explicitly stated in these chunks, you MUST say 'Maaf, informasi tersebut tidak ada di dalam materi yang diberikan.' and STOP. Do NOT guess. Do NOT use outside knowledge. Do NOT hallucinate citations.\n\n";
+            $system_prompt .= "CRITICAL INSTRUCTION: You MUST strictly limit your explanation to ONLY the concepts, facts, and code examples explicitly mentioned in the text below. DO NOT elaborate, DO NOT add extra code examples, and DO NOT explain things using your own knowledge. If the text only provides a brief sentence about a topic, your answer MUST be equally brief and only contain what is in the text. If the text does not contain the answer, say 'Maaf, informasi tersebut tidak dijelaskan secara detail di dalam materi yang diberikan.' and STOP. Do NOT hallucinate citations.\n\n";
             $system_prompt .= "{$rag_context}\n";
         } else {
             // Fallback if no embeddings found or search failed
@@ -127,7 +127,7 @@ class ai_client {
         $system_prompt .= "10. BEHAVIOR: ONLY generate a 'quiz', 'report', or 'mindmap' if the user explicitly asks for it by name. For all other questions, respond with standard text only.\n";
         $system_prompt .= "11. ADAPTIVE LEARNING: Monitor the student's understanding. If the student answers questions incorrectly or shows confusion on a specific topic, proactively recommend specific pages or sections from the uploaded study materials (e.g., 'Sepertinya kamu kurang paham di Bab 3, saya sarankan baca kembali halaman 12-15 dari dokumen dosen.').\n";
         $system_prompt .= "12. CITATIONS: [STRICT RULE] Every chunk of study material provided below begins with a header like '[Source: Filename.pdf - Page X]'. When you use information from a chunk, you MUST cite it using ONLY the filename. DO NOT include page numbers in your citations. You MUST format the citation exactly as a clickable markdown link: [Source: Filename](#citation-Filename) (for English) or [Sumber: Filename](#citation-Filename) (for Indonesian). DO NOT output plain text citations, they MUST be clickable markdown links.\n";
-        $system_prompt .= "13. SUGGESTIONS: At the very end of your response, you MUST provide 3 brief follow-up questions the student might ask next. Each question must be no longer than 10 words. Wrap them exactly inside `<suggestions>Q1|Q2|Q3</suggestions>`. Do not include these suggestions in the main text body.\n";
+        $system_prompt .= "13. SUGGESTIONS: At the very end of your response, you MUST provide 3 brief follow-up questions the student might ask next. These questions MUST be strictly relevant to the provided study materials and your current answer. Do not suggest questions about topics outside the material. Each question must be no longer than 10 words. Wrap them exactly inside `<suggestions>Q1|Q2|Q3</suggestions>`. Do not include these suggestions in the main text body.\n";
 
         // ── Fetch conversation history ─────────────────────────────────────────
         $history = $DB->get_records(

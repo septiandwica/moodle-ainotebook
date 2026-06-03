@@ -559,12 +559,6 @@ $js .= <<<'JS'
             }
         };
 
-        var renderSummary = function(markdownData) {
-            resultsContainer.style.display = "block";
-            resultsContent.innerHTML = "<div class='summary-container'><div class='markdown-body'>" + window.marked.parse(markdownData) + "</div></div>";
-            resultsContent.scrollIntoView({ behavior: 'smooth' });
-        };
-
         var renderQuiz = function(data) {
             resultsContainer.style.display = "block";
             resultsContent.innerHTML = "<div class=\'quiz-results-header\'><h3>Interactive Quiz</h3><div class=\'quiz-score\' id=\'quiz-score\'>Score: 0/" + data.questions.length + "</div></div><div id=\'quiz-container\'></div>";
@@ -709,7 +703,7 @@ $js .= <<<'JS'
                 </div>
                 
                 <div class="pdf-cover-main">
-                    <h1 class="pdf-report-title">COMPREHENSIVE STUDY SUMMARY:<br/>${activityName.toUpperCase()}</h1>
+                    <h1 class="pdf-report-title">${title.toUpperCase()}:<br/>${activityName.toUpperCase()}</h1>
                 </div>
 
                 <div class="pdf-cover-footer">
@@ -719,7 +713,7 @@ $js .= <<<'JS'
                 </div>
             </div>
             <div class="pdf-page-header">
-                <div class="pdf-header-label">STUDY REPORT</div>
+                <div class="pdf-header-label">${title.toUpperCase()}</div>
             </div>`;
         };
 
@@ -771,7 +765,7 @@ $js .= <<<'JS'
             downloadBtn.innerHTML = "<i class='fa fa-file-pdf-o'></i> Export as PDF";
             downloadBtn.onclick = function() { window.print(); };
         };
-        var renderReport = function(content) {
+        var renderSummary = function(content) {
             resultsContainer.style.display = "block";
             resultsContent.innerHTML = prepareFormalHeader("Study Summary") + "<div class=\'report-markdown\'>" + marked.parse(content) + "</div>";
             resultsContainer.scrollIntoView({ behavior: "smooth" });

@@ -194,7 +194,7 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
                         <p>Practice your understanding using Interactive Quiz</p>
                     </div>
                 </div>
-                <div class="creator-card report" onclick="window.sendSuggested('Generate a detailed study report.', 'report')">
+                <div class="creator-card summary" onclick="window.sendSuggested('Generate a detailed study summary.', 'summary')">
                     <div class="card-icon"><i class="fa fa-file-text-o"></i></div>
                     <div class="card-info">
                         <h5>Summary</h5>
@@ -331,7 +331,7 @@ $js .= <<<'JS'
         var getIcon = function(type) {
             if (type === "quiz") return "fa-question-circle";
             if (type === "mindmap") return "fa-sitemap";
-            if (type === "report") return "fa-file-text-o";
+            if (type === "summary") return "fa-file-text-o";
             return "fa-magic";
         };
 
@@ -454,13 +454,15 @@ $js .= <<<'JS'
                 }
             }
 
-            if (!found && text.includes("[REPORT_START]")) {
-                var reportMatch = text.match(/\[REPORT_START\]([\s\S]*?)\[REPORT_END\]/);
-                if (reportMatch) {
-                    artType = "report";
-                    artifact = { type: "report", data: reportMatch[1], title: "Report - " + new Date().toLocaleTimeString() };
-                    cleanText = text.replace(reportMatch[0], "").trim();
+            // 3. Check for SUMMARY.
+            if (!found) {
+                var summaryMatch = text.match(/\[SUMMARY_START\]([\s\S]*?)\[SUMMARY_END\]/);
+                if (summaryMatch) {
+                    artType = "summary";
+                    artifact = { type: "summary", data: summaryMatch[1].trim(), title: "Summary - " + new Date().toLocaleTimeString() };
+                    cleanText = text.replace(summaryMatch[0], "").trim();
                     found = true;
+                    console.log("Detected Summary artifact.");
                 }
             }
 
@@ -531,13 +533,6 @@ $js .= <<<'JS'
             }
         };
 
-        var getIcon = function(type) {
-            if (type === "quiz") return "fa-question-circle";
-            if (type === "mindmap") return "fa-sitemap";
-            if (type === "report") return "fa-file-text-o";
-            return "fa-magic";
-        };
-
         var setPrintLandscape = function(isLandscape) {
             var styleEl = document.getElementById("print-orientation-style");
             if (!styleEl) {
@@ -560,8 +555,14 @@ $js .= <<<'JS'
             } else {
                 setPrintLandscape(false);
                 if (art.type === "quiz") renderQuiz(art.data);
-                if (art.type === "report") renderReport(art.data);
+                if (art.type === "summary") renderSummary(art.data);
             }
+        };
+
+        var renderSummary = function(markdownData) {
+            resultsContainer.style.display = "block";
+            resultsContent.innerHTML = "<div class='summary-container'><div class='markdown-body'>" + window.marked.parse(markdownData) + "</div></div>";
+            resultsContent.scrollIntoView({ behavior: 'smooth' });
         };
 
         var renderQuiz = function(data) {
@@ -708,7 +709,7 @@ $js .= <<<'JS'
                 </div>
                 
                 <div class="pdf-cover-main">
-                    <h1 class="pdf-report-title">COMPREHENSIVE STUDY REPORT:<br/>${activityName.toUpperCase()}</h1>
+                    <h1 class="pdf-report-title">COMPREHENSIVE STUDY SUMMARY:<br/>${activityName.toUpperCase()}</h1>
                 </div>
 
                 <div class="pdf-cover-footer">
@@ -772,7 +773,7 @@ $js .= <<<'JS'
         };
         var renderReport = function(content) {
             resultsContainer.style.display = "block";
-            resultsContent.innerHTML = prepareFormalHeader("Study Report") + "<div class=\'report-markdown\'>" + marked.parse(content) + "</div>";
+            resultsContent.innerHTML = prepareFormalHeader("Study Summary") + "<div class=\'report-markdown\'>" + marked.parse(content) + "</div>";
             resultsContainer.scrollIntoView({ behavior: "smooth" });
             
             downloadBtn.innerHTML = "<i class=\'fa fa-file-pdf-o\'></i> Export as PDF";
@@ -819,7 +820,7 @@ $js .= <<<'JS'
                 var lowerVal = val.toLowerCase();
                 var toolType = null;
                 if (lowerVal.includes("quiz")) toolType = "quiz";
-                else if (lowerVal.includes("report")) toolType = "report";
+                else if (lowerVal.includes("summary")) toolType = "summary";
                 else if (lowerVal.includes("mindmap") || lowerVal.includes("mind map")) toolType = "mindmap";
 
                 if (toolType) {
@@ -1043,7 +1044,7 @@ $js .= <<<'JS'
                             var icon = card.querySelector(".card-icon i");
                             if (icon) {
                                 if (card.classList.contains("quiz")) icon.className = "fa fa-question-circle fa-3x brand-color";
-                                if (card.classList.contains("report")) icon.className = "fa fa-file-text-o fa-3x brand-success";
+                                if (card.classList.contains("summary")) icon.className = "fa fa-file-text-o fa-3x brand-success";
                                 if (card.classList.contains("mindmap")) icon.className = "fa fa-sitemap fa-3x brand-info";
                             }
                         });
@@ -1114,7 +1115,7 @@ $js .= <<<'JS'
                 const action = this.getAttribute("data-action");
                 let promptText = "";
                 if (action === "quiz") promptText = "Generate a quiz from the selected materials.";
-                if (action === "report") promptText = "Generate a study report from the selected materials.";
+                if (action === "summary") promptText = "Generate a study summary from the selected materials.";
                 if (action === "mindmap") promptText = "Generate a mindmap structure for the selected materials.";
                 
                 if (promptText) {

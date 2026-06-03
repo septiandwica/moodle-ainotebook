@@ -1169,6 +1169,19 @@ $js .= <<<'JS'
                                 alert("File not found: " + filename);
                             }
                         }
+                    } else {
+                        var filename = decodeURIComponent(citationStr);
+                        var baseUrl = fileUrls[filename];
+                        if (baseUrl) {
+                            window.open(baseUrl, "_blank");
+                        } else {
+                            var matchedKey = Object.keys(fileUrls).find(k => k.toLowerCase() === filename.toLowerCase());
+                            if (matchedKey && fileUrls[matchedKey]) {
+                                window.open(fileUrls[matchedKey], "_blank");
+                            } else {
+                                alert("File not found: " + filename);
+                            }
+                        }
                     }
                 }
             }

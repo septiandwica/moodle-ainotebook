@@ -160,7 +160,10 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
                     if (empty($clean_response)) $clean_response = "I have generated the requested material below.";
 
                     echo '<div class="message user">' . nl2br(s($log->message)) . '</div>';
-                    echo '<div class="message ai"><div class="markdown-body">' . nl2br($clean_response) . '</div>' . $suggestions_html . '</div>';
+                    echo '<div class="message ai"><div class="markdown-body">' . nl2br($clean_response) . '</div></div>';
+                    if (!empty($suggestions_html)) {
+                        echo $suggestions_html;
+                    }
                 }
                 ?>
             </div>

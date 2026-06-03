@@ -1085,7 +1085,7 @@ class ai_client {
         $cache = \cache::make('mod_ainotebook', 'material_context');
         
         foreach ($file_ids as $file_id) {
-            $cache_key = "file_embeddings_" . $file_id;
+            $cache_key = "file_embeddings_v2_" . $file_id;
             $cached_chunks = $cache->get($cache_key);
             
             if ($cached_chunks === false) {

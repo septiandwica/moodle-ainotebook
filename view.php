@@ -187,6 +187,7 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
             <button id="toggle-creator" class="btn-icon" style="<?php if($is_readonly) echo 'pointer-events: auto;'; ?>"><i class="fa fa-angle-double-up"></i></button>
         </div>
         <div id="creator-hub-content" class="creator-content" style="<?php if($is_readonly) echo 'pointer-events: auto;'; ?>">
+            <?php if (!$is_readonly): ?>
             <div class="creator-grid">
                 <div class="creator-card quiz" onclick="window.sendSuggested('Generate a comprehensive quiz from my materials.', 'quiz')">
                     <div class="card-icon"><i class="fa fa-question-circle"></i></div>
@@ -210,6 +211,7 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
                     </div>
                 </div>
             </div>
+            <?php endif; ?>
 
             <div class="creator-workspace">
                 <div class="creator-history-panel">
@@ -636,26 +638,28 @@ $js .= <<<'JS'
                                 }
                                 
                                 // Send score to Gradebook
-                                var formData = new FormData();
-                                formData.append("cmid", cmid);
-                                formData.append("action", "submit_quiz_grade");
-                                formData.append("score", score);
-                                formData.append("maxscore", data.questions.length);
-                                formData.append("sesskey", sesskey);
-                                fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?t=" + Date.now(), {
-                                    method: "POST",
-                                    body: formData
-                                }).then(r => r.json()).then(res => {
-                                    if(res.success) {
-                                        var p = document.createElement("p");
-                                        p.className = "gradebook-sync-msg";
-                                        p.style.color = "#00d084";
-                                        p.style.fontWeight = "bold";
-                                        p.style.marginTop = "10px";
-                                        p.innerHTML = "<i class=\'fa fa-check-circle\'></i> Score synchronized with Gradebook!";
-                                        container.querySelector(".quiz-score-container").appendChild(p);
-                                    }
-                                });
+                                if (!isReadonly) {
+                                    var formData = new FormData();
+                                    formData.append("cmid", cmid);
+                                    formData.append("action", "submit_quiz_grade");
+                                    formData.append("score", score);
+                                    formData.append("maxscore", data.questions.length);
+                                    formData.append("sesskey", sesskey);
+                                    fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?t=" + Date.now(), {
+                                        method: "POST",
+                                        body: formData
+                                    }).then(r => r.json()).then(res => {
+                                        if(res.success) {
+                                            var p = document.createElement("p");
+                                            p.className = "gradebook-sync-msg";
+                                            p.style.color = "#00d084";
+                                            p.style.fontWeight = "bold";
+                                            p.style.marginTop = "10px";
+                                            p.innerHTML = "<i class=\'fa fa-check-circle\'></i> Score synchronized with Gradebook!";
+                                            container.querySelector(".quiz-score-container").appendChild(p);
+                                        }
+                                    });
+                                }
 
                                 container.innerHTML = `
                                     <div class="quiz-score-container">

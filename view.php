@@ -149,7 +149,8 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
                                 $suggestions_html .= '<div class="suggestion-container">';
                                 foreach ($suggestions as $s) {
                                     $s_escaped = s($s);
-                                    $suggestions_html .= '<button class="suggestion-btn" onclick="sendSuggested(\''.$s_escaped.'\')">' . $s_escaped . '</button>';
+                                    $s_json = htmlspecialchars(json_encode($s));
+                                    $suggestions_html .= '<button class="suggestion-btn" onclick="sendSuggested('.$s_json.')">' . $s_escaped . '</button>';
                                 }
                                 $suggestions_html .= '</div>';
                             }

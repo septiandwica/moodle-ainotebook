@@ -136,6 +136,37 @@ if ($ADMIN->fulltree) {
         1
     ));
 
+    // ── Rate Limiting ─────────────────────────────────────────────────────────
+    $settings->add(new admin_setting_heading(
+        'mod_ainotebook/ratelimit_heading',
+        'Rate Limiting (Per User)',
+        'Limits applied to each individual student to prevent API abuse.'
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'mod_ainotebook/limit_rpm',
+        'Requests Per Minute (RPM)',
+        'Maximum number of chat requests a student can make in 1 minute. Set to 0 to disable.',
+        '10',
+        PARAM_INT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'mod_ainotebook/limit_rpd',
+        'Requests Per Day (RPD)',
+        'Maximum number of chat requests a student can make in 24 hours. Set to 0 to disable.',
+        '100',
+        PARAM_INT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'mod_ainotebook/limit_tpm',
+        'Tokens Per Minute (TPM)',
+        'Maximum estimated tokens (input + output) a student can consume in 1 minute. Set to 0 to disable.',
+        '4000',
+        PARAM_INT
+    ));
+
     // ─────────────────────────────────────────────────────────────────────────
     // JS visibility logic.
     //

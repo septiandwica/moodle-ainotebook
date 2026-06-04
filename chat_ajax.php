@@ -145,6 +145,19 @@ if ($action === 'chat_stream') {
     $config_raw = optional_param('config', '[]', PARAM_RAW);
     $config = json_decode($config_raw, true) ?: [];
     
+    // Check rate limits
+    try {
+        $estimated_input_tokens = \mod_ainotebook\rate_limiter::estimate_tokens($message);
+        \mod_ainotebook\rate_limiter::enforce_limits($USER->id, $estimated_input_tokens);
+    } catch (\Exception $e) {
+        header('Content-Type: text/event-stream');
+        header('Cache-Control: no-cache');
+        echo "data: " . json_encode(['chunk' => "⚠️ " . $e->getMessage()]) . "\n\n";
+        echo "data: " . json_encode(['done' => true]) . "\n\n";
+        flush();
+        exit;
+    }
+
     // Disable Moodle's output buffering and set SSE headers
     while (ob_get_level() > 0) {
         @ob_end_flush();
@@ -179,6 +192,10 @@ if ($action === 'chat_stream') {
     
     $silent = optional_param('silent', 0, PARAM_INT);
     if (!$silent && !empty($response_text)) {
+        // Log token usage
+        $total_tokens = $estimated_input_tokens + \mod_ainotebook\rate_limiter::estimate_tokens($response_text);
+        \mod_ainotebook\rate_limiter::log_request($USER->id, $total_tokens);
+
         $log = new stdClass();
         $log->ainotebookid = $cm->instance;
         $log->userid = $USER->id;
@@ -197,12 +214,27 @@ $file_ids = json_decode($selected_files, true) ?: [];
 $config_raw = optional_param('config', '[]', PARAM_RAW);
 $config = json_decode($config_raw, true) ?: [];
 
+try {
+    $estimated_input_tokens = \mod_ainotebook\rate_limiter::estimate_tokens($message);
+    \mod_ainotebook\rate_limiter::enforce_limits($USER->id, $estimated_input_tokens);
+} catch (\Exception $e) {
+    echo json_encode([
+        'success' => false,
+        'response' => "⚠️ " . $e->getMessage()
+    ]);
+    exit;
+}
+
 $result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config);
 $response_text = $result['response'] ?? "Error retrieving response.";
 $sources_count = $result['sources_count'] ?? 0;
 
 $silent = optional_param('silent', 0, PARAM_INT);
 if (!$silent) {
+    // Log token usage
+    $total_tokens = $estimated_input_tokens + \mod_ainotebook\rate_limiter::estimate_tokens($response_text);
+    \mod_ainotebook\rate_limiter::log_request($USER->id, $total_tokens);
+
     $log = new stdClass();
     $log->ainotebookid = $cm->instance;
     $log->userid = $USER->id;

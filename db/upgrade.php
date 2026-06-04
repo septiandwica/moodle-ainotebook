@@ -116,5 +116,25 @@ function xmldb_ainotebook_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026010101, 'ainotebook');
     }
 
+    if ($oldversion < 2026060400) {
+        $table = new xmldb_table('ainotebook_api_logs');
+
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('tokens', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, array('id'));
+
+        $table->add_index('userid', XMLDB_INDEX_NOTUNIQUE, array('userid'));
+        $table->add_index('timecreated', XMLDB_INDEX_NOTUNIQUE, array('timecreated'));
+
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        upgrade_mod_savepoint(true, 2026060400, 'ainotebook');
+    }
+
     return true;
 }

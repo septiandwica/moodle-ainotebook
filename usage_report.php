@@ -48,15 +48,15 @@ $sql = "
         COUNT(l.id) AS total_requests,
         SUM(l.tokens) AS total_tokens,
         MAX(l.timecreated) AS last_active,
-        SUM(CASE WHEN l.timecreated >= :today THEN 1 ELSE 0 END) AS today_requests,
-        SUM(CASE WHEN l.timecreated >= :today THEN l.tokens ELSE 0 END) AS today_tokens
+        SUM(CASE WHEN l.timecreated >= :today1 THEN 1 ELSE 0 END) AS today_requests,
+        SUM(CASE WHEN l.timecreated >= :today2 THEN l.tokens ELSE 0 END) AS today_tokens
     FROM {ainotebook_api_logs} l
     JOIN {user} u ON l.userid = u.id
     GROUP BY l.userid, u.firstname, u.lastname, u.email
     ORDER BY total_tokens DESC
 ";
 
-$records = $DB->get_records_sql($sql, ['today' => $today_start]);
+$records = $DB->get_records_sql($sql, ['today1' => $today_start, 'today2' => $today_start]);
 
 echo html_writer::start_tag('div', ['class' => 'container-fluid py-4']);
 

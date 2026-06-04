@@ -137,10 +137,13 @@ if ($ADMIN->fulltree) {
     ));
 
     // ── Rate Limiting ─────────────────────────────────────────────────────────
+    $url = new moodle_url('/mod/ainotebook/usage_report.php');
+    $link = \html_writer::link($url, '📊 Open Global Usage Report Dashboard', ['class' => 'btn btn-primary', 'target' => '_blank']);
+    
     $settings->add(new admin_setting_heading(
         'mod_ainotebook/ratelimit_heading',
-        'Rate Limiting (Per User)',
-        'Limits applied to each individual student to prevent API abuse.'
+        'Rate Limiting & Usage Tracking',
+        'Manage user API quotas and view consumption reports.<br><br>' . $link
     ));
 
     $settings->add(new admin_setting_configtext(

@@ -97,3 +97,7 @@ The plugin follows a sophisticated Retrieval-Augmented Generation (RAG) pipeline
 
 ---
 Developed by **septiandwica** & Supported by **Tateta** ([samastanuswantara.com](https://samastanuswantara.com)).
+
+## Development & Support
+
+Developed and maintained by [Tateta](https://samastanuswantara.com) and [Septian Dwi Cahyo](https://github.com/septiandwica).

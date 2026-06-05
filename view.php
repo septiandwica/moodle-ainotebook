@@ -17,6 +17,9 @@ $config = get_config('mod_ainotebook');
 $ai_name = empty($config->ai_name) ? 'DEMI TUTOR' : $config->ai_name;
 
 require_login($course, true, $cm);
+if (isguestuser() || !isloggedin()) {
+    print_error('noguest');
+}
 $context = context_module::instance($cm->id);
 
 $viewself = optional_param('viewself', 0, PARAM_INT);

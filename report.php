@@ -15,6 +15,9 @@ $course = $DB->get_record('course', array('id' => $cm->course), '*', MUST_EXIST)
 $ainotebook = $DB->get_record('ainotebook', array('id' => $cm->instance), '*', MUST_EXIST);
 
 require_login($course, true, $cm);
+if (isguestuser() || !isloggedin()) {
+    print_error('noguest');
+}
 $context = context_module::instance($cm->id);
 
 // Ensure the user has permission to view the progress.

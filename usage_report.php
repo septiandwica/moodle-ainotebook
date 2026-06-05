@@ -9,6 +9,9 @@ require_once(__DIR__ . '/../../config.php');
 
 // Must be logged in and must be a site admin.
 require_login();
+if (isguestuser() || !isloggedin()) {
+    print_error('noguest');
+}
 $context = context_system::instance();
 require_capability('moodle/site:config', $context);
 

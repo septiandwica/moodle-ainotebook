@@ -1,4 +1,16 @@
 
+    var cmid = 1;
+    var sesskey = "1";
+    var wwwroot = "1";
+    var activityName = "1";
+    var pdfLogoUrl = "1";
+    var studentName = "1";
+    var studentId = "1";
+    var notebookName = "1";
+    var savedArtifacts = [];
+    var isReadonly = true;
+    var isTeacher = true;
+
     console.log("AI Notebook JS Loaded. CMID: " + cmid);
 
     if (typeof mermaid !== "undefined") {
@@ -10,7 +22,7 @@
         });
     }
 
-    // Global handlers available immediately.
+    /* Global handlers available immediately. */
     window.sendSuggested = function(text, toolType = null) {
         var input = document.getElementById("chat-input");
         if (input) {
@@ -23,7 +35,7 @@
                     var icon = card.querySelector(".card-icon i");
                     if (icon) icon.className = "fa fa-circle-o-notch fa-spin";
                 }
-                // Call sendMessage in silent mode.
+                /* Call sendMessage in silent mode. */
                 sendMessage(true);
             } else {
                 var btn = document.getElementById("send-btn");
@@ -48,7 +60,7 @@
 
         if (!sendBtn || !input || !messages) return false;
 
-        // Attach listeners early!
+        /* Attach listeners early! */
         sendBtn.onclick = function(e) {
             e.preventDefault();
             sendMessage();
@@ -86,20 +98,18 @@
                 var realIdx = artifactHistory.length - 1 - i;
                 var item = document.createElement("div");
                 item.className = "history-item " + art.type + (art.saved ? " is-saved" : "");
-                item.innerHTML = `
-                    <div class="history-main" onclick="window.renderHistoryItem(${realIdx})">
-                        <i class="fa ${getIcon(art.type)}"></i>
-                        <span>${art.title}</span>
-                    </div>
-                    <div class="history-actions">
-                        ${!art.saved && !isReadonly ? `<button title="Save to Database" onclick="window.saveArtifact(${realIdx})"><i class="fa fa-save"></i></button>` : `<span class="saved-badge"><i class="fa fa-check-circle"></i></span>`}
-                        ${!isReadonly ? `<button title="Delete" onclick="window.deleteArtifact(${realIdx})"><i class="fa fa-trash"></i></button>` : ''}
-                    </div>
-                `;
+                item.innerHTML = '<div class="history-main" onclick="window.renderHistoryItem(' + realIdx + ')">' +
+                    '<i class="fa ' + getIcon(art.type) + '"></i>' +
+                    '<span>' + art.title + '</span>' +
+                '</div>' +
+                '<div class="history-actions">' +
+                    (!art.saved && !isReadonly ? '<button title="Save to Database" onclick="window.saveArtifact(' + realIdx + ')"><i class="fa fa-save"></i></button>' : '<span class="saved-badge"><i class="fa fa-check-circle"></i></span>') +
+                    (!isReadonly ? '<button title="Delete" onclick="window.deleteArtifact(' + realIdx + ')"><i class="fa fa-trash"></i></button>' : '') +
+                '</div>';
                 list.appendChild(item);
             });
         };
-        // Load from DB.
+        /* Load from DB. */
         if (savedArtifacts && savedArtifacts.length > 0) {
             savedArtifacts.forEach(a => {
                 artifactHistory.push({
@@ -113,7 +123,7 @@
             updateHistoryList();
         }
 
-        // UI Handlers.
+        /* UI Handlers. */
         var modal = document.getElementById("settings-modal");
         var openBtn = document.getElementById("open-settings");
         var closeBtn = document.getElementById("close-settings");
@@ -134,14 +144,14 @@
                 localStorage.setItem("ainotebook_config", JSON.stringify(config));
                 modal.classList.remove("active");
                 
-                // Visual feedback.
+                /* Visual feedback. */
                 var originalText = saveBtn.innerHTML;
                 saveBtn.innerHTML = "<i class='fa fa-check'></i> Saved!";
                 setTimeout(() => { saveBtn.innerHTML = originalText; }, 2000);
             };
         }
 
-        // Load existing config.
+        /* Load existing config. */
         var savedConfig = localStorage.getItem("ainotebook_config");
         if (savedConfig) {
             var config = JSON.parse(savedConfig);
@@ -171,7 +181,7 @@
                     var m = document.getElementById("mq-diff-medium").value || 0;
                     var h = document.getElementById("mq-diff-hard").value || 0;
                     var x = document.getElementById("mq-diff-expert").value || 0;
-                    diffStr = `Exactly ${e} Easy, ${m} Medium, ${h} Hard, and ${x} Expert questions.`;
+                    diffStr = "Exactly " + e + " Easy, " + m + " Medium, " + h + " Hard, and " + x + " Expert questions.";
                 }
                 
                 var typeMode = document.getElementById("mq-type-mode").value;
@@ -181,15 +191,15 @@
                     var tf = document.getElementById("mq-type-tf").value || 0;
                     var es = document.getElementById("mq-type-es").value || 0;
                     var sa = document.getElementById("mq-type-sa").value || 0;
-                    typeStr = `Exactly ${mc} Multiple Choice, ${tf} True/False, ${es} Essay, and ${sa} Short Answer questions.`;
+                    typeStr = "Exactly " + mc + " Multiple Choice, " + tf + " True/False, " + es + " Essay, and " + sa + " Short Answer questions.";
                 }
 
                 mqModal.classList.remove("active");
                 
-                var prompt = `Generate a quiz with exactly ${count} questions based on the materials.\n\n`;
-                prompt += `Difficulty Distribution: ${diffStr}\n`;
-                prompt += `Question Type Distribution: ${typeStr}\n\n`;
-                prompt += `CRITICAL INSTRUCTION: You MUST follow these exact numbers. Do not generate more or fewer questions than requested. Include 'type' property in the JSON for each question ('multichoice', 'truefalse', 'essay', or 'shortanswer').`;
+                var prompt = "Generate a quiz with exactly " + count + " questions based on the materials.\n\n";
+                prompt += "Difficulty Distribution: " + diffStr + "\n";
+                prompt += "Question Type Distribution: " + typeStr + "\n\n";
+                prompt += "CRITICAL INSTRUCTION: You MUST follow these exact numbers. Do not generate more or fewer questions than requested. Include 'type' property in the JSON for each question ('multichoice', 'truefalse', 'essay', or 'shortanswer').";
                 
                 window.sendSuggested(prompt, 'quiz');
             };
@@ -288,14 +298,15 @@
                     art.saved = true;
                     art.dbid = d.id;
                     updateHistoryList();
-                    alert("Successfully saved to database!");
-                } else alert("Error saving: " + d.error);
+                    require(['core/notification'], function(Notification) { Notification.addNotification({message: 'Successfully saved to database!', type: 'success'}); });
+                } else require(['core/notification'], function(Notification) { Notification.addNotification({message: 'Error saving: ' + d.error, type: 'error'}); });
             });
         };
 
         window.deleteArtifact = function(idx) {
             var art = artifactHistory[idx];
-            if (confirm("Delete this generated item?")) {
+            require(['core/notification'], function(Notification) {
+                Notification.confirm("Delete Artifact", "Are you sure you want to delete this generated item?", "Delete", "Cancel", function() {
                 if (art.saved && art.dbid) {
                     var formData = new FormData();
                     formData.append("artifactid", art.dbid);
@@ -315,7 +326,8 @@
                     artifactHistory.splice(idx, 1);
                     updateHistoryList();
                 }
-            }
+                });
+            });
         };
 
         var setPrintLandscape = function(isLandscape) {
@@ -351,7 +363,7 @@
             
             var convertBtnMarkup = "";
             if (isTeacher && !isReadonly) {
-                convertBtnMarkup = `<button id="btn-convert-moodle-quiz" class="btn-premium" style="background: var(--pres-primary); margin-left: 10px;"><i class="fa fa-graduation-cap"></i> Convert to Moodle Quiz</button>`;
+                convertBtnMarkup = '<button id="btn-convert-moodle-quiz" class="btn-premium" style="background: var(--pres-primary); margin-left: 10px;"><i class="fa fa-graduation-cap"></i> Convert to Moodle Quiz</button>';
             }
             
             downloadBtn.innerHTML = "<i class=\'fa fa-download\'></i> Download Text";
@@ -359,50 +371,68 @@
                 downloadFile("quiz.txt", data.questions.map((q,i) => (i+1) + ". " + (q.text || q.question || "No question") + "\n   " + (q.options ? q.options.join("\n   ") : "")).join("\n\n"));
             };
             
-            // Re-render toolbar to include the convert button
+            /* Re-render toolbar to include the convert button */
             var toolbar = document.querySelector(".preview-toolbar");
             if (toolbar) {
-                // Ensure we don't append multiple times if they switch tabs
+                /* Ensure we don't append multiple times if they switch tabs */
                 var existingConvert = document.getElementById("btn-convert-moodle-quiz");
                 if (existingConvert) existingConvert.remove();
                 if (isTeacher && !isReadonly) {
                     toolbar.insertAdjacentHTML('beforeend', convertBtnMarkup);
                     
                     document.getElementById("btn-convert-moodle-quiz").onclick = function() {
-                        var qName = prompt("Enter Quiz Name:", "AI Generated Quiz");
-                        if (!qName) return;
-                        var qIntro = prompt("Enter Quiz Description/Intro:", "Please answer the following questions carefully.");
-                        if (qIntro === null) return;
+                        var modal = document.getElementById("convert-quiz-modal");
+                        if (!modal) return;
+                        modal.classList.add("active");
+                        
+                        var closeBtn = document.getElementById("close-convert-quiz");
+                        var confirmBtn = document.getElementById("confirm-convert-quiz");
                         
                         var btn = this;
-                        btn.innerHTML = "<i class='fa fa-spinner fa-spin'></i> Converting...";
-                        btn.disabled = true;
+                        
+                        if (closeBtn) closeBtn.onclick = function() { modal.classList.remove("active"); };
+                        
+                        if (confirmBtn) {
+                            confirmBtn.onclick = function() {
+                                var qName = document.getElementById("cq-name").value;
+                                var qIntro = document.getElementById("cq-intro").value;
+                                
+                                if (!qName) {
+                                    require(['core/notification'], function(Notification) { Notification.addNotification({message: 'Quiz name is required!', type: 'error'}); });
+                                    return;
+                                }
+                                
+                                modal.classList.remove("active");
+                                btn.innerHTML = "<i class='fa fa-spinner fa-spin'></i> Converting...";
+                                btn.disabled = true;
 
-                        var formData = new FormData();
-                        formData.append("cmid", cmid);
-                        formData.append("sesskey", sesskey);
-                        formData.append("name", qName);
-                        formData.append("intro", qIntro);
-                        formData.append("quizdata", JSON.stringify(data));
+                                var formData = new FormData();
+                                formData.append("cmid", cmid);
+                                formData.append("sesskey", sesskey);
+                                formData.append("name", qName);
+                                formData.append("intro", qIntro);
+                                formData.append("quizdata", JSON.stringify(data));
 
-                        fetch(wwwroot + "/mod/ainotebook/create_moodle_quiz_ajax.php", {
-                            method: "POST",
-                            body: formData
-                        })
-                        .then(r => r.json())
-                        .then(res => {
-                            if (res.success && res.url) {
-                                window.location.href = res.url;
-                            } else {
-                                alert("Failed to convert quiz: " + (res.error || "Unknown error"));
-                                btn.innerHTML = "<i class='fa fa-graduation-cap'></i> Convert to Moodle Quiz";
-                                btn.disabled = false;
-                            }
-                        }).catch(e => {
-                            alert("Network error occurred.");
-                            btn.innerHTML = "<i class='fa fa-graduation-cap'></i> Convert to Moodle Quiz";
-                            btn.disabled = false;
-                        });
+                                fetch(wwwroot + "/mod/ainotebook/create_moodle_quiz_ajax.php", {
+                                    method: "POST",
+                                    body: formData
+                                })
+                                .then(function(r) { return r.json(); })
+                                .then(function(res) {
+                                    if (res.success && res.url) {
+                                        window.location.href = res.url;
+                                    } else {
+                                        require(['core/notification'], function(Notification) { Notification.addNotification({message: 'Failed to convert quiz: ' + (res.error || 'Unknown error'), type: 'error'}); });
+                                        btn.innerHTML = "<i class='fa fa-graduation-cap'></i> Convert to Moodle Quiz";
+                                        btn.disabled = false;
+                                    }
+                                }).catch(function(e) {
+                                    require(['core/notification'], function(Notification) { Notification.addNotification({message: 'Network error occurred.', type: 'error'}); });
+                                    btn.innerHTML = "<i class='fa fa-graduation-cap'></i> Convert to Moodle Quiz";
+                                    btn.disabled = false;
+                                });
+                            };
+                        }
                     };
                 }
             }
@@ -417,7 +447,7 @@
                 var qDiv = document.createElement("div");
                 qDiv.className = "quiz-question active-question";
                 
-                // Normalize answer (handle 0-3, "0"-"3", or "A"-"E")
+                /* Normalize answer (handle 0-3, "0"-"3", or "A"-"E") */
                 var correctAnswer = q.answer;
                 if (typeof correctAnswer === "string") {
                     var upper = correctAnswer.trim().toUpperCase();
@@ -431,13 +461,13 @@
                 var qText = q.text || q.question || "No question text provided.";
                 var type = (q.type || "multichoice").toLowerCase();
                 
-                qDiv.innerHTML = `<h5>Question ${idx+1} of ${data.questions.length} <span style="font-size:0.7em; color:#64748b; background:#f1f5f9; padding:2px 6px; border-radius:4px; margin-left:10px;">${type}</span></h5>
-                                 <p class="quiz-text">${qText}</p>
-                                 <div class="quiz-options"></div>
-                                 <div class="quiz-footer">
-                                    <button class="btn-hint" onclick="var h=this.parentNode.querySelector('.quiz-hint'); if(h){h.style.display='block'; this.style.display='none';}"><i class="fa fa-lightbulb-o"></i> Show Hint</button>
-                                    <div class="quiz-hint" style="display:none;"><strong>Hint:</strong> ${q.hint || "Try to recall the main concept from the study materials."}</div>
-                                 </div>`;
+                qDiv.innerHTML = '<h5>Question ' + (idx+1) + ' of ' + data.questions.length + ' <span style="font-size:0.7em; color:#64748b; background:#f1f5f9; padding:2px 6px; border-radius:4px; margin-left:10px;">' + type + '</span></h5>' +
+                                 '<p class="quiz-text">' + qText + '</p>' +
+                                 '<div class="quiz-options"></div>' +
+                                 '<div class="quiz-footer">' +
+                                    '<button class="btn-hint" onclick="var h=this.parentNode.querySelector(\'.quiz-hint\'); if(h){h.style.display=\'block\'; this.style.display=\'none\';}"><i class="fa fa-lightbulb-o"></i> Show Hint</button>' +
+                                    '<div class="quiz-hint" style="display:none;"><strong>Hint:</strong> ' + (q.hint || "Try to recall the main concept from the study materials.") + '</div>' +
+                                 '</div>';
                 var optionsDiv = qDiv.querySelector(".quiz-options");
                 
                 var handleNext = function() {
@@ -462,7 +492,7 @@
                                 desc = "You're on the right track. A quick review of the material should get you to the top.";
                             }
                             
-                            // Send score to Gradebook
+                            /* Send score to Gradebook */
                             if (!isReadonly) {
                                 var formData = new FormData();
                                 formData.append("cmid", cmid);
@@ -486,20 +516,18 @@
                                 });
                             }
                             
-                            container.innerHTML = `
-                                <div class="quiz-score-container text-center">
-                                    <div class="score-circle">
-                                        <svg viewBox="0 0 36 36" class="circular-chart">
-                                            <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                            <path class="circle" stroke-dasharray="${percent}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                        </svg>
-                                        <div class="score-text">${score}/${data.questions.length}</div>
-                                    </div>
-                                    <h3>${feedback}</h3>
-                                    <p class="text-muted" style="margin-bottom:20px;">${desc}</p>
-                                    <button class="btn-outline" onclick="window.renderHistoryItem(window.lastRenderedIdx)"><i class="fa fa-refresh"></i> Retake Quiz</button>
-                                </div>
-                            `;
+                            container.innerHTML = '<div class="quiz-score-container text-center">' +
+                                '<div class="score-circle">' +
+                                    '<svg viewBox="0 0 36 36" class="circular-chart">' +
+                                        '<path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />' +
+                                        '<path class="circle" stroke-dasharray="' + percent + ', 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />' +
+                                    '</svg>' +
+                                    '<div class="score-text">' + score + '/' + data.questions.length + '</div>' +
+                                '</div>' +
+                                '<h3>' + feedback + '</h3>' +
+                                '<p class="text-muted" style="margin-bottom:20px;">' + desc + '</p>' +
+                                '<button class="btn-outline" onclick="window.renderHistoryItem(window.lastRenderedIdx)"><i class="fa fa-refresh"></i> Retake Quiz</button>' +
+                            '</div>';
                         }
                     };
                     qDiv.appendChild(nextBtn);
@@ -533,7 +561,7 @@
                         feedbackDiv.innerHTML = "<strong>Suggested Answer/Rubric:</strong><br>" + (q.answer || "No specific answer provided by AI.");
                         optionsDiv.appendChild(feedbackDiv);
                         
-                        // Treat as correct for participation
+                        /* Treat as correct for participation */
                         score++;
                         document.getElementById("quiz-score").innerText = "Score: " + score + "/" + data.questions.length;
                         handleNext();
@@ -547,7 +575,7 @@
                     opts.forEach((opt, oi) => {
                         var optDiv = document.createElement("div");
                         optDiv.className = "quiz-option";
-                        optDiv.innerHTML = `<span class="opt-label">${alpha[oi] || oi}</span> <span class="opt-text">${opt}</span>`;
+                        optDiv.innerHTML = '<span class="opt-label">' + (alpha[oi] || oi) + '</span> <span class="opt-text">' + opt + '</span>';
                         optDiv.onclick = function() {
                             if (qDiv.classList.contains("answered")) return;
                             qDiv.classList.add("answered");
@@ -596,29 +624,26 @@
 
         var prepareFormalHeader = function(title) {
             var now = new Date().toLocaleDateString();
-            return `
-            <div class="pdf-cover-page">
-                <div class="pdf-cover-logo">
-                    <img src="${pdfLogoUrl}" class="pdf-brand-logo-large">
-                    <div class="pdf-brand-text-large">
-                        <h1 class="pdf-univ-title">PRESIDENT</h1>
-                        <h1 class="pdf-univ-subtitle">UNIVERSITY</h1>
-                    </div>
-                </div>
-                
-                <div class="pdf-cover-main">
-                    <h1 class="pdf-report-title">${title.toUpperCase()}:<br/>${activityName.toUpperCase()}</h1>
-                </div>
-
-                <div class="pdf-cover-footer">
-                    <div class="pdf-info-card">
-                        <div class="info-row" style="font-weight: 800;">${studentName}</div>
-                    </div>
-                </div>
-            </div>
-            <div class="pdf-page-header">
-                <div class="pdf-header-label">${title.toUpperCase()}</div>
-            </div>`;
+            return '<div class="pdf-cover-page">' +
+                '<div class="pdf-cover-logo">' +
+                    '<img src="' + pdfLogoUrl + '" class="pdf-brand-logo-large">' +
+                    '<div class="pdf-brand-text-large">' +
+                        '<h1 class="pdf-univ-title">PRESIDENT</h1>' +
+                        '<h1 class="pdf-univ-subtitle">UNIVERSITY</h1>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="pdf-cover-main">' +
+                    '<h1 class="pdf-report-title">' + (title ? title.toUpperCase() : '') + ':<br/>' + (activityName ? activityName.toUpperCase() : '') + '</h1>' +
+                '</div>' +
+                '<div class="pdf-cover-footer">' +
+                    '<div class="pdf-info-card">' +
+                        '<div class="info-row" style="font-weight: 800;">' + studentName + '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="pdf-page-header">' +
+                '<div class="pdf-header-label">' + (title ? title.toUpperCase() : '') + '</div>' +
+            '</div>';
         };
 
         // ── Mermaid syntax sanitizer (mirrors PHP-side sanitize_mermaid) ─────────
@@ -1074,7 +1099,7 @@
                             if (matchedKey && fileUrls[matchedKey]) {
                                 window.open(fileUrls[matchedKey] + "#page=" + page, "_blank");
                             } else {
-                                alert("File not found: " + filename);
+                                require(['core/notification'], function(Notification) { Notification.addNotification({message: 'File not found: ' + filename, type: 'error'}); });
                             }
                         }
                     } else {
@@ -1087,7 +1112,7 @@
                             if (matchedKey && fileUrls[matchedKey]) {
                                 window.open(fileUrls[matchedKey], "_blank");
                             } else {
-                                alert("File not found: " + filename);
+                                require(['core/notification'], function(Notification) { Notification.addNotification({message: 'File not found: ' + filename, type: 'error'}); });
                             }
                         }
                     }

@@ -1,250 +1,4 @@
 
-<div id="ainotebook-wrapper">
-    {{#is_readonly}}
-    <div class="readonly-banner">
-        <div class="readonly-info">
-            <i class="fa fa-eye"></i> 
-            <span><strong>{{str_readonlymode}}</strong> - {{str_viewingprogressfor}} {{target_fullname}} ({{target_email}})</span>
-        </div>
-        <a href="?id={{cmid}}" class="btn-premium btn-small"><i class="fa fa-arrow-left"></i> {{str_backtodashboard}}</a>
-    </div>
-    {{/is_readonly}}
-    {{^is_readonly}}
-        {{#is_teacher_self}}
-        <div class="readonly-banner" style="background: #e0f2fe; border-color: #7dd3fc;">
-            <div class="readonly-info" style="color: #0369a1;">
-                <i class="fa fa-user"></i> 
-                <span><strong>Personal Workspace</strong> - You are currently using your own AI Notebook.</span>
-            </div>
-            <a href="?id={{cmid}}" class="btn-premium btn-small"><i class="fa fa-arrow-left"></i> {{str_backtodashboard}}</a>
-        </div>
-        {{/is_teacher_self}}
-    {{/is_readonly}}
-
-    <!-- Main Workspace Card: Materials + Chat -->
-    <div class="main-dashboard-card">
-        <!-- Sidebar Panel: Material List -->
-        <div id="ainotebook-sidebar-nav" class="ainotebook-sidebar">
-            <div class="sidebar-header">
-                <h3><i class="fa fa-folder-open"></i> Materials</h3>
-                <button id="toggle-sidebar" class="btn-icon"><i class="fa fa-angle-double-left"></i></button>
-            </div>
-            <div class="material-list">
-                <div class="select-all-container">
-                    <input type="checkbox" id="select-all-files" checked>
-                    <label for="select-all-files">Select All</label>
-                </div>
-                {{#files}}
-                <div class="material-file-item">
-                    <input type="checkbox" class="file-checkbox" value="{{id}}" checked>
-                    <div class="material-file">
-                        <i class="fa fa-file-pdf-o"></i>
-                        <a href="{{url}}" target="_blank">{{filename}}</a>
-                    </div>
-                </div>
-                {{/files}}
-            </div>
-        </div>
-
-        <!-- Chat Panel: The AI Interface -->
-        <div class="ainotebook-chat">
-            <div class="chat-header">
-                <div class="chat-brand-section">
-                    <img src="{{wwwroot}}/mod/ainotebook/pix/icon.svg" class="chat-brand-icon">
-                    <div class="chat-info">
-                        <h2>{{ai_name}}</h2>
-                        <p class="chat-subtitle">Your AI Study Assistant by President University</p>
-                    </div>
-                </div>
-                <button id="open-settings" class="btn-icon" title="Configure Chat"><i class="fa fa-cog"></i></button>
-            </div>
-            <div id="chat-messages" class="chat-messages">
-                <div class="message ai">
-                    Hi, {{target_firstname}}! I am {{ai_name}}, your course study companion. I can help you with:<br>
-                    - Explaining the lecture materials shared by your teacher.<br>
-                    - Creating quizzes for your exam practice.<br>
-                    - Summarizing long readings and complex modules.<br>
-                    - Generating mindmaps to help you visualize key concepts.<br><br>
-                    Are you ready to start? What are we studying together today?
-                </div>
-                {{#history}}
-                <div class="message user">{{{message}}}</div>
-                <div class="message ai"><div class="markdown-body">{{{response}}}</div></div>
-                {{{suggestions_html}}}
-                {{/history}}
-            </div>
-            <div class="input-wrapper-container">
-                <div class="input-wrapper" {{#is_readonly}}style="opacity: 0.6; pointer-events: none;"{{/is_readonly}}>
-                    <input type="text" id="chat-input" placeholder="{{str_asksomething}}" {{#is_readonly}}disabled{{/is_readonly}}>
-                    <span id="source-count" class="source-pill">0 sources</span>
-                    <button id="send-btn" {{#is_readonly}}disabled{{/is_readonly}}>
-                        <i class="fa fa-paper-plane"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Creator Hub Card: Separate at the bottom -->
-    <div id="creator-hub" class="creator-hub-card" {{#is_readonly}}style="pointer-events: none; opacity: 0.9;"{{/is_readonly}}>
-        <div class="creator-header-action" style="{{#is_readonly}}pointer-events: auto;{{/is_readonly}}">
-            <h3>Learning Activities {{#is_readonly}}<span style="font-size: 0.8rem; font-weight: normal; color: var(--pres-text-dim);">(Read-Only)</span>{{/is_readonly}}</h3>
-            <button id="toggle-creator" class="btn-icon" style="{{#is_readonly}}pointer-events: auto;{{/is_readonly}}"><i class="fa fa-angle-double-up"></i></button>
-        </div>
-        <div id="creator-hub-content" class="creator-content" style="{{#is_readonly}}pointer-events: auto;{{/is_readonly}}">
-            {{^is_readonly}}
-            <div class="creator-grid">
-                <div class="creator-card quiz" onclick="{{#is_teacher}}window.openQuizGenerator(){{/is_teacher}}{{^is_teacher}}window.sendSuggested('Generate a comprehensive quiz from my materials.', 'quiz'){{/is_teacher}}">
-                    <div class="card-icon"><i class="fa fa-question-circle"></i></div>
-                    <div class="card-info">
-                        <h5>Quiz</h5>
-                        <p>Practice your understanding using Interactive Quiz</p>
-                    </div>
-                </div>
-                <div class="creator-card summary" onclick="window.sendSuggested('Generate a detailed study summary.', 'summary')">
-                    <div class="card-icon"><i class="fa fa-file-text-o"></i></div>
-                    <div class="card-info">
-                        <h5>Summary</h5>
-                        <p>Get the summary of the learning materials.</p>
-                    </div>
-                </div>
-                <div class="creator-card mindmap" onclick="window.sendSuggested('Generate a mindmap structure.', 'mindmap')">
-                    <div class="card-icon"><i class="fa fa-sitemap"></i></div>
-                    <div class="card-info">
-                        <h5>Mindmap</h5>
-                        <p>Generate a mindmap</p>
-                    </div>
-                </div>
-            </div>
-            {{/is_readonly}}
-
-            <div class="creator-workspace">
-                <div class="creator-history-panel">
-                    <div class="panel-header">
-                        <i class="fa fa-history"></i> Generated learning activities
-                    </div>
-                    <div id="history-list" class="history-list-items"></div>
-                </div>
-                <div id="creator-results" class="creator-preview-panel">
-                    <div class="preview-toolbar">
-                        <button id="download-result" class="btn-premium">
-                            <i class="fa fa-download"></i> Export to PDF
-                        </button>
-                    </div>
-                    <div id="results-content" class="preview-scroll-area">
-                        <div class="empty-preview">
-                            <i class="fa fa-magic fa-3x"></i>
-                            <p>Select an item from history to preview</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal: Quiz Generator Settings -->
-{{#is_teacher}}
-{{^is_readonly}}
-<div id="moodle-quiz-modal" class="chat-settings-modal">
-    <div class="modal-content" style="max-width: 500px;">
-        <div class="modal-header">
-            <h3><i class="fa fa-cogs"></i> Quiz Generator Settings</h3>
-            <button id="close-moodle-quiz" class="btn-icon"><i class="fa fa-times"></i></button>
-        </div>
-        <div class="modal-body form-vertical">
-            <div class="form-group">
-                <label>Total Questions</label>
-                <input type="number" id="mq-count" class="form-control" value="10" min="1" max="50">
-            </div>
-            
-            <div class="form-group">
-                <label>Difficulty Distribution</label>
-                <select id="mq-diff-mode" class="form-control" onchange="document.getElementById('mq-diff-custom').style.display = this.value === 'custom' ? 'block' : 'none';">
-                    <option value="auto" selected>Auto / Random</option>
-                    <option value="custom">Custom Distribution</option>
-                </select>
-                <div id="mq-diff-custom" style="display:none; margin-top:10px; background:#f8fafc; padding:10px; border-radius:5px; border:1px solid #e2e8f0;">
-                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">Easy</label><input type="number" id="mq-diff-easy" class="form-control form-control-sm" value="2" min="0"></div>
-                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">Medium</label><input type="number" id="mq-diff-medium" class="form-control form-control-sm" value="0" min="0"></div>
-                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">Hard</label><input type="number" id="mq-diff-hard" class="form-control form-control-sm" value="5" min="0"></div>
-                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">Expert</label><input type="number" id="mq-diff-expert" class="form-control form-control-sm" value="3" min="0"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label>Question Type</label>
-                <select id="mq-type-mode" class="form-control" onchange="document.getElementById('mq-type-custom').style.display = this.value === 'custom' ? 'block' : 'none';">
-                    <option value="auto" selected>Auto / Mixed</option>
-                    <option value="custom">Custom Distribution</option>
-                </select>
-                <div id="mq-type-custom" style="display:none; margin-top:10px; background:#f8fafc; padding:10px; border-radius:5px; border:1px solid #e2e8f0;">
-                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">Multiple Choice</label><input type="number" id="mq-type-mc" class="form-control form-control-sm" value="8" min="0"></div>
-                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">True/False</label><input type="number" id="mq-type-tf" class="form-control form-control-sm" value="1" min="0"></div>
-                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">Essay</label><input type="number" id="mq-type-es" class="form-control form-control-sm" value="1" min="0"></div>
-                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">Short Ans</label><input type="number" id="mq-type-sa" class="form-control form-control-sm" value="0" min="0"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="modal-footer">
-            <button id="generate-moodle-quiz" class="btn-premium w-100"><i class="fa fa-magic"></i> Generate Quiz</button>
-        </div>
-    </div>
-</div>
-{{/is_readonly}}
-{{/is_teacher}}
-
-<!-- Configuration Modal -->
-<div id="settings-modal" class="ain-modal-overlay">
-    <div class="ain-modal-content">
-        <div class="ain-modal-header">
-            <h3>Configure chat</h3>
-            <button id="close-settings" class="btn-icon"><i class="fa fa-times"></i></button>
-        </div>
-        <div class="ain-modal-body">
-            <p class="ain-modal-desc">Notebooks can be customised to help you achieve different goals: do research, help learn, show various perspectives or converse in a particular style and tone.</p>
-            
-            <div class="setting-group">
-                <label>Define your conversational goal, style or role</label>
-                <select id="chat-style" class="custom-select">
-                    <option value="general">Best for general purpose research and brainstorming tasks.</option>
-                    <option value="tutor">Professional Tutor - patient and encouraging.</option>
-                    <option value="critic">Critical Thinker - challenges your assumptions.</option>
-                </select>
-            </div>
-
-            <div class="setting-group">
-                <label>Choose your response length</label>
-                <select id="chat-length" class="custom-select">
-                    <option value="short">Short & Concise</option>
-                    <option value="medium" selected>Balanced</option>
-                    <option value="long">Detailed & Comprehensive</option>
-                </select>
-            </div>
-        </div>
-        <div class="ain-modal-footer">
-            <button id="save-settings" class="btn-premium">Save Settings</button>
-        </div>
-    </div>
-</div>
-
-{{#js}}
-    var cmid = {{cmid}};
-    var sesskey = '{{sesskey}}';
-    var wwwroot = '{{wwwroot}}';
-    var activityName = {{{activityname}}};
-    var pdfLogoUrl = '{{pdf_logo_url}}';
-    var studentName = '{{target_fullname}}';
-    var studentId = '{{target_idnumber}}';
-    var notebookName = {{{activityname}}};
-    var savedArtifacts = {{{saved_json}}};
-    var isReadonly = {{#is_readonly}}true{{/is_readonly}}{{^is_readonly}}false{{/is_readonly}};
-    var isTeacher = {{#is_teacher}}true{{/is_teacher}}{{^is_teacher}}false{{/is_teacher}};
-
     console.log("AI Notebook JS Loaded. CMID: " + cmid);
 
     if (typeof mermaid !== "undefined") {
@@ -256,7 +10,7 @@
         });
     }
 
-    /* Global handlers available immediately. */
+    // Global handlers available immediately.
     window.sendSuggested = function(text, toolType = null) {
         var input = document.getElementById("chat-input");
         if (input) {
@@ -269,7 +23,7 @@
                     var icon = card.querySelector(".card-icon i");
                     if (icon) icon.className = "fa fa-circle-o-notch fa-spin";
                 }
-                /* Call sendMessage in silent mode. */
+                // Call sendMessage in silent mode.
                 sendMessage(true);
             } else {
                 var btn = document.getElementById("send-btn");
@@ -294,7 +48,7 @@
 
         if (!sendBtn || !input || !messages) return false;
 
-        /* Attach listeners early! */
+        // Attach listeners early!
         sendBtn.onclick = function(e) {
             e.preventDefault();
             sendMessage();
@@ -332,18 +86,20 @@
                 var realIdx = artifactHistory.length - 1 - i;
                 var item = document.createElement("div");
                 item.className = "history-item " + art.type + (art.saved ? " is-saved" : "");
-                item.innerHTML = '<div class="history-main" onclick="window.renderHistoryItem(' + realIdx + ')">' +
-                    '<i class="fa ' + getIcon(art.type) + '"></i>' +
-                    '<span>' + art.title + '</span>' +
-                '</div>' +
-                '<div class="history-actions">' +
-                    (!art.saved && !isReadonly ? '<button title="Save to Database" onclick="window.saveArtifact(' + realIdx + ')"><i class="fa fa-save"></i></button>' : '<span class="saved-badge"><i class="fa fa-check-circle"></i></span>') +
-                    (!isReadonly ? '<button title="Delete" onclick="window.deleteArtifact(' + realIdx + ')"><i class="fa fa-trash"></i></button>' : '') +
-                '</div>';
+                item.innerHTML = `
+                    <div class="history-main" onclick="window.renderHistoryItem(${realIdx})">
+                        <i class="fa ${getIcon(art.type)}"></i>
+                        <span>${art.title}</span>
+                    </div>
+                    <div class="history-actions">
+                        ${!art.saved && !isReadonly ? `<button title="Save to Database" onclick="window.saveArtifact(${realIdx})"><i class="fa fa-save"></i></button>` : `<span class="saved-badge"><i class="fa fa-check-circle"></i></span>`}
+                        ${!isReadonly ? `<button title="Delete" onclick="window.deleteArtifact(${realIdx})"><i class="fa fa-trash"></i></button>` : ''}
+                    </div>
+                `;
                 list.appendChild(item);
             });
         };
-        /* Load from DB. */
+        // Load from DB.
         if (savedArtifacts && savedArtifacts.length > 0) {
             savedArtifacts.forEach(a => {
                 artifactHistory.push({
@@ -357,7 +113,7 @@
             updateHistoryList();
         }
 
-        /* UI Handlers. */
+        // UI Handlers.
         var modal = document.getElementById("settings-modal");
         var openBtn = document.getElementById("open-settings");
         var closeBtn = document.getElementById("close-settings");
@@ -378,14 +134,14 @@
                 localStorage.setItem("ainotebook_config", JSON.stringify(config));
                 modal.classList.remove("active");
                 
-                /* Visual feedback. */
+                // Visual feedback.
                 var originalText = saveBtn.innerHTML;
                 saveBtn.innerHTML = "<i class='fa fa-check'></i> Saved!";
                 setTimeout(() => { saveBtn.innerHTML = originalText; }, 2000);
             };
         }
 
-        /* Load existing config. */
+        // Load existing config.
         var savedConfig = localStorage.getItem("ainotebook_config");
         if (savedConfig) {
             var config = JSON.parse(savedConfig);
@@ -415,7 +171,7 @@
                     var m = document.getElementById("mq-diff-medium").value || 0;
                     var h = document.getElementById("mq-diff-hard").value || 0;
                     var x = document.getElementById("mq-diff-expert").value || 0;
-                    diffStr = "Exactly " + e + " Easy, " + m + " Medium, " + h + " Hard, and " + x + " Expert questions.";
+                    diffStr = `Exactly ${e} Easy, ${m} Medium, ${h} Hard, and ${x} Expert questions.`;
                 }
                 
                 var typeMode = document.getElementById("mq-type-mode").value;
@@ -425,15 +181,15 @@
                     var tf = document.getElementById("mq-type-tf").value || 0;
                     var es = document.getElementById("mq-type-es").value || 0;
                     var sa = document.getElementById("mq-type-sa").value || 0;
-                    typeStr = "Exactly " + mc + " Multiple Choice, " + tf + " True/False, " + es + " Essay, and " + sa + " Short Answer questions.";
+                    typeStr = `Exactly ${mc} Multiple Choice, ${tf} True/False, ${es} Essay, and ${sa} Short Answer questions.`;
                 }
 
                 mqModal.classList.remove("active");
                 
-                var prompt = "Generate a quiz with exactly " + count + " questions based on the materials.\n\n";
-                prompt += "Difficulty Distribution: " + diffStr + "\n";
-                prompt += "Question Type Distribution: " + typeStr + "\n\n";
-                prompt += "CRITICAL INSTRUCTION: You MUST follow these exact numbers. Do not generate more or fewer questions than requested. Include 'type' property in the JSON for each question ('multichoice', 'truefalse', 'essay', or 'shortanswer').";
+                var prompt = `Generate a quiz with exactly ${count} questions based on the materials.\n\n`;
+                prompt += `Difficulty Distribution: ${diffStr}\n`;
+                prompt += `Question Type Distribution: ${typeStr}\n\n`;
+                prompt += `CRITICAL INSTRUCTION: You MUST follow these exact numbers. Do not generate more or fewer questions than requested. Include 'type' property in the JSON for each question ('multichoice', 'truefalse', 'essay', or 'shortanswer').`;
                 
                 window.sendSuggested(prompt, 'quiz');
             };
@@ -595,7 +351,7 @@
             
             var convertBtnMarkup = "";
             if (isTeacher && !isReadonly) {
-                convertBtnMarkup = '<button id="btn-convert-moodle-quiz" class="btn-premium" style="background: var(--pres-primary); margin-left: 10px;"><i class="fa fa-graduation-cap"></i> Convert to Moodle Quiz</button>';
+                convertBtnMarkup = `<button id="btn-convert-moodle-quiz" class="btn-premium" style="background: var(--pres-primary); margin-left: 10px;"><i class="fa fa-graduation-cap"></i> Convert to Moodle Quiz</button>`;
             }
             
             downloadBtn.innerHTML = "<i class=\'fa fa-download\'></i> Download Text";
@@ -603,10 +359,10 @@
                 downloadFile("quiz.txt", data.questions.map((q,i) => (i+1) + ". " + (q.text || q.question || "No question") + "\n   " + (q.options ? q.options.join("\n   ") : "")).join("\n\n"));
             };
             
-            /* Re-render toolbar to include the convert button */
+            // Re-render toolbar to include the convert button
             var toolbar = document.querySelector(".preview-toolbar");
             if (toolbar) {
-                /* Ensure we don't append multiple times if they switch tabs */
+                // Ensure we don't append multiple times if they switch tabs
                 var existingConvert = document.getElementById("btn-convert-moodle-quiz");
                 if (existingConvert) existingConvert.remove();
                 if (isTeacher && !isReadonly) {
@@ -661,7 +417,7 @@
                 var qDiv = document.createElement("div");
                 qDiv.className = "quiz-question active-question";
                 
-                /* Normalize answer (handle 0-3, "0"-"3", or "A"-"E") */
+                // Normalize answer (handle 0-3, "0"-"3", or "A"-"E")
                 var correctAnswer = q.answer;
                 if (typeof correctAnswer === "string") {
                     var upper = correctAnswer.trim().toUpperCase();
@@ -675,13 +431,13 @@
                 var qText = q.text || q.question || "No question text provided.";
                 var type = (q.type || "multichoice").toLowerCase();
                 
-                qDiv.innerHTML = '<h5>Question ' + (idx+1) + ' of ' + data.questions.length + ' <span style="font-size:0.7em; color:#64748b; background:#f1f5f9; padding:2px 6px; border-radius:4px; margin-left:10px;">' + type + '</span></h5>' +
-                                 '<p class="quiz-text">' + qText + '</p>' +
-                                 '<div class="quiz-options"></div>' +
-                                 '<div class="quiz-footer">' +
-                                    '<button class="btn-hint" onclick="var h=this.parentNode.querySelector(\'.quiz-hint\'); if(h){h.style.display=\'block\'; this.style.display=\'none\';}"><i class="fa fa-lightbulb-o"></i> Show Hint</button>' +
-                                    '<div class="quiz-hint" style="display:none;"><strong>Hint:</strong> ' + (q.hint || "Try to recall the main concept from the study materials.") + '</div>' +
-                                 '</div>';
+                qDiv.innerHTML = `<h5>Question ${idx+1} of ${data.questions.length} <span style="font-size:0.7em; color:#64748b; background:#f1f5f9; padding:2px 6px; border-radius:4px; margin-left:10px;">${type}</span></h5>
+                                 <p class="quiz-text">${qText}</p>
+                                 <div class="quiz-options"></div>
+                                 <div class="quiz-footer">
+                                    <button class="btn-hint" onclick="var h=this.parentNode.querySelector('.quiz-hint'); if(h){h.style.display='block'; this.style.display='none';}"><i class="fa fa-lightbulb-o"></i> Show Hint</button>
+                                    <div class="quiz-hint" style="display:none;"><strong>Hint:</strong> ${q.hint || "Try to recall the main concept from the study materials."}</div>
+                                 </div>`;
                 var optionsDiv = qDiv.querySelector(".quiz-options");
                 
                 var handleNext = function() {
@@ -706,7 +462,7 @@
                                 desc = "You're on the right track. A quick review of the material should get you to the top.";
                             }
                             
-                            /* Send score to Gradebook */
+                            // Send score to Gradebook
                             if (!isReadonly) {
                                 var formData = new FormData();
                                 formData.append("cmid", cmid);
@@ -730,18 +486,20 @@
                                 });
                             }
                             
-                            container.innerHTML = '<div class="quiz-score-container text-center">' +
-                                '<div class="score-circle">' +
-                                    '<svg viewBox="0 0 36 36" class="circular-chart">' +
-                                        '<path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />' +
-                                        '<path class="circle" stroke-dasharray="' + percent + ', 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />' +
-                                    '</svg>' +
-                                    '<div class="score-text">' + score + '/' + data.questions.length + '</div>' +
-                                '</div>' +
-                                '<h3>' + feedback + '</h3>' +
-                                '<p class="text-muted" style="margin-bottom:20px;">' + desc + '</p>' +
-                                '<button class="btn-outline" onclick="window.renderHistoryItem(window.lastRenderedIdx)"><i class="fa fa-refresh"></i> Retake Quiz</button>' +
-                            '</div>';
+                            container.innerHTML = `
+                                <div class="quiz-score-container text-center">
+                                    <div class="score-circle">
+                                        <svg viewBox="0 0 36 36" class="circular-chart">
+                                            <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                            <path class="circle" stroke-dasharray="${percent}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                        </svg>
+                                        <div class="score-text">${score}/${data.questions.length}</div>
+                                    </div>
+                                    <h3>${feedback}</h3>
+                                    <p class="text-muted" style="margin-bottom:20px;">${desc}</p>
+                                    <button class="btn-outline" onclick="window.renderHistoryItem(window.lastRenderedIdx)"><i class="fa fa-refresh"></i> Retake Quiz</button>
+                                </div>
+                            `;
                         }
                     };
                     qDiv.appendChild(nextBtn);
@@ -775,7 +533,7 @@
                         feedbackDiv.innerHTML = "<strong>Suggested Answer/Rubric:</strong><br>" + (q.answer || "No specific answer provided by AI.");
                         optionsDiv.appendChild(feedbackDiv);
                         
-                        /* Treat as correct for participation */
+                        // Treat as correct for participation
                         score++;
                         document.getElementById("quiz-score").innerText = "Score: " + score + "/" + data.questions.length;
                         handleNext();
@@ -789,7 +547,7 @@
                     opts.forEach((opt, oi) => {
                         var optDiv = document.createElement("div");
                         optDiv.className = "quiz-option";
-                        optDiv.innerHTML = '<span class="opt-label">' + (alpha[oi] || oi) + '</span> <span class="opt-text">' + opt + '</span>';
+                        optDiv.innerHTML = `<span class="opt-label">${alpha[oi] || oi}</span> <span class="opt-text">${opt}</span>`;
                         optDiv.onclick = function() {
                             if (qDiv.classList.contains("answered")) return;
                             qDiv.classList.add("answered");
@@ -838,7 +596,7 @@
 
         var prepareFormalHeader = function(title) {
             var now = new Date().toLocaleDateString();
-            return '<div class="summary-section">' + 
+            return `
             <div class="pdf-cover-page">
                 <div class="pdf-cover-logo">
                     <img src="${pdfLogoUrl}" class="pdf-brand-logo-large">
@@ -860,7 +618,7 @@
             </div>
             <div class="pdf-page-header">
                 <div class="pdf-header-label">${title.toUpperCase()}</div>
-'</div>';
+            </div>`;
         };
 
         // ── Mermaid syntax sanitizer (mirrors PHP-side sanitize_mermaid) ─────────
@@ -1389,4 +1147,3 @@
         attempts++;
     }, 300);
 
-{{/js}}

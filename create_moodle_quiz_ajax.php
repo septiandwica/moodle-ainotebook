@@ -59,6 +59,18 @@ try {
     $quiz->timecreated = time();
     $quiz->timemodified = time();
     
+    // Add required Moodle 4.x display options (0x11100 = 69888 = during, immediately, later, closed)
+    $quiz->reviewattempts = 69888;
+    $quiz->reviewcorrectness = 69888;
+    $quiz->reviewmarks = 69888;
+    $quiz->reviewspecificfeedback = 69888;
+    $quiz->reviewgeneralfeedback = 69888;
+    $quiz->reviewrightanswer = 69888;
+    $quiz->reviewoverallfeedback = 69888;
+    $quiz->reviewmaxmarks = 69888;
+    $quiz->shuffleanswers = 1;
+    $quiz->questionsperpage = 1;
+    
     $quiz->id = $DB->insert_record('quiz', $quiz);
     
     // Create cm record

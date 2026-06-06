@@ -182,7 +182,7 @@ try {
             $falseId = $DB->insert_record('question_answers', $ansFalse);
             
             $tf = new stdClass();
-            $tf->question = $question->id;
+            $tf->questionid = $question->id;
             $tf->trueanswer = $trueId;
             $tf->falseanswer = $falseId;
             $DB->insert_record('qtype_truefalse_options', $tf);
@@ -207,7 +207,7 @@ try {
             $DB->insert_record('question_versions', $qversion);
             
             $es = new stdClass();
-            $es->question = $question->id;
+            $es->questionid = $question->id;
             $es->responseformat = 'editor';
             $es->responserequired = 1;
             $es->responsefieldlines = 15;
@@ -239,7 +239,7 @@ try {
             $DB->insert_record('question_versions', $qversion);
             
             $sa = new stdClass();
-            $sa->question = $question->id;
+            $sa->questionid = $question->id;
             $sa->usecase = 0;
             $DB->insert_record('qtype_shortanswer_options', $sa);
             
@@ -273,7 +273,7 @@ try {
             $DB->insert_record('question_versions', $qversion);
             
             $mc = new stdClass();
-            $mc->question = $question->id;
+            $mc->questionid = $question->id;
             $mc->layout = 0;
             $mc->single = 1;
             $mc->shuffleanswers = 1;

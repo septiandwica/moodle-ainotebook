@@ -78,7 +78,11 @@ try {
     $newcm->course = $course->id;
     $newcm->module = $quizmodule->id;
     $newcm->instance = $quiz->id;
-    $newcm->section = 1; // Default to section 1
+    // Get current section
+    $current_section = $DB->get_record('course_sections', ['id' => $cm->section]);
+    $sectionnum = $current_section ? $current_section->section : 1;
+
+    $newcm->section = 1; // Temporary placeholder
     $newcm->idnumber = '';
     $newcm->added = time();
     $newcm->visible = 1;
@@ -87,14 +91,14 @@ try {
     $newcm->id = $DB->insert_record('course_modules', $newcm);
     
     // Assign to section
-    $section = $DB->get_record('course_sections', ['course' => $course->id, 'section' => 1]);
+    $section = $DB->get_record('course_sections', ['course' => $course->id, 'section' => $sectionnum]);
     if (!$section) {
-        course_create_sections_if_missing($course, [1]);
-        $section = $DB->get_record('course_sections', ['course' => $course->id, 'section' => 1]);
+        course_create_sections_if_missing($course, [$sectionnum]);
+        $section = $DB->get_record('course_sections', ['course' => $course->id, 'section' => $sectionnum]);
     }
     $newcm->section = $section->id;
     $DB->update_record('course_modules', $newcm);
-    course_add_cm_to_section($course, $newcm->id, 1);
+    course_add_cm_to_section($course, $newcm->id, $sectionnum);
     
     // Update quiz with coursemodule id
     $quiz->coursemodule = $newcm->id;
@@ -319,7 +323,7 @@ try {
         $page++; // 1 question per page
     }
     
-    $url = new moodle_url('/mod/quiz/view.php', ['id' => $newcm->id]);
+    $url = new moodle_url('/course/modedit.php', ['update' => $newcm->id, 'return' => 1]);
     echo json_encode(['success' => true, 'url' => $url->out(false)]);
     
 } catch (Exception $e) {

@@ -318,23 +318,8 @@ try {
             }
         }
         
-        // Moodle 4.x Slot and Reference linking
-        $slot = new stdClass();
-        $slot->quizid = $quiz->id;
-        $slot->slot = $page;
-        $slot->page = $page;
-        $slot->requireprevious = 0;
-        $slot->maxmark = $question->defaultmark;
-        $slot->id = $DB->insert_record('quiz_slots', $slot);
-        
-        $ref = new stdClass();
-        $ref->usingcontextid = $quizcontext->id;
-        $ref->component = 'mod_quiz';
-        $ref->questionarea = 'slot';
-        $ref->itemid = $slot->id;
-        $ref->questionbankentryid = $bankentry->id;
-        $ref->version = null; // Always use latest
-        $DB->insert_record('question_references', $ref);
+        // Add question to quiz
+        quiz_add_quiz_question($question->id, $quiz, $page);
         $page++; // 1 question per page
     }
     

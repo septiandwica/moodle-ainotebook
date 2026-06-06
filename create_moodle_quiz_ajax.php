@@ -147,6 +147,20 @@ try {
             $question->qtype = 'truefalse';
             $question->id = $DB->insert_record('question', $question);
             
+            // Moodle 4.x Question Bank Entry
+            $bankentry = new stdClass();
+            $bankentry->questioncategoryid = $category->id;
+            $bankentry->idnumber = '';
+            $bankentry->ownerid = $USER->id;
+            $bankentry->id = $DB->insert_record('question_bank_entries', $bankentry);
+            
+            $qversion = new stdClass();
+            $qversion->questionbankentryid = $bankentry->id;
+            $qversion->version = 1;
+            $qversion->questionid = $question->id;
+            $qversion->status = 'ready';
+            $DB->insert_record('question_versions', $qversion);
+            
             // truefalse needs 2 answers in question_answers
             $ansTrue = new stdClass();
             $ansTrue->question = $question->id;
@@ -176,6 +190,20 @@ try {
             $question->qtype = 'essay';
             $question->id = $DB->insert_record('question', $question);
             
+            // Moodle 4.x Question Bank Entry
+            $bankentry = new stdClass();
+            $bankentry->questioncategoryid = $category->id;
+            $bankentry->idnumber = '';
+            $bankentry->ownerid = $USER->id;
+            $bankentry->id = $DB->insert_record('question_bank_entries', $bankentry);
+            
+            $qversion = new stdClass();
+            $qversion->questionbankentryid = $bankentry->id;
+            $qversion->version = 1;
+            $qversion->questionid = $question->id;
+            $qversion->status = 'ready';
+            $DB->insert_record('question_versions', $qversion);
+            
             $es = new stdClass();
             $es->question = $question->id;
             $es->responseformat = 'editor';
@@ -192,6 +220,20 @@ try {
         } elseif ($type === 'shortanswer') {
             $question->qtype = 'shortanswer';
             $question->id = $DB->insert_record('question', $question);
+            
+            // Moodle 4.x Question Bank Entry
+            $bankentry = new stdClass();
+            $bankentry->questioncategoryid = $category->id;
+            $bankentry->idnumber = '';
+            $bankentry->ownerid = $USER->id;
+            $bankentry->id = $DB->insert_record('question_bank_entries', $bankentry);
+            
+            $qversion = new stdClass();
+            $qversion->questionbankentryid = $bankentry->id;
+            $qversion->version = 1;
+            $qversion->questionid = $question->id;
+            $qversion->status = 'ready';
+            $DB->insert_record('question_versions', $qversion);
             
             $sa = new stdClass();
             $sa->question = $question->id;
@@ -211,6 +253,20 @@ try {
             // Default to multichoice
             $question->qtype = 'multichoice';
             $question->id = $DB->insert_record('question', $question);
+            
+            // Moodle 4.x Question Bank Entry
+            $bankentry = new stdClass();
+            $bankentry->questioncategoryid = $category->id;
+            $bankentry->idnumber = '';
+            $bankentry->ownerid = $USER->id;
+            $bankentry->id = $DB->insert_record('question_bank_entries', $bankentry);
+            
+            $qversion = new stdClass();
+            $qversion->questionbankentryid = $bankentry->id;
+            $qversion->version = 1;
+            $qversion->questionid = $question->id;
+            $qversion->status = 'ready';
+            $DB->insert_record('question_versions', $qversion);
             
             $mc = new stdClass();
             $mc->question = $question->id;

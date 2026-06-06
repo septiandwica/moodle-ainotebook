@@ -146,13 +146,13 @@
 <!-- Modal: Quiz Generator Settings -->
 {{#is_teacher}}
 {{^is_readonly}}
-<div id="moodle-quiz-modal" class="chat-settings-modal">
-    <div class="modal-content" style="max-width: 500px;">
-        <div class="modal-header">
+<div id="moodle-quiz-modal" class="ain-modal-overlay">
+    <div class="ain-modal-content" style="max-width: 500px;">
+        <div class="ain-modal-header">
             <h3><i class="fa fa-cogs"></i> Quiz Generator Settings</h3>
             <button id="close-moodle-quiz" class="btn-icon"><i class="fa fa-times"></i></button>
         </div>
-        <div class="modal-body form-vertical">
+        <div class="ain-modal-body form-vertical">
             <div class="form-group">
                 <label>Total Questions</label>
                 <input type="number" id="mq-count" class="form-control" value="10" min="1" max="50">
@@ -190,7 +190,7 @@
                 </div>
             </div>
         </div>
-        <div class="modal-footer">
+        <div class="ain-modal-footer">
             <button id="generate-moodle-quiz" class="btn-premium w-100"><i class="fa fa-magic"></i> Generate Quiz</button>
         </div>
     </div>
@@ -235,13 +235,13 @@
 <!-- Convert to Quiz Modal -->
 {{#is_teacher}}
 {{^is_readonly}}
-<div id="convert-quiz-modal" class="chat-settings-modal">
-    <div class="modal-content" style="max-width: 500px;">
-        <div class="modal-header">
+<div id="convert-quiz-modal" class="ain-modal-overlay">
+    <div class="ain-modal-content" style="max-width: 500px;">
+        <div class="ain-modal-header">
             <h3><i class="fa fa-graduation-cap"></i> Convert to Moodle Quiz</h3>
             <button id="close-convert-quiz" class="btn-icon"><i class="fa fa-times"></i></button>
         </div>
-        <div class="modal-body form-vertical">
+        <div class="ain-modal-body form-vertical">
             <div class="form-group">
                 <label>Quiz Name</label>
                 <input type="text" id="cq-name" class="form-control" value="AI Generated Quiz">
@@ -251,7 +251,7 @@
                 <textarea id="cq-intro" class="form-control" rows="3">Please answer the following questions carefully.</textarea>
             </div>
         </div>
-        <div class="modal-footer">
+        <div class="ain-modal-footer">
             <button id="confirm-convert-quiz" class="btn-premium w-100"><i class="fa fa-check"></i> Create Quiz</button>
         </div>
     </div>

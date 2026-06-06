@@ -150,6 +150,7 @@ try {
             // Moodle 4.x Question Bank Entry
             $bankentry = new stdClass();
             $bankentry->questioncategoryid = $category->id;
+            $bankentry->idnumber = make_unique_id_code();
             
             $bankentry->ownerid = $USER->id;
             $bankentry->id = $DB->insert_record('question_bank_entries', $bankentry);
@@ -193,6 +194,7 @@ try {
             // Moodle 4.x Question Bank Entry
             $bankentry = new stdClass();
             $bankentry->questioncategoryid = $category->id;
+            $bankentry->idnumber = make_unique_id_code();
             
             $bankentry->ownerid = $USER->id;
             $bankentry->id = $DB->insert_record('question_bank_entries', $bankentry);
@@ -224,6 +226,7 @@ try {
             // Moodle 4.x Question Bank Entry
             $bankentry = new stdClass();
             $bankentry->questioncategoryid = $category->id;
+            $bankentry->idnumber = make_unique_id_code();
             
             $bankentry->ownerid = $USER->id;
             $bankentry->id = $DB->insert_record('question_bank_entries', $bankentry);
@@ -257,6 +260,7 @@ try {
             // Moodle 4.x Question Bank Entry
             $bankentry = new stdClass();
             $bankentry->questioncategoryid = $category->id;
+            $bankentry->idnumber = make_unique_id_code();
             
             $bankentry->ownerid = $USER->id;
             $bankentry->id = $DB->insert_record('question_bank_entries', $bankentry);
@@ -319,5 +323,9 @@ try {
     echo json_encode(['success' => true, 'url' => $url->out(false)]);
     
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    $errorMsg = $e->getMessage();
+    if (isset($e->debuginfo)) {
+        $errorMsg .= ' | Debug: ' . $e->debuginfo;
+    }
+    echo json_encode(['success' => false, 'error' => $errorMsg]);
 }

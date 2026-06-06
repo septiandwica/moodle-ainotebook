@@ -150,7 +150,7 @@ try {
             // Moodle 4.x Question Bank Entry
             $bankentry = new stdClass();
             $bankentry->questioncategoryid = $category->id;
-            $bankentry->idnumber = '';
+            
             $bankentry->ownerid = $USER->id;
             $bankentry->id = $DB->insert_record('question_bank_entries', $bankentry);
             
@@ -193,7 +193,7 @@ try {
             // Moodle 4.x Question Bank Entry
             $bankentry = new stdClass();
             $bankentry->questioncategoryid = $category->id;
-            $bankentry->idnumber = '';
+            
             $bankentry->ownerid = $USER->id;
             $bankentry->id = $DB->insert_record('question_bank_entries', $bankentry);
             
@@ -224,7 +224,7 @@ try {
             // Moodle 4.x Question Bank Entry
             $bankentry = new stdClass();
             $bankentry->questioncategoryid = $category->id;
-            $bankentry->idnumber = '';
+            
             $bankentry->ownerid = $USER->id;
             $bankentry->id = $DB->insert_record('question_bank_entries', $bankentry);
             
@@ -257,7 +257,7 @@ try {
             // Moodle 4.x Question Bank Entry
             $bankentry = new stdClass();
             $bankentry->questioncategoryid = $category->id;
-            $bankentry->idnumber = '';
+            
             $bankentry->ownerid = $USER->id;
             $bankentry->id = $DB->insert_record('question_bank_entries', $bankentry);
             

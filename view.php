@@ -69,6 +69,7 @@ $context_data = [
     'target_fullname' => fullname($target_user),
     'target_firstname' => $target_user->firstname,
     'target_email' => s($target_user->email),
+    'target_idnumber' => addslashes($target_user->idnumber ?: $target_user->id),
     'ai_name' => s($ai_name)
 ];
 

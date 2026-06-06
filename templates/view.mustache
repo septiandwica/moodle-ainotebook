@@ -233,29 +233,17 @@
 </div>
 
 {{#js}}
-$js .= "    var cmid = {{cmid}};\n";
-$js .= "    var sesskey = '{{sesskey}}';\n";
-$js .= "    var wwwroot = '{{wwwroot}}';\n";
-$js .= "    var activityName = {{activityname}};\n";
-
-    // [DYNAMIC LOGO] Check for custom uploaded logo.
-    $pdf_logo_url = '';
-    $fs = get_file_storage();
-    $context_system = context_system::instance();
-    $logo_files = $fs->get_area_files($context_system->id, 'mod_ainotebook', 'pdf_logo', 0, 'itemid, filepath, filename', false);
-    if ($logo_files) {
-        $logo_file = reset($logo_files);
-        $pdf_logo_url = moodle_url::make_pluginfile_url($logo_file->get_contextid(), $logo_file->get_component(), $logo_file->get_filearea(), $logo_file->get_itemid(), $logo_file->get_filepath(), $logo_file->get_filename())->out(false);
-    } else {
-        $pdf_logo_url = $CFG->wwwroot . '/mod/ainotebook/pix/presunivlogo.png';
-    }
-
-    $js .= "    var pdfLogoUrl = '" . $pdf_logo_url . "';\n";
-    $js .= "    var studentName = '" . addslashes(fullname($target_user)) . "';\n";
-    $js .= "    var studentId = '" . addslashes($target_user->idnumber ?: $target_user->id) . "';\n    var notebookName = '" . addslashes($ainotebook->name) . "';\n    var savedArtifacts = " . $saved_json . ";\n";
-    $js .= "    var isReadonly = " . ($is_readonly ? 'true' : 'false') . ";\n";
-    $js .= "    var isTeacher = " . ($is_teacher ? 'true' : 'false') . ";\n";
-$js .= <<<'JS'
+    var cmid = {{cmid}};
+    var sesskey = '{{sesskey}}';
+    var wwwroot = '{{wwwroot}}';
+    var activityName = {{{activityname}}};
+    var pdfLogoUrl = '{{pdf_logo_url}}';
+    var studentName = '{{target_fullname}}';
+    var studentId = '{{target_idnumber}}';
+    var notebookName = {{{activityname}}};
+    var savedArtifacts = {{{saved_json}}};
+    var isReadonly = {{#is_readonly}}true{{/is_readonly}}{{^is_readonly}}false{{/is_readonly}};
+    var isTeacher = {{#is_teacher}}true{{/is_teacher}}{{^is_teacher}}false{{/is_teacher}};
 
     console.log("AI Notebook JS Loaded. CMID: " + cmid);
 

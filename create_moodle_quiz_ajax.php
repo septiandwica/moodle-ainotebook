@@ -60,7 +60,7 @@ try {
     $quiz->timemodified = time();
     
     // Add required Moodle 4.x display options (0x11100 = 69888 = during, immediately, later, closed)
-    $quiz->reviewattempts = 69888;
+    $quiz->reviewattempt = 69888;
     $quiz->reviewcorrectness = 69888;
     $quiz->reviewmarks = 69888;
     $quiz->reviewspecificfeedback = 69888;

@@ -194,10 +194,10 @@ try {
             $falseId = $DB->insert_record('question_answers', $ansFalse);
             
             $tf = new stdClass();
-            $tf->questionid = $question->id;
+            $tf->question = $question->id;
             $tf->trueanswer = $trueId;
             $tf->falseanswer = $falseId;
-            $DB->insert_record('qtype_truefalse_options', $tf);
+            $DB->insert_record('question_truefalse', $tf);
             
         } elseif ($type === 'essay') {
             $question->qtype = 'essay';

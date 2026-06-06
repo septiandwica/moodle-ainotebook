@@ -120,6 +120,14 @@ try {
     $category->sortorder = 999;
     $category->id = $DB->insert_record('question_categories', $category);
     
+    // Create quiz section (Moodle requires at least one section for slots to display)
+    $qsection = new stdClass();
+    $qsection->quizid = $quiz->id;
+    $qsection->firstslot = 1;
+    $qsection->heading = '';
+    $qsection->shufflequestions = 0;
+    $DB->insert_record('quiz_sections', $qsection);
+
     // 3. Create Questions and add to Quiz
     $page = 1;
     foreach ($quizdata->questions as $q) {
@@ -318,10 +326,32 @@ try {
             }
         }
         
-        // Add question to quiz
-        quiz_add_quiz_question($question->id, $quiz, $page);
+        // Manually link the question to the quiz slot (Moodle 4.x compatible)
+        $slot = new stdClass();
+        $slot->quizid = $quiz->id;
+        $slot->slot = $page;
+        $slot->page = $page;
+        $slot->requireprevious = 0;
+        $slot->maxmark = $question->defaultmark;
+        $slot->questionid = $question->id; // Required for cache/backward compatibility
+        $slot->questioncategoryid = $category->id; // Required in some Moodle versions
+        $slot->id = $DB->insert_record('quiz_slots', $slot);
+        
+        $ref = new stdClass();
+        $ref->usingcontextid = $quizcontext->id;
+        $ref->component = 'mod_quiz';
+        $ref->questionarea = 'slot';
+        $ref->itemid = $slot->id;
+        $ref->questionbankentryid = $bankentry->id;
+        $ref->version = null; // Always use latest version
+        $DB->insert_record('question_references', $ref);
         $page++; // 1 question per page
     }
+    
+    // Update quiz sumgrades based on inserted questions
+    $quiz->sumgrades = $page - 1;
+    $DB->update_record('quiz', $quiz);
+    quiz_update_grades($quiz, 0, false);
     
     $url = new moodle_url('/course/modedit.php', ['update' => $newcm->id, 'return' => 1]);
     echo json_encode(['success' => true, 'url' => $url->out(false)]);

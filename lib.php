@@ -65,14 +65,22 @@ function ainotebook_update_instance($ainotebook, $mform) {
  * @return bool
  */
 function ainotebook_delete_instance($id) {
-    global $DB;
+    global $CFG, $DB;
+    require_once($CFG->libdir . '/gradelib.php');
 
     if (!$ainotebook = $DB->get_record('ainotebook', array('id' => $id))) {
         return false;
     }
 
-    $DB->delete_records('ainotebook_chat', array('ainotebookid' => $ainotebook->id));
-    $DB->delete_records('ainotebook', array('id' => $ainotebook->id));
+    $DB->delete_records('ainotebook_chat',          array('ainotebookid' => $ainotebook->id));
+    $DB->delete_records('ainotebook_artifacts',     array('ainotebookid' => $ainotebook->id));
+    $DB->delete_records('ainotebook_evals',         array('ainotebookid' => $ainotebook->id));
+    $DB->delete_records('ainotebook_quiz_attempts', array('ainotebookid' => $ainotebook->id));
+    $DB->delete_records('ainotebook_embeddings',    array('ainotebookid' => $ainotebook->id));
+    $DB->delete_records('ainotebook',               array('id'           => $ainotebook->id));
+
+    grade_update('mod/ainotebook', $ainotebook->course, 'mod', 'ainotebook', $ainotebook->id, 0, null, array('deleted' => 1));
+    grade_update('mod/ainotebook', $ainotebook->course, 'mod', 'ainotebook', $ainotebook->id, 1, null, array('deleted' => 1));
 
     return true;
 }

@@ -228,8 +228,6 @@ class ai_client {
         require_once($CFG->libdir . '/filelib.php');
         $curl = new \curl();
         $curl->setopt([
-            'CURLOPT_SSL_VERIFYPEER' => false,
-            'CURLOPT_SSL_VERIFYHOST' => false,
             'CURLOPT_TIMEOUT'        => 60,
             'CURLOPT_CONNECTTIMEOUT' => 10,
             // Phase 6: Connection Optimization (Keep-Alive)
@@ -934,6 +932,8 @@ class ai_client {
             return;
         }
 
+        $binaries = [];
+
         foreach ($files as $file) {
             if ($file->is_directory()) {
                 continue;
@@ -1144,8 +1144,6 @@ class ai_client {
         require_once($CFG->libdir . '/filelib.php');
         $curl = new \curl();
         $curl->setopt([
-            'CURLOPT_SSL_VERIFYPEER' => false,
-            'CURLOPT_SSL_VERIFYHOST' => false,
             'CURLOPT_TIMEOUT'        => 30,
         ]);
 
@@ -1209,8 +1207,6 @@ class ai_client {
         require_once($CFG->libdir . '/filelib.php');
         $curl = new \curl();
         $curl->setopt([
-            'CURLOPT_SSL_VERIFYPEER' => false,
-            'CURLOPT_SSL_VERIFYHOST' => false,
             'CURLOPT_TIMEOUT'        => 60,
         ]);
 

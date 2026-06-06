@@ -18,7 +18,7 @@ $ai_name = empty($config->ai_name) ? 'DEMI TUTOR' : $config->ai_name;
 
 require_login($course, true, $cm);
 if (isguestuser() || !isloggedin()) {
-    print_error('noguest');
+    throw new \moodle_exception('noguest');
 }
 $context = context_module::instance($cm->id);
 
@@ -44,12 +44,15 @@ $PAGE->set_pagelayout('incourse');
 echo $OUTPUT->header();
 
 // Include FontAwesome and Custom CSS.
+$plugin = new stdClass();
+require_once(__DIR__ . '/version.php');
+$pluginrev = $plugin->version;
 echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">';
-echo '<link rel="stylesheet" href="styles.css?v=' . time() . '">';
+echo '<link rel="stylesheet" href="styles.css?v=' . $pluginrev . '">';
 
 // Include Marked.js and Mermaid.js.
-echo '<script src="' . $CFG->wwwroot . '/mod/ainotebook/js/marked.min.js?v=' . time() . '"></script>';
-echo '<script src="' . $CFG->wwwroot . '/mod/ainotebook/js/mermaid.min.js?v=' . time() . '"></script>';
+echo '<script src="' . $CFG->wwwroot . '/mod/ainotebook/js/marked.min.js?v=' . $pluginrev . '"></script>';
+echo '<script src="' . $CFG->wwwroot . '/mod/ainotebook/js/mermaid.min.js?v=' . $pluginrev . '"></script>';
 
 $fs = get_file_storage();
 $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', false);

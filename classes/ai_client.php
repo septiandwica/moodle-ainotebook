@@ -319,7 +319,7 @@ class ai_client {
                         if (stripos($error_msg, 'quota') !== false || stripos($error_msg, 'rate limit') !== false || stripos($error_msg, '429') !== false) {
                             return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
                         }
-                        return "AI Error: " . $error_msg;
+                        return "The AI service is currently unavailable. Please try again later.<script>console.error('AI Error (Gemini): " . addslashes($error_msg) . "');</script>";
                     }
                     return "No response received from the AI.";
                 }
@@ -340,7 +340,7 @@ class ai_client {
                 if (stripos($error_msg, 'quota') !== false || stripos($error_msg, 'rate limit') !== false || stripos($error_msg, '429') !== false) {
                     return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
                 }
-                return "The AI service is currently unavailable. Please try again later.";
+                return "The AI service is currently unavailable. Please try again later.<script>console.error('AI Error (Gemini): " . addslashes($error_msg) . "');</script>";
             }
 
             if (isset($result->candidates[0]->content->parts[0]->text)) {
@@ -486,8 +486,8 @@ class ai_client {
                 if (stripos($err_type, 'rate_limit') !== false || stripos($err, 'rate limit') !== false || stripos($err, 'quota') !== false) {
                     return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
                 }
-                // Show a sanitised but informative error for everything else.
-                return "The AI service is currently unavailable. Please try again later.";
+                // Show actual error in console, but generic message in UI.
+                return "The AI service is currently unavailable. Please try again later.<script>console.error('AI Error ({$provider}): " . addslashes($err) . "');</script>";
             }
 
             debugging("ainotebook: unexpected response shape from {$provider}: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);

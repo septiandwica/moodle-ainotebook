@@ -817,7 +817,10 @@
             if (resultsContent) return resultsContent;
             var aiMsgs = document.querySelectorAll(".message.ai .markdown-body, .message.ai .message-text");
             if (aiMsgs.length > 0) return aiMsgs[aiMsgs.length - 1];
-            ret        var renderQuiz = function(data, customTarget = null) {
+            return null;
+        };
+
+        var renderQuiz = function(data, customTarget = null) {
             if (resultsContainer && !customTarget) resultsContainer.style.display = "block";
             var target = customTarget || getOrCreateTargetContainer();
             if (!target) return;

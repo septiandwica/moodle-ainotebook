@@ -459,6 +459,147 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: s
     overflow-x: auto;
     padding-bottom: 2px;
 }
+
+/* Syllabus & Topics Tree Styling (Matching AiTutor.tsx) */
+.syllabus-header-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+}
+.syllabus-header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+.syllabus-header-title i {
+    font-size: 1.2rem;
+    color: #07366c;
+}
+.syllabus-header-title h4 {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+.syllabus-badge {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #047857;
+    background: #d1fae5;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+}
+.syllabus-instruction {
+    margin: 0;
+    font-size: 0.72rem;
+    color: #64748b;
+    line-height: 1.3;
+}
+
+.syllabus-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.syllabus-topic-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.syllabus-topic-card:hover {
+    border-color: #3b82f6;
+    background: #f8fafc;
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.08);
+}
+.syllabus-topic-card.active {
+    border-color: #07366c;
+    background: #eff6ff;
+    box-shadow: 0 0 0 2px rgba(7, 54, 108, 0.15);
+}
+.topic-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.topic-header i {
+    font-size: 1.1rem;
+    color: #07366c;
+    flex-shrink: 0;
+}
+.topic-meta {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+}
+.topic-meta strong {
+    font-size: 0.82rem;
+    color: #0f172a;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.topic-subtitle {
+    font-size: 0.7rem;
+    color: #64748b;
+}
+.btn-focus-topic {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #07366c;
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+.btn-focus-topic:hover {
+    background: #07366c;
+    color: #ffffff;
+    border-color: #07366c;
+}
+.topic-modules-list {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.topic-module-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.76rem;
+    color: #334155;
+}
+.topic-module-item i {
+    font-size: 0.9rem;
+    color: #07366c;
+}
+.topic-module-item a {
+    color: #334155;
+    text-decoration: none;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.topic-module-item a:hover {
+    color: #07366c;
+    text-decoration: underline;
+}
 .tools-label {
     font-size: 0.68rem;
     font-weight: 800;

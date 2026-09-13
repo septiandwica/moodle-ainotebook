@@ -94,27 +94,62 @@
                 </div>
             </div>
 
-            <!-- Tab 2: Syllabus / Materials Panel -->
+            <!-- Tab 2: Syllabus / Course Modules Panel (Matching AiTutor.tsx 100%) -->
             <div id="syllabus-panel" class="sidebar-tab-content">
-                <div class="select-all-container">
-                    <input type="checkbox" id="select-all-files" checked>
-                    <label for="select-all-files">Select All Materials</label>
-                </div>
-                <div class="material-list">
-                    {{#files}}
-                    <div class="material-file-item">
-                        <input type="checkbox" class="file-checkbox" value="{{id}}" checked>
-                        <div class="material-file">
-                            <i class="fa {{#icon}}{{icon}}{{/icon}}{{^icon}}fa-file-pdf-o{{/icon}}"></i>
-                            <a href="{{url}}" target="_blank">{{filename}}</a>
+                <div class="syllabus-header-card">
+                    <div class="syllabus-header-title">
+                        <i class="fa fa-book"></i>
+                        <div>
+                            <h4>Course Syllabus & Lecture Slides</h4>
+                            <span class="syllabus-badge">{{files_count}} Modules</span>
                         </div>
                     </div>
-                    {{/files}}
-                    {{^files}}
-                    <div class="empty-files-notice">
-                        <p>No course materials uploaded for this course yet.</p>
+                    <p class="syllabus-instruction">Select a specific week/topic to filter the AI tutor focus:</p>
+                </div>
+
+                <div class="syllabus-list">
+                    <!-- All Course Materials (Full Scope) -->
+                    <div class="syllabus-topic-card active" onclick="window.filterTopicFocus('All Course Materials', this)">
+                        <div class="topic-header">
+                            <i class="fa fa-university"></i>
+                            <div class="topic-meta">
+                                <strong>📚 All Course Materials</strong>
+                                <span class="topic-subtitle">Full Scope</span>
+                            </div>
+                        </div>
                     </div>
-                    {{/files}}
+
+                    <!-- Section / Topic Cards -->
+                    {{#syllabus_sections}}
+                    <div class="syllabus-topic-card" onclick="window.filterTopicFocus('{{{name}}}', this)">
+                        <div class="topic-header">
+                            <i class="fa fa-folder-open-o"></i>
+                            <div class="topic-meta">
+                                <strong>{{name}}</strong>
+                                <span class="topic-subtitle">{{modules_count}} items</span>
+                            </div>
+                            <button type="button" class="btn-focus-topic" title="Focus AI Tutor on this topic">
+                                Focus Topic
+                            </button>
+                        </div>
+                        {{#modules_count}}
+                        <div class="topic-modules-list">
+                            {{#modules}}
+                            <div class="topic-module-item">
+                                <i class="fa {{icon}}"></i>
+                                <a href="{{url}}" target="_blank" onclick="event.stopPropagation()">{{name}}</a>
+                            </div>
+                            {{/modules}}
+                        </div>
+                        {{/modules_count}}
+                    </div>
+                    {{/syllabus_sections}}
+
+                    {{^syllabus_sections}}
+                    <div class="empty-files-notice">
+                        <p>No course syllabus topics found yet.</p>
+                    </div>
+                    {{/syllabus_sections}}
                 </div>
             </div>
 
@@ -385,6 +420,29 @@
         var target = document.getElementById(tabId);
         if (target) target.classList.add('active');
         if (btnEl) btnEl.classList.add('active');
+    };
+
+    window.filterTopicFocus = function(topicName, cardEl) {
+        document.querySelectorAll('.syllabus-topic-card').forEach(function(c) {
+            c.classList.remove('active');
+        });
+        if (cardEl) cardEl.classList.add('active');
+
+        var headerSub = document.querySelector('.chat-header .chat-subtitle');
+        if (headerSub) {
+            if (topicName === 'All Course Materials') {
+                headerSub.innerText = 'All Course Materials · Direct Discussion Thread';
+            } else {
+                headerSub.innerText = 'Topic Focus: ' + topicName + ' · Direct Discussion Thread';
+            }
+        }
+
+        require(['core/notification'], function(Notification) {
+            Notification.addNotification({
+                message: 'DEMI AI Tutor focus set to: ' + topicName,
+                type: 'info'
+            });
+        });
     };
 
     window.startNewSession = function() {

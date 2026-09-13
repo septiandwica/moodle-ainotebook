@@ -83,31 +83,85 @@ if ($logo_files) {
 }
 $context_data['pdf_logo_url'] = $pdf_logo_url;
 
-// Get all course materials across the course (mod_ainotebook, mod_resource, mod_folder).
-$files = \mod_ainotebook\ai_client::get_all_course_materials($course->id, $cm->id);
+// Build Syllabus sections & modules (Matching AiTutor.tsx / Portal syllabus tree)
+$modinfo = get_fast_modinfo($course);
+$sections_data = [];
+$total_modules = 0;
 
-$files_data = [];
-foreach ($files as $file) {
-    if ($file->is_directory() || $file->get_filesize() === 0) continue;
-    $filename = $file->get_filename();
-    $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
+    if (!$section->uservisible) {
+        continue;
+    }
     
-    $icon = 'fa-file-o';
-    if ($ext === 'pdf') $icon = 'fa-file-pdf-o';
-    elseif (in_array($ext, ['pptx', 'ppt'])) $icon = 'fa-file-powerpoint-o';
-    elseif (in_array($ext, ['docx', 'doc'])) $icon = 'fa-file-word-o';
-    elseif (in_array($ext, ['txt', 'md', 'csv'])) $icon = 'fa-file-text-o';
-    elseif (in_array($ext, ['png', 'jpg', 'jpeg', 'svg'])) $icon = 'fa-file-image-o';
+    // Skip empty section 0 if unnamed and no items
+    if ($sectionnum == 0 && empty($section->summary) && empty($section->name) && empty($modinfo->sections[0])) {
+        continue;
+    }
 
-    $files_data[] = [
-        'id' => $file->get_id(),
-        'filename' => s($filename),
-        'icon' => $icon,
-        'url' => moodle_url::make_pluginfile_url($file->get_contextid(), $file->get_component(), $file->get_filearea(), $file->get_itemid(), $file->get_filepath(), $file->get_filename())->out()
+    $sectionname = get_section_name($course, $section);
+    if (empty(trim($sectionname))) {
+        $sectionname = "Topic " . $sectionnum;
+    }
+
+    $modules = [];
+    if (!empty($modinfo->sections[$sectionnum])) {
+        foreach ($modinfo->sections[$sectionnum] as $sec_cmid) {
+            $sec_cm = $modinfo->cms[$sec_cmid];
+            if (!$sec_cm->uservisible) continue;
+
+            $icon = 'fa-file-o';
+            if ($sec_cm->modname === 'resource') {
+                $icon = 'fa-file-text-o';
+            } elseif ($sec_cm->modname === 'folder') {
+                $icon = 'fa-folder-o';
+            } elseif ($sec_cm->modname === 'page' || $sec_cm->modname === 'url') {
+                $icon = 'fa-globe';
+            } elseif ($sec_cm->modname === 'quiz' || $sec_cm->modname === 'assign') {
+                $icon = 'fa-pencil-square-o';
+            } elseif ($sec_cm->modname === 'ainotebook') {
+                $icon = 'fa-graduation-cap';
+            }
+
+            $url = $sec_cm->url ? $sec_cm->url->out() : '#';
+            if ($sec_cm->modname === 'resource' || $sec_cm->modname === 'folder') {
+                $c_ctx = context_module::instance($sec_cm->id, IGNORE_MISSING);
+                if ($c_ctx) {
+                    $area_files = $fs->get_area_files($c_ctx->id, 'mod_' . $sec_cm->modname, 'content', 0, 'id ASC', false);
+                    foreach ($area_files as $f) {
+                        if (!$f->is_directory() && $f->get_filesize() > 0) {
+                            $f_ext = strtolower(pathinfo($f->get_filename(), PATHINFO_EXTENSION));
+                            if ($f_ext === 'pdf') $icon = 'fa-file-pdf-o';
+                            elseif (in_array($f_ext, ['pptx', 'ppt'])) $icon = 'fa-file-powerpoint-o';
+                            elseif (in_array($f_ext, ['docx', 'doc'])) $icon = 'fa-file-word-o';
+                            $url = moodle_url::make_pluginfile_url($f->get_contextid(), $f->get_component(), $f->get_filearea(), $f->get_itemid(), $f->get_filepath(), $f->get_filename())->out();
+                            break;
+                        }
+                    }
+                }
+            }
+
+            $modules[] = [
+                'cmid' => $sec_cm->id,
+                'name' => s($sec_cm->name),
+                'modname' => $sec_cm->modname,
+                'icon' => $icon,
+                'url' => $url
+            ];
+            $total_modules++;
+        }
+    }
+
+    $sections_data[] = [
+        'section_id' => $section->id,
+        'section_num' => $sectionnum,
+        'name' => s($sectionname),
+        'modules' => $modules,
+        'modules_count' => count($modules)
     ];
 }
-$context_data['files'] = $files_data;
-$context_data['files_count'] = count($files_data);
+
+$context_data['syllabus_sections'] = $sections_data;
+$context_data['files_count'] = count($sections_data);
 
 // Format history array
 $history = \mod_ainotebook\ai_client::get_unified_history($cm->id, $target_user->id);

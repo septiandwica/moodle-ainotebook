@@ -13,8 +13,8 @@ if ($ADMIN->fulltree) {
     $settings->add(new admin_setting_configtext(
         'mod_ainotebook/ai_name',
         'AI Name',
-        'The display name of your AI Assistant (e.g. PresMate).',
-        'PresMate',
+        'The display name of your AI Assistant (e.g. DEMI AI Academic Tutor).',
+        'DEMI AI Academic Tutor',
         PARAM_TEXT
     ));
 
@@ -31,21 +31,38 @@ if ($ADMIN->fulltree) {
     $settings->add(new admin_setting_configselect(
         'mod_ainotebook/ai_provider',
         'AI Provider',
-        'Select which AI provider to use.',
-        'groq',
+        'Select AI Provider. DEMI Core AI Engine automatically handles model routing and agent selection.',
+        'demi_engine',
         [
-            'groq'   => 'Groq (Fastest)',
-            'openai' => 'OpenAI',
-            'gemini' => 'Google Gemini',
-            'moodle' => 'Moodle AI Subsystem (Default)',
+            'demi_engine' => 'DEMI Core AI Engine (Primary Endpoint - FastAPI Port 8001)',
+            'groq'        => 'Groq (Direct Fallback)',
+            'openai'      => 'OpenAI (Direct Fallback)',
+            'gemini'      => 'Google Gemini (Direct Fallback)',
+            'moodle'      => 'Moodle AI Subsystem',
         ]
     ));
 
-    // ── API Key ───────────────────────────────────────────────────────────────
+    // ── DEMI Engine Settings ──────────────────────────────────────────────────
+    $settings->add(new admin_setting_configtext(
+        'mod_ainotebook/demi_engine_url',
+        'DEMI AI Engine Endpoint URL',
+        'The base URL of the central DEMI AI Engine FastAPI service.',
+        'http://localhost:8001',
+        PARAM_URL
+    ));
+
+    $settings->add(new admin_setting_configpasswordunmask(
+        'mod_ainotebook/demi_engine_key',
+        'DEMI AI Engine Secret Key (X-Engine-API-Key)',
+        'Authentication key used to communicate with DEMI Core AI Engine.',
+        'demi_secret_engine_key_2026'
+    ));
+
+    // ── Legacy API Key ────────────────────────────────────────────────────────
     $settings->add(new admin_setting_configpasswordunmask(
         'mod_ainotebook/api_key',
-        'API Key',
-        'Your API Key for the selected provider (leave empty if using Moodle AI).',
+        'Direct Provider API Key',
+        'Direct API Key for fallback providers (Groq/OpenAI/Gemini).',
         ''
     ));
 

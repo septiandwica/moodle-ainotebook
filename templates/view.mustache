@@ -21,6 +21,31 @@
         {{/is_teacher_self}}
     {{/is_readonly}}
 
+    <!-- DEMI Top Control Bar (Matching DEMI AI Academic Tutor Portal) -->
+    <div class="demi-top-control-bar">
+        <div class="demi-brand-group">
+            <div class="demi-avatar-badge">DEMI</div>
+            <div class="demi-brand-meta">
+                <div class="demi-title-row">
+                    <h2>24/7 Academic AI Tutor</h2>
+                    <span class="demi-mode-badge">STUDY MODE</span>
+                </div>
+                <p class="demi-subtitle">Grounded in your E-Campus course modules, slides & professor syllabus.</p>
+            </div>
+        </div>
+        <div class="demi-header-controls">
+            <div class="demi-course-pill">
+                <i class="fa fa-book" style="color: #07366c;"></i>
+                <span>{{course_fullname}}</span>
+            </div>
+            <div class="demi-status-pill">
+                <span class="pulse-dot"></span>
+                <span>DEMI AI</span>
+            </div>
+            <button id="open-settings" class="btn-icon" title="Configure Chat"><i class="fa fa-cog"></i></button>
+        </div>
+    </div>
+
     <!-- Main Workspace Card: Materials + Chat -->
     <div class="main-dashboard-card">
         <!-- Sidebar Panel: Material List -->
@@ -50,33 +75,64 @@
         <div class="ainotebook-chat">
             <div class="chat-header">
                 <div class="chat-brand-section">
-                    <img src="{{wwwroot}}/mod/ainotebook/pix/icon.svg" class="chat-brand-icon">
                     <div class="chat-info">
-                        <h2>{{ai_name}}</h2>
-                        <p class="chat-subtitle">Your AI Study Assistant by President University</p>
+                        <h2>{{course_fullname}}</h2>
+                        <p class="chat-subtitle">Topic Focus: {{activity_name}}</p>
                     </div>
                 </div>
-                <button id="open-settings" class="btn-icon" title="Configure Chat"><i class="fa fa-cog"></i></button>
+                <span class="academic-mode-tag"><i class="fa fa-graduation-cap"></i> Academic Study Thread</span>
             </div>
             <div id="chat-messages" class="chat-messages">
                 <div class="message ai">
-                    Hi, {{target_firstname}}! I am {{ai_name}}, your course study companion. I can help you with:<br>
-                    - Explaining the lecture materials shared by your teacher.<br>
-                    - Creating quizzes for your exam practice.<br>
-                    - Summarizing long readings and complex modules.<br>
-                    - Generating mindmaps to help you visualize key concepts.<br><br>
-                    Are you ready to start? What are we studying together today?
+                    <div class="ai-avatar-icon">DEMI</div>
+                    <div class="message-bubble-body">
+                        <div class="message-meta-header">
+                            <span class="meta-author">DEMI AI Academic Tutor</span>
+                        </div>
+                        <div class="message-text">
+                            Hello <strong>{{target_fullname}}</strong>! I am your DEMI AI Academic Tutor for <strong>{{course_fullname}}</strong> ({{activity_name}}).<br><br>
+                            I am connected to your lecture modules, presentation slides, and syllabus on E-Campus. Ask any questions about concepts, or trigger a study tool below!
+                        </div>
+                    </div>
                 </div>
                 {{#history}}
-                <div class="message user">{{{message}}}</div>
-                <div class="message ai"><div class="markdown-body">{{{response}}}</div></div>
+                <div class="message user">
+                    <div class="message-bubble-body">
+                        <div class="message-meta-header"><span class="meta-author">{{target_fullname}}</span>{{#time}}<span class="meta-time">{{time}}</span>{{/time}}</div>
+                        <div class="message-text">{{{message}}}</div>
+                    </div>
+                </div>
+                <div class="message ai">
+                    <div class="ai-avatar-icon">DEMI</div>
+                    <div class="message-bubble-body">
+                        <div class="message-meta-header"><span class="meta-author">DEMI AI Academic Tutor</span>{{#time}}<span class="meta-time">{{time}}</span>{{/time}}</div>
+                        <div class="message-text"><div class="markdown-body">{{{response}}}</div></div>
+                    </div>
+                </div>
                 {{{suggestions_html}}}
                 {{/history}}
             </div>
+
+            <!-- Quick Action Academic Prompt Chips Bar -->
+            <div class="suggested-prompts-bar">
+                <button class="prompt-chip" onclick="window.sendSuggested('Explain key concepts and pseudocode conventions from lecture slides.', null)">
+                    💡 Explain Concepts
+                </button>
+                <button class="prompt-chip" onclick="window.sendSuggested('Generate a comprehensive quiz from my materials.', 'quiz')">
+                    📝 Interactive Quiz
+                </button>
+                <button class="prompt-chip" onclick="window.sendSuggested('Generate a mindmap structure.', 'mindmap')">
+                    📊 Concept Mindmap
+                </button>
+                <button class="prompt-chip" onclick="window.sendSuggested('Generate a detailed study report.', 'report')">
+                    📄 Module Summary
+                </button>
+            </div>
+
             <div class="input-wrapper-container">
                 <div class="input-wrapper" {{#is_readonly}}style="opacity: 0.6; pointer-events: none;"{{/is_readonly}}>
                     <input type="text" id="chat-input" placeholder="{{str_asksomething}}" {{#is_readonly}}disabled{{/is_readonly}}>
-                    <span id="source-count" class="source-pill">0 sources</span>
+                    <span id="source-count" class="source-pill">0 sources attached</span>
                     <button id="send-btn" {{#is_readonly}}disabled{{/is_readonly}}>
                         <i class="fa fa-paper-plane"></i>
                     </button>

@@ -14,7 +14,7 @@ $cm = get_coursemodule_from_id('ainotebook', $id, 0, false, MUST_EXIST);
 $course = $DB->get_record('course', array('id' => $cm->course), '*', MUST_EXIST);
 $ainotebook = $DB->get_record('ainotebook', array('id' => $cm->instance), '*', MUST_EXIST);
 $config = get_config('mod_ainotebook');
-$ai_name = empty($config->ai_name) ? 'DEMI TUTOR' : $config->ai_name;
+$ai_name = empty($config->ai_name) ? 'DEMI AI Academic Tutor' : $config->ai_name;
 
 require_login($course, true, $cm);
 if (isguestuser() || !isloggedin()) {
@@ -41,30 +41,24 @@ $PAGE->set_heading(format_string($course->fullname));
 $PAGE->set_context($context);
 $PAGE->set_pagelayout('incourse');
 
-echo $OUTPUT->header();
-
-// Include FontAwesome and Custom CSS.
-$plugin = new stdClass();
-require_once(__DIR__ . '/version.php');
-$pluginrev = $plugin->version;
-echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">';
-echo '<link rel="stylesheet" href="styles.css?v=' . $pluginrev . '">';
-
-// Include Marked.js and Mermaid.js.
-echo '<script src="' . $CFG->wwwroot . '/mod/ainotebook/js/marked.min.js?v=' . $pluginrev . '"></script>';
-echo '<script src="' . $CFG->wwwroot . '/mod/ainotebook/js/mermaid.min.js?v=' . $pluginrev . '"></script>';
-
+// Get files.
 $fs = get_file_storage();
 $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', false);
 
+$plugin = new stdClass();
+require_once(__DIR__ . '/version.php');
+$pluginrev = $plugin->version;
+
 $context_data = [
     'cmid' => $cm->id,
-    'sesskey' => $sesskey,
-    'wwwroot' => $CFG->wwwroot,
-    'activityname' => json_encode($ainotebook->name),
+    'courseid' => $course->id,
+    'course_fullname' => s($course->fullname),
+    'activity_name' => s($ainotebook->name),
     'is_readonly' => $is_readonly,
     'is_teacher' => $is_teacher,
     'is_teacher_self' => ($is_teacher && $viewself),
+    'sesskey' => $sesskey,
+    'wwwroot' => $CFG->wwwroot,
     'str_readonlymode' => get_string('readonlymode', 'mod_ainotebook'),
     'str_viewingprogressfor' => get_string('viewingprogressfor', 'mod_ainotebook'),
     'str_backtodashboard' => get_string('backtodashboard', 'mod_ainotebook'),
@@ -101,49 +95,33 @@ foreach ($files as $file) {
 $context_data['files'] = $files_data;
 
 // Format history array
-$history = $DB->get_records('ainotebook_chat', ['ainotebookid' => $ainotebook->id, 'userid' => $target_user->id], 'timecreated ASC');
-$hist_array = array_values($history);
-$total_hist = count($hist_array);
+$history = \mod_ainotebook\ai_client::get_unified_history($cm->id, $target_user->id);
 $history_data = [];
 
-foreach ($hist_array as $index => $log) {
+foreach ($history as $index => $log) {
     $clean_response = preg_replace('/```json-quiz[\s\S]*?```/', '', $log->response);
     $clean_response = preg_replace('/```mermaid[\s\S]*?```/', '', $clean_response);
     $clean_response = preg_replace('/\[REPORT_START\][\s\S]*?\[REPORT_END\]/', '', $clean_response);
-    
-    $sug_match = [];
-    $suggestions_html = '';
-    if (preg_match('/<suggestions>([\s\S]*?)<\/suggestions>/i', $clean_response, $sug_match)) {
-        $clean_response = str_replace($sug_match[0], '', $clean_response);
-        if ($index === $total_hist - 1 && !$is_readonly) {
-            $suggestions = array_filter(array_map('trim', explode('|', $sug_match[1])));
-            if (!empty($suggestions)) {
-                $suggestions_html .= '<div class="suggestion-container">';
-                foreach ($suggestions as $s) {
-                    $s_escaped = s($s);
-                    $s_json = htmlspecialchars(json_encode($s));
-                    $suggestions_html .= '<button class="suggestion-btn" onclick="sendSuggested('.$s_json.')">' . $s_escaped . '</button>';
-                }
-                $suggestions_html .= '</div>';
-            }
-        }
-    }
-    
     $clean_response = trim($clean_response);
     if (empty($clean_response)) $clean_response = "I have generated the requested material below.";
+    $time_str = !empty($log->timecreated) ? date('h:i A', $log->timecreated) : date('h:i A');
 
     $history_data[] = [
         'message' => nl2br(s($log->message)),
         'response' => nl2br($clean_response),
-        'suggestions_html' => $suggestions_html
+        'time' => $time_str
     ];
 }
 $context_data['history'] = $history_data;
 
-// Format saved artifacts JSON
 $saved_artifacts = $DB->get_records('ainotebook_artifacts', ['ainotebookid' => $ainotebook->id, 'userid' => $target_user->id], 'timecreated DESC');
 $context_data['saved_json'] = json_encode(array_values($saved_artifacts));
 
-echo $OUTPUT->render_from_template('mod_ainotebook/view', $context_data);
+echo $OUTPUT->header();
+echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">';
+echo '<link rel="stylesheet" href="styles.css?v=' . $pluginrev . '">';
+echo '<script src="' . $CFG->wwwroot . '/mod/ainotebook/js/marked.min.js?v=' . $pluginrev . '"></script>';
+echo '<script src="' . $CFG->wwwroot . '/mod/ainotebook/js/mermaid.min.js?v=' . $pluginrev . '"></script>';
 
+echo $OUTPUT->render_from_template('mod_ainotebook/view', $context_data);
 echo $OUTPUT->footer();

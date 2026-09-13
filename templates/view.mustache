@@ -471,20 +471,8 @@
         var input = document.getElementById("chat-input");
         if (input) {
             input.value = text;
-            
-            if (toolType) {
-                var card = document.querySelector(".creator-card." + toolType);
-                if (card) {
-                    card.classList.add("loading");
-                    var icon = card.querySelector(".card-icon i");
-                    if (icon) icon.className = "fa fa-circle-o-notch fa-spin";
-                }
-                /* Call sendMessage in silent mode. */
-                sendMessage(true);
-            } else {
-                var btn = document.getElementById("send-btn");
-                if (btn) btn.click();
-            }
+            var btn = document.getElementById("send-btn");
+            if (btn) btn.click();
         }
     };
 
@@ -800,20 +788,31 @@
             }
         };
 
+        var getOrCreateTargetContainer = function() {
+            if (resultsContent) return resultsContent;
+            var aiMsgs = document.querySelectorAll(".message.ai .markdown-body, .message.ai .message-text");
+            if (aiMsgs.length > 0) return aiMsgs[aiMsgs.length - 1];
+            return null;
+        };
+
         var renderQuiz = function(data) {
-            resultsContainer.style.display = "block";
+            if (resultsContainer) resultsContainer.style.display = "block";
+            var target = getOrCreateTargetContainer();
+            if (!target) return;
             
-            resultsContent.innerHTML = "<div class=\'quiz-results-header\'><h3>Interactive Quiz Preview</h3><div class=\'quiz-score\' id=\'quiz-score\'>Score: 0/" + data.questions.length + "</div></div><div id=\'quiz-container\'></div>";
+            target.innerHTML = "<div class=\'quiz-results-header\'><h3>Interactive Quiz</h3><div class=\'quiz-score\' id=\'quiz-score\'>Score: 0/" + data.questions.length + "</div></div><div id=\'quiz-container\'></div>";
             
             var convertBtnMarkup = "";
             if (isTeacher && !isReadonly) {
                 convertBtnMarkup = '<button id="btn-convert-moodle-quiz" class="btn-premium" style="background: var(--pres-primary); margin-left: 10px;"><i class="fa fa-graduation-cap"></i> Convert to Moodle Quiz</button>';
             }
             
-            downloadBtn.innerHTML = "<i class=\'fa fa-download\'></i> Download Text";
-            downloadBtn.onclick = function() {
-                downloadFile("quiz.txt", data.questions.map((q,i) => (i+1) + ". " + (q.text || q.question || "No question") + "\n   " + (q.options ? q.options.join("\n   ") : "")).join("\n\n"));
-            };
+            if (downloadBtn) {
+                downloadBtn.innerHTML = "<i class=\'fa fa-download\'></i> Download Text";
+                downloadBtn.onclick = function() {
+                    downloadFile("quiz.txt", data.questions.map((q,i) => (i+1) + ". " + (q.text || q.question || "No question") + "\n   " + (q.options ? q.options.join("\n   ") : "")).join("\n\n"));
+                };
+            }
             
             /* Re-render toolbar to include the convert button */
             var toolbar = document.querySelector(".preview-toolbar");
@@ -1123,30 +1122,41 @@
         };
 
         var renderMindmap = function(data) {
-            resultsContainer.style.display = "block";
+            if (resultsContainer) resultsContainer.style.display = "block";
+            var target = getOrCreateTargetContainer();
+            if (!target) return;
             var cleanData = sanitizeMermaid(data);
 
-            resultsContent.innerHTML = prepareFormalHeader("Mindmap Visualization") + "<h3>Mindmap Concept</h3><div id='mermaid-container' class='mermaid'>" + cleanData + "</div>";
+            target.innerHTML = prepareFormalHeader("Mindmap Visualization") + "<h3>Mindmap Concept</h3><div id='mermaid-container' class='mermaid'>" + cleanData + "</div>";
             try {
-                mermaid.init(undefined, document.querySelectorAll(".mermaid"));
+                mermaid.init(undefined, target.querySelectorAll(".mermaid"));
             } catch (err) {
                 console.error("Mermaid init error:", err);
-                document.getElementById("mermaid-container").innerHTML = "<div class='alert alert-warning'>Failed to render Mindmap. The AI generated invalid syntax. Please try again.</div>";
+                var container = document.getElementById("mermaid-container");
+                if (container) container.innerHTML = "<div class='alert alert-warning'>Failed to render Mindmap. The AI generated invalid syntax. Please try again.</div>";
             }
-            resultsContainer.scrollIntoView({ behavior: "smooth" });
+            if (resultsContainer) resultsContainer.scrollIntoView({ behavior: "smooth" });
 
-            downloadBtn.innerHTML = "<i class='fa fa-file-pdf-o'></i> Export as PDF";
-            downloadBtn.onclick = function() { window.print(); };
+            if (downloadBtn) {
+                downloadBtn.innerHTML = "<i class='fa fa-file-pdf-o'></i> Export as PDF";
+                downloadBtn.onclick = function() { window.print(); };
+            }
         };
+
         var renderSummary = function(content) {
-            resultsContainer.style.display = "block";
-            resultsContent.innerHTML = prepareFormalHeader("Study Summary") + "<div class=\'report-markdown\'>" + marked.parse(content) + "</div>";
-            resultsContainer.scrollIntoView({ behavior: "smooth" });
+            if (resultsContainer) resultsContainer.style.display = "block";
+            var target = getOrCreateTargetContainer();
+            if (!target) return;
+
+            target.innerHTML = prepareFormalHeader("Study Summary") + "<div class=\'report-markdown\'>" + marked.parse(content) + "</div>";
+            if (resultsContainer) resultsContainer.scrollIntoView({ behavior: "smooth" });
             
-            downloadBtn.innerHTML = "<i class=\'fa fa-file-pdf-o\'></i> Export as PDF";
-            downloadBtn.onclick = function() {
-                window.print();
-            };
+            if (downloadBtn) {
+                downloadBtn.innerHTML = "<i class=\'fa fa-file-pdf-o\'></i> Export as PDF";
+                downloadBtn.onclick = function() {
+                    window.print();
+                };
+            }
         };
 
         var downloadFile = function(filename, text) {

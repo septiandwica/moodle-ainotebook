@@ -104,9 +104,32 @@ foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
         continue;
     }
 
-    $sectionname = get_section_name($course, $section);
-    if (empty(trim($sectionname))) {
-        $sectionname = "Topic " . $sectionnum;
+    // Auto sync & resolve real Moodle section name
+    $raw_name = !empty($section->name) ? trim($section->name) : '';
+
+    if (empty($raw_name) && !empty($section->summary)) {
+        $clean_summary = trim(strip_tags($section->summary));
+        if (!empty($clean_summary)) {
+            $lines = explode("\n", $clean_summary);
+            $raw_name = trim($lines[0]);
+            if (strlen($raw_name) > 80) {
+                $raw_name = substr($raw_name, 0, 77) . '...';
+            }
+        }
+    }
+
+    if (empty($raw_name)) {
+        $raw_name = get_section_name($course, $section);
+    }
+
+    $sectionname = trim(strip_tags(format_string($raw_name)));
+
+    if (empty($sectionname) || $sectionname === 'New section') {
+        if ($sectionnum == 0) {
+            $sectionname = "General";
+        } else {
+            $sectionname = "Session " . sprintf("%02d", $sectionnum);
+        }
     }
 
     $modules = [];
@@ -210,6 +233,13 @@ $context_data['history_count'] = count($history_data);
 
 $saved_artifacts = $DB->get_records('ainotebook_artifacts', ['ainotebookid' => $ainotebook->id, 'userid' => $target_user->id], 'timecreated DESC');
 $context_data['saved_json'] = json_encode(array_values($saved_artifacts));
+
+// Auto-ingest & sync course materials to vector index
+try {
+    \mod_ainotebook\ai_client::process_all_materials($cm->id);
+} catch (\Throwable $e) {
+    debugging("mod_ainotebook: Auto process materials failed: " . $e->getMessage(), DEBUG_DEVELOPER);
+}
 
 echo $OUTPUT->header();
 echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">';

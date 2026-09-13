@@ -1081,7 +1081,7 @@ class ai_client {
     public static function process_all_materials(int $cmid): void {
         global $DB;
 
-        $cm = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
+        $cm = self::get_cm_safe($cmid);
         $files = self::get_all_course_materials($cm->course, $cmid);
 
         if (empty($files)) {

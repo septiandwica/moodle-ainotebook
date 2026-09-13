@@ -208,69 +208,26 @@
             </div>
 
             <div class="input-wrapper-container">
+                <!-- Floating Study Tools Bar directly above input box (Matching Portal AiTutor.tsx) -->
+                <div class="floating-study-tools-bar">
+                    <span class="tools-label">Study Tools:</span>
+                    <button type="button" class="tool-btn quiz" onclick="window.sendSuggested('Generate an authentic interactive practice quiz with multiple-choice questions strictly synthesized from lecture slides for {{course_fullname}}.', 'quiz')">
+                        📝 Interactive Quiz
+                    </button>
+                    <button type="button" class="tool-btn mindmap" onclick="window.sendSuggested('Generate a comprehensive visual concept mindmap synthesizing the lecture slides for {{course_fullname}}.', 'mindmap')">
+                        📊 Concept Mindmap
+                    </button>
+                    <button type="button" class="tool-btn summary" onclick="window.sendSuggested('Generate a comprehensive executive study summary report for {{course_fullname}}.', 'summary')">
+                        📄 Study Summary
+                    </button>
+                </div>
+
                 <div class="input-wrapper" {{#is_readonly}}style="opacity: 0.6; pointer-events: none;"{{/is_readonly}}>
                     <input type="text" id="chat-input" placeholder="Ask DEMI AI Tutor about {{course_fullname}}... (Enter to send, Shift+Enter for newline)" {{#is_readonly}}disabled{{/is_readonly}}>
                     <span id="source-count" class="source-pill">0 sources attached</span>
                     <button id="send-btn" {{#is_readonly}}disabled{{/is_readonly}}>
                         <i class="fa fa-paper-plane"></i>
                     </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Creator Hub Card: Separate at the bottom -->
-    <div id="creator-hub" class="creator-hub-card" {{#is_readonly}}style="pointer-events: none; opacity: 0.9;"{{/is_readonly}}>
-        <div class="creator-header-action" style="{{#is_readonly}}pointer-events: auto;{{/is_readonly}}">
-            <h3>Learning Activities {{#is_readonly}}<span style="font-size: 0.8rem; font-weight: normal; color: var(--pres-text-dim);">(Read-Only)</span>{{/is_readonly}}</h3>
-            <button id="toggle-creator" class="btn-icon" style="{{#is_readonly}}pointer-events: auto;{{/is_readonly}}"><i class="fa fa-angle-double-up"></i></button>
-        </div>
-        <div id="creator-hub-content" class="creator-content" style="{{#is_readonly}}pointer-events: auto;{{/is_readonly}}">
-            {{^is_readonly}}
-            <div class="creator-grid">
-                <div class="creator-card quiz" onclick="{{#is_teacher}}window.openQuizGenerator(){{/is_teacher}}{{^is_teacher}}window.sendSuggested('Generate a comprehensive quiz from my materials.', 'quiz'){{/is_teacher}}">
-                    <div class="card-icon"><i class="fa fa-question-circle"></i></div>
-                    <div class="card-info">
-                        <h5>Quiz</h5>
-                        <p>Practice your understanding using Interactive Quiz</p>
-                    </div>
-                </div>
-                <div class="creator-card summary" onclick="window.sendSuggested('Generate a detailed study summary.', 'summary')">
-                    <div class="card-icon"><i class="fa fa-file-text-o"></i></div>
-                    <div class="card-info">
-                        <h5>Summary</h5>
-                        <p>Get the summary of the learning materials.</p>
-                    </div>
-                </div>
-                <div class="creator-card mindmap" onclick="window.sendSuggested('Generate a mindmap structure.', 'mindmap')">
-                    <div class="card-icon"><i class="fa fa-sitemap"></i></div>
-                    <div class="card-info">
-                        <h5>Mindmap</h5>
-                        <p>Generate a mindmap</p>
-                    </div>
-                </div>
-            </div>
-            {{/is_readonly}}
-
-            <div class="creator-workspace">
-                <div class="creator-history-panel">
-                    <div class="panel-header">
-                        <i class="fa fa-history"></i> Generated learning activities
-                    </div>
-                    <div id="history-list" class="history-list-items"></div>
-                </div>
-                <div id="creator-results" class="creator-preview-panel">
-                    <div class="preview-toolbar">
-                        <button id="download-result" class="btn-premium">
-                            <i class="fa fa-download"></i> Export to PDF
-                        </button>
-                    </div>
-                    <div id="results-content" class="preview-scroll-area">
-                        <div class="empty-preview">
-                            <i class="fa fa-magic fa-3x"></i>
-                            <p>Select an item from history to preview</p>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

@@ -54,6 +54,34 @@ class ai_client {
         $binaries         = []; // FORCE EMPTY: We use RAG now, no need to send huge base64 PDFs to Gemini directly
         $ainame           = get_config('mod_ainotebook', 'ai_name') ?: "DEMI AI Academic Tutor";
         
+    }
+
+    /**
+     * Sanitize AI output to strip raw provider brand names, API key error messages, and raw URLs,
+     * ensuring responses are strictly branded as DEMI AI.
+     */
+    public static function sanitize_ai_output(string $text): string {
+        if (empty($text)) return $text;
+
+        // If error message contains API key leak, unauthorized or provider platform URL, sanitize completely
+        if (stripos($text, 'Incorrect API key') !== false || stripos($text, 'platform.openai.com') !== false || stripos($text, 'api-keys') !== false || stripos($text, 'invalid_api_key') !== false || stripos($text, 'unauthorized') !== false) {
+            return "DEMI AI service is currently unavailable. Please try again later or notify your instructor/admin.";
+        }
+
+        // Replace raw provider references in text if any
+        $replacements = [
+            '/https?:\/\/platform\.openai\.com[^\s]*/i' => '',
+            '/\bOpenAI\b/i'   => 'DEMI AI',
+            '/\bChatGPT\b/i'  => 'DEMI AI',
+            '/\bGemini\b/i'   => 'DEMI AI',
+            '/\bGroq\b/i'     => 'DEMI AI',
+            '/\bAnthropic\b/i' => 'DEMI AI',
+            '/\bClaude\b/i'   => 'DEMI AI',
+        ];
+
+        return preg_replace(array_keys($replacements), array_values($replacements), $text);
+    }
+        
         // --- Smart Retrieval (RAG) & Hybrid Context Strategy ---
         $is_generator = false;
         $lower_msg = strtolower($user_message);
@@ -556,9 +584,9 @@ class ai_client {
                         if (stripos($err_type, 'rate_limit') !== false || stripos($err, 'rate limit') !== false || stripos($err, 'quota') !== false) {
                             return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
                         }
-                        return "AI Error: " . $err;
+                        return "DEMI AI service is currently unavailable. Please try again later.<script>console.error('DEMI AI Error: " . addslashes(self::sanitize_ai_output($err)) . "');</script>";
                     }
-                    return "No response received from the AI.";
+                    return "No response received from DEMI AI.";
                 }
                 // For stream, the full text is collected by the write callback.
                 if (strpos($full_stream_text, '```mermaid') !== false) {
@@ -568,7 +596,7 @@ class ai_client {
                         $full_stream_text
                     );
                 }
-                return $full_stream_text;
+                return self::sanitize_ai_output($full_stream_text);
             }
 
             $result = json_decode($raw_response);
@@ -588,7 +616,7 @@ class ai_client {
                         $text
                     );
                 }
-                return $text;
+                return self::sanitize_ai_output($text);
             }
 
             if (isset($result->error)) {
@@ -601,8 +629,8 @@ class ai_client {
                 if (stripos($err_type, 'rate_limit') !== false || stripos($err, 'rate limit') !== false || stripos($err, 'quota') !== false) {
                     return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
                 }
-                // Show actual error in console, but generic message in UI.
-                return "The AI service is currently unavailable. Please try again later.<script>console.error('AI Error ({$provider}): " . addslashes($err) . "');</script>";
+                // Show actual error in console, but generic clean message in UI.
+                return "DEMI AI service is currently unavailable. Please try again later.<script>console.error('DEMI AI Error: " . addslashes(self::sanitize_ai_output($err)) . "');</script>";
             }
 
             debugging("ainotebook: unexpected response shape from {$provider}: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);

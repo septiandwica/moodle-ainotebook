@@ -89,67 +89,127 @@ if ($logo_files) {
 }
 $context_data['pdf_logo_url'] = $pdf_logo_url;
 
-// Build Syllabus sections & modules (Matching AiTutor.tsx / Portal syllabus tree)
+// Build Syllabus sections & modules with 2-Pass Subsection Merging
 $modinfo = get_fast_modinfo($course);
-$sections_data = [];
+$childSectionMap = [];
+$registeredChildNames = [];
+$knownSubsections = ['pre activities', 'main activities', 'post activities', 'new subsection'];
+
+$lastParentSecNum = 0;
+foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
+    if (!$section->uservisible) continue;
+    $raw_name = !empty($section->name) ? trim($section->name) : get_section_name($course, $section);
+    $lower_name = strtolower(trim(strip_tags(format_string($raw_name))));
+
+    $is_child = in_array($lower_name, $knownSubsections) || (isset($section->component) && $section->component === 'mod_subsection');
+
+    if ($is_child) {
+        if (isset($childSectionMap[$lower_name])) {
+            $childSectionMap[$sectionnum] = $childSectionMap[$lower_name];
+        } else {
+            $childSectionMap[$sectionnum] = $lastParentSecNum;
+        }
+    } else {
+        $lastParentSecNum = $sectionnum;
+        if (!empty($modinfo->sections[$sectionnum])) {
+            foreach ($modinfo->sections[$sectionnum] as $sec_cmid) {
+                $sec_cm = $modinfo->cms[$sec_cmid];
+                if ($sec_cm->modname === 'subsection') {
+                    $m_name = strtolower(trim($sec_cm->name));
+                    if ($m_name) {
+                        $childSectionMap[$m_name] = $sectionnum;
+                        $registeredChildNames[] = $m_name;
+                    }
+                }
+            }
+        }
+    }
+}
+
+$sections_data_map = [];
 $total_modules = 0;
 
 foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
-    if (!$section->uservisible) {
-        continue;
-    }
-    
-    // Skip empty section 0 if unnamed and no items
-    if ($sectionnum == 0 && empty($section->summary) && empty($section->name) && empty($modinfo->sections[0])) {
-        continue;
-    }
+    if (!$section->uservisible) continue;
 
-    // Auto sync & resolve real Moodle section name
     $raw_name = !empty($section->name) ? trim($section->name) : '';
-
     if (empty($raw_name) && !empty($section->summary)) {
         $clean_summary = trim(strip_tags($section->summary));
         if (!empty($clean_summary)) {
             $lines = explode("\n", $clean_summary);
             $raw_name = trim($lines[0]);
-            if (strlen($raw_name) > 80) {
-                $raw_name = substr($raw_name, 0, 77) . '...';
+            if (strlen($raw_name) > 80) $raw_name = substr($raw_name, 0, 77) . '...';
+        }
+    }
+    if (empty($raw_name)) $raw_name = get_section_name($course, $section);
+    $sectionname = trim(strip_tags(format_string($raw_name)));
+    $lower_name = strtolower($sectionname);
+
+    $is_child = isset($childSectionMap[$sectionnum]) || in_array($lower_name, $registeredChildNames) || in_array($lower_name, $knownSubsections);
+
+    if ($is_child) {
+        $parentSecNum = $childSectionMap[$sectionnum] ?? ($childSectionMap[$lower_name] ?? null);
+        if ($parentSecNum !== null && isset($sections_data_map[$parentSecNum])) {
+            if (!empty($modinfo->sections[$sectionnum])) {
+                foreach ($modinfo->sections[$sectionnum] as $sec_cmid) {
+                    $sec_cm = $modinfo->cms[$sec_cmid];
+                    if (!$sec_cm->uservisible || $sec_cm->modname === 'subsection') continue;
+
+                    $icon = 'fa-file-o';
+                    if ($sec_cm->modname === 'resource') $icon = 'fa-file-text-o';
+                    elseif ($sec_cm->modname === 'folder') $icon = 'fa-folder-o';
+                    elseif ($sec_cm->modname === 'page' || $sec_cm->modname === 'url') $icon = 'fa-globe';
+                    elseif ($sec_cm->modname === 'quiz' || $sec_cm->modname === 'assign') $icon = 'fa-pencil-square-o';
+                    elseif ($sec_cm->modname === 'ainotebook') $icon = 'fa-graduation-cap';
+
+                    $url = $sec_cm->url ? $sec_cm->url->out() : '#';
+                    if ($sec_cm->modname === 'resource' || $sec_cm->modname === 'folder') {
+                        $c_ctx = context_module::instance($sec_cm->id, IGNORE_MISSING);
+                        if ($c_ctx) {
+                            $area_files = $fs->get_area_files($c_ctx->id, 'mod_' . $sec_cm->modname, 'content', 0, 'id ASC', false);
+                            foreach ($area_files as $f) {
+                                if (!$f->is_directory() && $f->get_filesize() > 0) {
+                                    $f_ext = strtolower(pathinfo($f->get_filename(), PATHINFO_EXTENSION));
+                                    if ($f_ext === 'pdf') $icon = 'fa-file-pdf-o';
+                                    elseif (in_array($f_ext, ['pptx', 'ppt'])) $icon = 'fa-file-powerpoint-o';
+                                    elseif (in_array($f_ext, ['docx', 'doc'])) $icon = 'fa-file-word-o';
+                                    $url = moodle_url::make_pluginfile_url($f->get_contextid(), $f->get_component(), $f->get_filearea(), $f->get_itemid(), $f->get_filepath(), $f->get_filename())->out();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    $sections_data_map[$parentSecNum]['modules'][] = [
+                        'cmid' => $sec_cm->id,
+                        'name' => s($sec_cm->name) . " [{$sectionname}]",
+                        'modname' => $sec_cm->modname,
+                        'icon' => $icon,
+                        'url' => $url
+                    ];
+                    $total_modules++;
+                }
             }
         }
+        continue;
     }
-
-    if (empty($raw_name)) {
-        $raw_name = get_section_name($course, $section);
-    }
-
-    $sectionname = trim(strip_tags(format_string($raw_name)));
 
     if (empty($sectionname) || $sectionname === 'New section') {
-        if ($sectionnum == 0) {
-            $sectionname = "General";
-        } else {
-            $sectionname = "Session " . sprintf("%02d", $sectionnum);
-        }
+        $sectionname = ($sectionnum == 0) ? "Course Overview" : "Session " . sprintf("%02d", $sectionnum);
     }
 
     $modules = [];
     if (!empty($modinfo->sections[$sectionnum])) {
         foreach ($modinfo->sections[$sectionnum] as $sec_cmid) {
             $sec_cm = $modinfo->cms[$sec_cmid];
-            if (!$sec_cm->uservisible) continue;
+            if (!$sec_cm->uservisible || $sec_cm->modname === 'subsection') continue;
 
             $icon = 'fa-file-o';
-            if ($sec_cm->modname === 'resource') {
-                $icon = 'fa-file-text-o';
-            } elseif ($sec_cm->modname === 'folder') {
-                $icon = 'fa-folder-o';
-            } elseif ($sec_cm->modname === 'page' || $sec_cm->modname === 'url') {
-                $icon = 'fa-globe';
-            } elseif ($sec_cm->modname === 'quiz' || $sec_cm->modname === 'assign') {
-                $icon = 'fa-pencil-square-o';
-            } elseif ($sec_cm->modname === 'ainotebook') {
-                $icon = 'fa-graduation-cap';
-            }
+            if ($sec_cm->modname === 'resource') $icon = 'fa-file-text-o';
+            elseif ($sec_cm->modname === 'folder') $icon = 'fa-folder-o';
+            elseif ($sec_cm->modname === 'page' || $sec_cm->modname === 'url') $icon = 'fa-globe';
+            elseif ($sec_cm->modname === 'quiz' || $sec_cm->modname === 'assign') $icon = 'fa-pencil-square-o';
+            elseif ($sec_cm->modname === 'ainotebook') $icon = 'fa-graduation-cap';
 
             $url = $sec_cm->url ? $sec_cm->url->out() : '#';
             if ($sec_cm->modname === 'resource' || $sec_cm->modname === 'folder') {
@@ -180,14 +240,16 @@ foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
         }
     }
 
-    $sections_data[] = [
-        'section_id' => $section->id,
-        'section_num' => $sectionnum,
-        'name' => s($sectionname),
+    $sections_data_map[$sectionnum] = [
+        'sectionnum' => $sectionnum,
+        'name' => $sectionname,
+        'summary' => s(strip_tags($section->summary)),
         'modules' => $modules,
         'modules_count' => count($modules)
     ];
 }
+
+$sections_data = array_values($sections_data_map);
 
 $context_data['syllabus_sections'] = $sections_data;
 $context_data['files_count'] = count($sections_data);

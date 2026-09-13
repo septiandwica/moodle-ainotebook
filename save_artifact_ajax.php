@@ -18,7 +18,7 @@ if (!confirm_sesskey($sesskey)) {
     exit;
 }
 
-$cm = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
+$cm = \mod_ainotebook\ai_client::get_cm_safe($cmid);
 $context = context_module::instance($cm->id);
 require_capability('mod/ainotebook:view', $context);
 

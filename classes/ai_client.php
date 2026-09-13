@@ -22,12 +22,31 @@ class ai_client {
 
     /**
      * Get a response from the AI.
+    /**
+     * Safely fetch course module record by either CM ID or Instance ID.
+     */
+    public static function get_cm_safe(int $id): \stdClass {
+        if ($id <= 0) {
+            throw new \moodle_exception('invalidcoursemodule', 'error');
+        }
+        $cm = get_coursemodule_from_id('ainotebook', $id, 0, false, IGNORE_MISSING);
+        if (!$cm) {
+            $cm = get_coursemodule_from_instance('ainotebook', $id, 0, false, IGNORE_MISSING);
+        }
+        if (!$cm) {
+            throw new \moodle_exception('invalidcoursemodule', 'error');
+        }
+        return $cm;
+    }
+
+    /**
+     * Main entry point for generating AI response.
      */
     public static function get_response(int $cmid, int $userid, string $user_message, array $selected_file_ids = [], array $config = [], bool $stream = false): array {
         self::$streamed = false;
         global $DB, $USER;
 
-        $cm         = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
+        $cm         = self::get_cm_safe($cmid);
         $course     = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
         $ainotebook = $DB->get_record('ainotebook', ['id' => $cm->instance], '*', MUST_EXIST);
 

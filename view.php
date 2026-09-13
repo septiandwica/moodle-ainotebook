@@ -8,9 +8,15 @@
 require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/lib.php');
 
-$id = required_param('id', PARAM_INT); // Course Module ID.
+$id = optional_param('id', 0, PARAM_INT); // Course Module ID.
+$n  = optional_param('n', 0, PARAM_INT);  // Activity Instance ID.
 
-$cm = get_coursemodule_from_id('ainotebook', $id, 0, false, MUST_EXIST);
+$target_id = $id ?: $n;
+if (!$target_id) {
+    throw new \moodle_exception('invalidcoursemodule', 'error');
+}
+
+$cm = \mod_ainotebook\ai_client::get_cm_safe($target_id);
 $course = $DB->get_record('course', array('id' => $cm->course), '*', MUST_EXIST);
 $ainotebook = $DB->get_record('ainotebook', array('id' => $cm->instance), '*', MUST_EXIST);
 $config = get_config('mod_ainotebook');

@@ -296,7 +296,7 @@ function ainotebook_pluginfile($course, $cm, $context, $filearea, $args, $forced
  * @param settings_navigation $settingsnav
  * @param navigation_node $ainotebooknode
  */
-function ainotebook_extend_settings_navigation(settings_navigation $settingsnav, navigation_node $ainotebooknode = null) {
+function ainotebook_extend_settings_navigation(settings_navigation $settingsnav, ?navigation_node $ainotebooknode = null) {
     global $PAGE;
 
     if (!isset($PAGE->cm->id)) {

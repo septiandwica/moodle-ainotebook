@@ -829,7 +829,7 @@
 
             var containerId = "quiz-container-" + Math.random().toString(36).substring(2, 9);
             target.innerHTML = "<div id='" + containerId + "' class='interactive-quiz-wrapper'></div>";
-            var container = document.getElementById(containerId);
+            var container = target.querySelector("#" + containerId) || target;
             
             var currentIdx = 0;
             var score = 0;
@@ -1044,9 +1044,9 @@
             return out.join("\n");
         };
 
-        var renderMindmap = function(data) {
-            if (resultsContainer) resultsContainer.style.display = "block";
-            var target = getOrCreateTargetContainer();
+        var renderMindmap = function(data, customTarget = null) {
+            if (resultsContainer && !customTarget) resultsContainer.style.display = "block";
+            var target = customTarget || getOrCreateTargetContainer();
             if (!target) return;
             var cleanData = sanitizeMermaid(data);
 
@@ -1055,10 +1055,10 @@
                 mermaid.init(undefined, target.querySelectorAll(".mermaid"));
             } catch (err) {
                 console.error("Mermaid init error:", err);
-                var container = document.getElementById("mermaid-container");
+                var container = target.querySelector("#mermaid-container") || target;
                 if (container) container.innerHTML = "<div class='alert alert-warning'>Failed to render Mindmap. The AI generated invalid syntax. Please try again.</div>";
             }
-            if (resultsContainer) resultsContainer.scrollIntoView({ behavior: "smooth" });
+            if (resultsContainer && !customTarget) resultsContainer.scrollIntoView({ behavior: "smooth" });
 
             if (downloadBtn) {
                 downloadBtn.innerHTML = "<i class='fa fa-file-pdf-o'></i> Export as PDF";
@@ -1066,13 +1066,13 @@
             }
         };
 
-        var renderSummary = function(content) {
-            if (resultsContainer) resultsContainer.style.display = "block";
-            var target = getOrCreateTargetContainer();
+        var renderSummary = function(content, customTarget = null) {
+            if (resultsContainer && !customTarget) resultsContainer.style.display = "block";
+            var target = customTarget || getOrCreateTargetContainer();
             if (!target) return;
 
             target.innerHTML = prepareFormalHeader("Study Summary") + "<div class=\'report-markdown\'>" + marked.parse(content) + "</div>";
-            if (resultsContainer) resultsContainer.scrollIntoView({ behavior: "smooth" });
+            if (resultsContainer && !customTarget) resultsContainer.scrollIntoView({ behavior: "smooth" });
             
             if (downloadBtn) {
                 downloadBtn.innerHTML = "<i class=\'fa fa-file-pdf-o\'></i> Export as PDF";

@@ -75,7 +75,31 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
     </div>
     <?php endif; ?>
 
-<div id="ainotebook-wrapper">
+    <!-- DEMI Top Control Bar (Matching DEMI AI Academic Tutor Portal) -->
+    <div class="demi-top-control-bar">
+        <div class="demi-brand-group">
+            <div class="demi-avatar-badge">DEMI</div>
+            <div class="demi-brand-meta">
+                <div class="demi-title-row">
+                    <h2>24/7 Academic AI Tutor</h2>
+                    <span class="demi-mode-badge">STUDY MODE</span>
+                </div>
+                <p class="demi-subtitle">Grounded in your E-Campus course modules, slides & professor syllabus.</p>
+            </div>
+        </div>
+        <div class="demi-header-controls">
+            <div class="demi-course-pill">
+                <i class="fa fa-book" style="color: #07366c;"></i>
+                <span><?php echo s($course->fullname); ?></span>
+            </div>
+            <div class="demi-status-pill">
+                <span class="pulse-dot"></span>
+                <span>DEMI AI</span>
+            </div>
+            <button id="open-settings" class="btn-icon" title="Configure Chat"><i class="fa fa-cog"></i></button>
+        </div>
+    </div>
+
     <!-- Main Workspace Card: Materials + Chat -->
     <div class="main-dashboard-card">
         <!-- Sidebar Panel: Material List -->
@@ -87,9 +111,12 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
             <div class="material-list">
                 <div class="select-all-container">
                     <input type="checkbox" id="select-all-files" checked>
-                    <label for="select-all-files">Select All</label>
+                    <label for="select-all-files">Select All (<?php echo count($files); ?> Attached)</label>
                 </div>
                 <?php
+                if (empty($files)) {
+                    echo '<div style="padding: 14px; font-size: 0.8rem; color: #64748b; font-style: italic;"><i class="fa fa-info-circle"></i> No PDF documents uploaded yet. Add lecture slides in activity settings to enable full RAG context.</div>';
+                }
                 foreach ($files as $file) {
                     if ($file->is_directory()) continue;
                     $url = moodle_url::make_pluginfile_url($file->get_contextid(), $file->get_component(), $file->get_filearea(), $file->get_itemid(), $file->get_filepath(), $file->get_filename());
@@ -109,41 +136,73 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
         <div class="ainotebook-chat">
             <div class="chat-header">
                 <div class="chat-brand-section">
-                    <img src="<?php echo $CFG->wwwroot; ?>/mod/ainotebook/pix/icon.svg" class="chat-brand-icon">
                     <div class="chat-info">
-                        <h2><?php echo s($ai_name); ?></h2>
-                        <p class="chat-subtitle">Your AI Study Assistant by President University</p>
+                        <h2><?php echo s($course->fullname); ?></h2>
+                        <p class="chat-subtitle">Topic Focus: <?php echo s($ainotebook->name); ?></p>
                     </div>
                 </div>
-                <button id="open-settings" class="btn-icon" title="Configure Chat"><i class="fa fa-cog"></i></button>
+                <span class="academic-mode-tag"><i class="fa fa-graduation-cap"></i> Academic Study Thread</span>
             </div>
             <div id="chat-messages" class="chat-messages">
                 <div class="message ai">
-                    Hi, PresUniver! I am DEMI Tutor, your course study companion. I can help you with:<br>
-                    - Explaining the lecture materials shared by your teacher.<br>
-                    - Creating quizzes for your exam practice.<br>
-                    - Summarizing long readings and complex modules.<br>
-                    - Generating mindmaps to help you visualize key concepts.<br><br>
-                    Are you ready to start? What are we studying together today?
+                    <div class="ai-avatar-icon">DEMI</div>
+                    <div class="message-bubble-body">
+                        <div class="message-meta-header">
+                            <span class="meta-author">DEMI AI Academic Tutor</span>
+                            <span class="meta-time"><?php echo date('h:i A'); ?></span>
+                        </div>
+                        <div class="message-text">
+                            Hello <strong><?php echo s(fullname($USER)); ?></strong>! I am your DEMI AI Academic Tutor for <strong><?php echo s($course->fullname); ?></strong> (<?php echo s($ainotebook->name); ?>).<br><br>
+                            I am connected to your lecture modules, presentation slides, and syllabus on E-Campus. Ask any questions about concepts, or trigger a study tool below!
+                        </div>
+                    </div>
                 </div>
                 <?php
-                $history = $DB->get_records('ainotebook_chat', ['ainotebookid' => $ainotebook->id, 'userid' => $target_user->id], 'timecreated ASC');
+                $history = \mod_ainotebook\ai_client::get_unified_history($cm->id, $target_user->id);
                 foreach ($history as $log) {
                     $clean_response = preg_replace('/```json-quiz[\s\S]*?```/', '', $log->response);
                     $clean_response = preg_replace('/```mermaid[\s\S]*?```/', '', $clean_response);
                     $clean_response = preg_replace('/\[REPORT_START\][\s\S]*?\[REPORT_END\]/', '', $clean_response);
                     $clean_response = trim($clean_response);
                     if (empty($clean_response)) $clean_response = "I have generated the requested material below.";
+                    $time_str = !empty($log->timecreated) ? date('h:i A', $log->timecreated) : date('h:i A');
 
-                    echo '<div class="message user">' . nl2br(s($log->message)) . '</div>';
-                    echo '<div class="message ai">' . nl2br($clean_response) . '</div>';
+                    echo '<div class="message user">';
+                    echo '<div class="message-bubble-body">';
+                    echo '<div class="message-meta-header"><span class="meta-author">' . s(fullname($USER)) . '</span><span class="meta-time">' . $time_str . '</span></div>';
+                    echo '<div class="message-text">' . nl2br(s($log->message)) . '</div>';
+                    echo '</div></div>';
+
+                    echo '<div class="message ai">';
+                    echo '<div class="ai-avatar-icon">DEMI</div>';
+                    echo '<div class="message-bubble-body">';
+                    echo '<div class="message-meta-header"><span class="meta-author">DEMI AI Academic Tutor</span><span class="meta-time">' . $time_str . '</span></div>';
+                    echo '<div class="message-text">' . nl2br($clean_response) . '</div>';
+                    echo '</div></div>';
                 }
                 ?>
             </div>
+
+            <!-- Quick Action Academic Prompt Chips Bar -->
+            <div class="suggested-prompts-bar">
+                <button class="prompt-chip" onclick="window.sendSuggested('Explain key concepts and pseudocode conventions from lecture slides.', null)">
+                    💡 Explain Concepts
+                </button>
+                <button class="prompt-chip" onclick="window.sendSuggested('Generate a comprehensive quiz from my materials.', 'quiz')">
+                    📝 Interactive Quiz
+                </button>
+                <button class="prompt-chip" onclick="window.sendSuggested('Generate a mindmap structure.', 'mindmap')">
+                    📊 Concept Mindmap
+                </button>
+                <button class="prompt-chip" onclick="window.sendSuggested('Generate a detailed study report.', 'report')">
+                    📄 Module Summary
+                </button>
+            </div>
+
             <div class="input-wrapper-container">
                 <div class="input-wrapper" <?php if($is_readonly) echo 'style="opacity: 0.6; pointer-events: none;"'; ?>>
                     <input type="text" id="chat-input" placeholder="<?php echo get_string('asksomething', 'mod_ainotebook'); ?>" <?php if($is_readonly) echo 'disabled'; ?>>
-                    <span id="source-count" class="source-pill">0 sources</span>
+                    <span id="source-count" class="source-pill">0 sources attached</span>
                     <button id="send-btn" <?php if($is_readonly) echo 'disabled'; ?>>
                         <i class="fa fa-paper-plane"></i>
                     </button>
@@ -163,22 +222,22 @@ $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', f
                 <div class="creator-card quiz" onclick="window.sendSuggested('Generate a comprehensive quiz from my materials.', 'quiz')">
                     <div class="card-icon"><i class="fa fa-question-circle"></i></div>
                     <div class="card-info">
-                        <h5>Quiz</h5>
-                        <p>Practice your understanding using Interactive Quiz</p>
+                        <h5>Interactive Quiz</h5>
+                        <p>Practice your understanding with automated multiple-choice quizzes</p>
                     </div>
                 </div>
                 <div class="creator-card report" onclick="window.sendSuggested('Generate a detailed study report.', 'report')">
                     <div class="card-icon"><i class="fa fa-file-text-o"></i></div>
                     <div class="card-info">
-                        <h5>Summary</h5>
-                        <p>Get the summary of the learning materials.</p>
+                        <h5>Module Summary</h5>
+                        <p>Generate a clear, structured summary of selected study materials</p>
                     </div>
                 </div>
                 <div class="creator-card mindmap" onclick="window.sendSuggested('Generate a mindmap structure.', 'mindmap')">
                     <div class="card-icon"><i class="fa fa-sitemap"></i></div>
                     <div class="card-info">
-                        <h5>Mindmap</h5>
-                        <p>Generate a mindmap</p>
+                        <h5>Concept Mindmap</h5>
+                        <p>Visualize key concepts and relationships in an interactive diagram</p>
                     </div>
                 </div>
             </div>
@@ -767,10 +826,20 @@ $js .= <<<'JS'
         var addMessage = function(text, type) {
             var msg = document.createElement("div");
             msg.className = "message " + type;
-            if (typeof marked !== "undefined") {
-                msg.innerHTML = marked.parse(text);
+            var timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            var parsedContent = (typeof marked !== "undefined") ? marked.parse(text) : text.replace(/\n/g, "<br>");
+            
+            if (type === "user") {
+                msg.innerHTML = '<div class="message-bubble-body">' +
+                    '<div class="message-meta-header"><span class="meta-author">' + studentName + '</span><span class="meta-time">' + timeStr + '</span></div>' +
+                    '<div class="message-text">' + parsedContent + '</div>' +
+                    '</div>';
             } else {
-                msg.innerHTML = text.replace(/\n/g, "<br>");
+                msg.innerHTML = '<div class="ai-avatar-icon">DEMI</div>' +
+                    '<div class="message-bubble-body">' +
+                    '<div class="message-meta-header"><span class="meta-author">DEMI AI Academic Tutor</span><span class="meta-time">' + timeStr + '</span></div>' +
+                    '<div class="message-text">' + parsedContent + '</div>' +
+                    '</div>';
             }
             messages.appendChild(msg);
             messages.scrollTop = messages.scrollHeight;

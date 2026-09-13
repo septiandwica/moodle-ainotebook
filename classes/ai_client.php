@@ -28,12 +28,12 @@ class ai_client {
         $material_data    = self::get_material_context($cmid, $selected_file_ids);
         $material_context = $material_data['text'] ?? "";
         $binaries         = $material_data['binaries'] ?? [];
-        $ainame           = "PresMate";
+        $ainame           = get_config('mod_ainotebook', 'ai_name') ?: "DEMI AI Academic Tutor";
 
         // ── Build system prompt ───────────────────────────────────────────────
         $course_context = self::get_context_material($cmid);
         
-        $system_prompt = "You are {$ainame}, an AI Study Assistant for President University Ecampus.\n";
+        $system_prompt = "You are {$ainame}, an official AI Academic Tutor for President University E-Campus.\n";
         $system_prompt .= $course_context;
         $num_files = count($selected_file_ids);
         if ($num_files === 1) {
@@ -110,9 +110,55 @@ class ai_client {
         );
 
         // ── Route to provider ─────────────────────────────────────────────────
-        $provider = get_config('mod_ainotebook', 'ai_provider');
+        $provider = get_config('mod_ainotebook', 'ai_provider') ?: 'demi_engine';
 
-        if ($provider !== 'moodle') {
+        // 1. Mandatory DEMI Core AI Engine Integration (FastAPI Port 8001)
+        if ($provider === 'demi_engine') {
+            $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
+            $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
+
+            global $CFG;
+            require_once($CFG->libdir . '/filelib.php');
+            $curl = new \curl();
+            $curl->setopt([
+                'CURLOPT_TIMEOUT'        => 30,
+                'CURLOPT_CONNECTTIMEOUT' => 8,
+                'CURLOPT_HTTPHEADER'     => [
+                    'X-Engine-API-Key: ' . $engine_key,
+                    'Content-Type: application/json',
+                    'Accept: application/json',
+                ],
+            ]);
+
+            $payload = json_encode([
+                'user_id'       => (int) $userid,
+                'course_id'     => (int) $course->id,
+                'activity_id'   => (int) $cm->instance,
+                'activity_name' => (string) $ainotebook->name,
+                'user_message'  => (string) $user_message,
+            ]);
+
+            $raw_response = $curl->post(rtrim($engine_url, '/') . '/api/v1/chat/tutor', $payload);
+
+            if (!$curl->errno) {
+                $res_data = json_decode($raw_response, true);
+                if (isset($res_data['data']['response'])) {
+                    $ai_text = $res_data['data']['response'];
+                    if (strpos($ai_text, '```mermaid') !== false) {
+                        $ai_text = preg_replace_callback(
+                            '/```mermaid(.*?)```/s',
+                            fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
+                            $ai_text
+                        );
+                    }
+                    return $ai_text;
+                }
+            }
+
+            debugging("mod_ainotebook: demi-engine request failed, falling back to direct provider. Error: " . $curl->error, DEBUG_DEVELOPER);
+        }
+
+        if ($provider !== 'moodle' && $provider !== 'demi_engine') {
             return self::custom_provider_request($provider, $system_prompt, $user_message, $history ? array_reverse($history) : [], $binaries);
         }
 
@@ -149,6 +195,56 @@ class ai_client {
         }
 
         return "Sorry, I encountered an error: " . $response->get_errormessage();
+    }
+
+    /**
+     * Get unified chat history across demi-portal and moodle-ainotebook from demi-engine
+     */
+    public static function get_unified_history(int $cmid, int $userid): array {
+        global $DB, $CFG;
+        $cm = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
+        $course = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
+
+        $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
+        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
+
+        require_once($CFG->libdir . '/filelib.php');
+        $curl = new \curl();
+        $curl->setopt([
+            'CURLOPT_TIMEOUT'        => 5,
+            'CURLOPT_CONNECTTIMEOUT' => 2,
+            'CURLOPT_HTTPHEADER'     => [
+                'X-Engine-API-Key: ' . $engine_key,
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ],
+        ]);
+
+        $payload = json_encode([
+            'user_id'   => (int) $userid,
+            'course_id' => (int) $course->id,
+            'limit'     => 30,
+        ]);
+
+        $raw_response = $curl->post(rtrim($engine_url, '/') . '/api/v1/chat/history', $payload);
+
+        $unified_list = [];
+        if (!$curl->errno) {
+            $res_data = json_decode($raw_response, true);
+            if (!empty($res_data['history']) && is_array($res_data['history'])) {
+                foreach ($res_data['history'] as $item) {
+                    $unified_list[] = (object)[
+                        'message'     => $item['prompt'] ?? '',
+                        'response'    => $item['response'] ?? '',
+                        'timecreated' => !empty($item['created_at']) ? strtotime($item['created_at']) : time(),
+                    ];
+                }
+                return $unified_list;
+            }
+        }
+
+        $local_history = $DB->get_records('ainotebook_chat', ['ainotebookid' => $cm->instance, 'userid' => $userid], 'timecreated ASC');
+        return array_values($local_history);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

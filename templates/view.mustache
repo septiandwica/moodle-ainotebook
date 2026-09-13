@@ -910,6 +910,12 @@
             var score = 0;
 
             var showQuestion = function(idx) {
+                var headerScoreEl = document.getElementById("quiz-score");
+                if (headerScoreEl) {
+                    headerScoreEl.style.display = "inline-block";
+                    headerScoreEl.innerText = "Score: " + score + "/" + data.questions.length;
+                }
+
                 container.innerHTML = "";
                 var q = data.questions[idx];
                 var qDiv = document.createElement("div");
@@ -946,6 +952,11 @@
                         if (idx < data.questions.length - 1) {
                             showQuestion(idx + 1);
                         } else {
+                            var headerScoreEl = document.getElementById("quiz-score");
+                            if (headerScoreEl) {
+                                headerScoreEl.style.display = "none";
+                            }
+
                             var percent = (score / data.questions.length) * 100;
                             var feedback = "Keep Learning!";
                             var desc = "Every mistake is a step forward. Review the materials and try again to master the topic.";

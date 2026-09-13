@@ -561,7 +561,9 @@
                     });
 
                     messages.innerHTML = html;
-                    scanHistoryForArtifacts();
+                    if (typeof window.scanHistoryForArtifacts === "function") {
+                        window.scanHistoryForArtifacts();
+                    }
                     messages.scrollTop = messages.scrollHeight;
                 }
             })
@@ -1670,14 +1672,14 @@
         // Initial suggestions load removed to save API calls. Suggestions appear after chat.
         messages.scrollTop = messages.scrollHeight;
         
-        var scanHistoryForArtifacts = function() {
+        window.scanHistoryForArtifacts = function() {
             messages.querySelectorAll(".message.ai").forEach(msg => {
                 detectAndRenderArtifacts(msg.innerText, "ai", true);
             });
             if (resultsContainer) resultsContainer.style.display = "none";
         };
 
-        scanHistoryForArtifacts();
+        window.scanHistoryForArtifacts();
         // Source counter and Select All logic.
         var updateSourceCount = function() {
             var checkedCount = document.querySelectorAll(".file-checkbox:checked").length;

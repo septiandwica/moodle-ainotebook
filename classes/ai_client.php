@@ -691,12 +691,54 @@ class ai_client {
         return $suggestions;
     }
 
+    /**
+     * Get all course materials across the entire course (mod_ainotebook, mod_resource, mod_folder).
+     */
+    public static function get_all_course_materials(int $courseid, int $cmid): array {
+        global $DB;
+        $fs = get_file_storage();
+        $all_files = [];
+
+        // 1. Files uploaded directly to this mod_ainotebook instance
+        $mod_context = \context_module::instance($cmid, IGNORE_MISSING);
+        if ($mod_context) {
+            $ain_files = $fs->get_area_files($mod_context->id, 'mod_ainotebook', 'files', 0, 'id ASC', false);
+            foreach ($ain_files as $f) {
+                if (!$f->is_directory() && $f->get_filesize() > 0) {
+                    $all_files[$f->get_id()] = $f;
+                }
+            }
+        }
+
+        // 2. All resource files and folder files across the course
+        $mod_resources = $DB->get_records_sql("
+            SELECT cm.id AS cmid, cm.module, m.name AS modname
+            FROM {course_modules} cm
+            JOIN {modules} m ON m.id = cm.module
+            WHERE cm.course = :courseid AND cm.deletioninprogress = 0
+            AND m.name IN ('resource', 'folder')
+        ", ['courseid' => $courseid]);
+
+        if ($mod_resources) {
+            foreach ($mod_resources as $mod) {
+                $c_ctx = \context_module::instance($mod->cmid, IGNORE_MISSING);
+                if ($c_ctx) {
+                    $area_files = $fs->get_area_files($c_ctx->id, 'mod_' . $mod->modname, 'content', 0, 'id ASC', false);
+                    foreach ($area_files as $f) {
+                        if (!$f->is_directory() && $f->get_filesize() > 0) {
+                            $all_files[$f->get_id()] = $f;
+                        }
+                    }
+                }
+            }
+        }
+
+        return array_values($all_files);
+    }
+
     public static function get_context_material(int $cmid): string {
         $cm = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
-        $context = \context_module::instance($cmid);
-        
-        $fs = get_file_storage();
-        $files = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id ASC', false);
+        $files = self::get_all_course_materials($cm->course, $cmid);
         
         if (empty($files)) {
             return "No study documents are currently uploaded for this activity.";
@@ -1020,9 +1062,8 @@ class ai_client {
     public static function process_all_materials(int $cmid): void {
         global $DB;
 
-        $context = \context_module::instance($cmid);
-        $fs      = get_file_storage();
-        $files   = $fs->get_area_files($context->id, 'mod_ainotebook', 'files', 0, 'id', false);
+        $cm = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
+        $files = self::get_all_course_materials($cm->course, $cmid);
 
         if (empty($files)) {
             return;

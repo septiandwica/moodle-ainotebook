@@ -83,13 +83,26 @@ if ($logo_files) {
 }
 $context_data['pdf_logo_url'] = $pdf_logo_url;
 
-// Format files array
+// Get all course materials across the course (mod_ainotebook, mod_resource, mod_folder).
+$files = \mod_ainotebook\ai_client::get_all_course_materials($course->id, $cm->id);
+
 $files_data = [];
 foreach ($files as $file) {
-    if ($file->is_directory()) continue;
+    if ($file->is_directory() || $file->get_filesize() === 0) continue;
+    $filename = $file->get_filename();
+    $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    
+    $icon = 'fa-file-o';
+    if ($ext === 'pdf') $icon = 'fa-file-pdf-o';
+    elseif (in_array($ext, ['pptx', 'ppt'])) $icon = 'fa-file-powerpoint-o';
+    elseif (in_array($ext, ['docx', 'doc'])) $icon = 'fa-file-word-o';
+    elseif (in_array($ext, ['txt', 'md', 'csv'])) $icon = 'fa-file-text-o';
+    elseif (in_array($ext, ['png', 'jpg', 'jpeg', 'svg'])) $icon = 'fa-file-image-o';
+
     $files_data[] = [
         'id' => $file->get_id(),
-        'filename' => s($file->get_filename()),
+        'filename' => s($filename),
+        'icon' => $icon,
         'url' => moodle_url::make_pluginfile_url($file->get_contextid(), $file->get_component(), $file->get_filearea(), $file->get_itemid(), $file->get_filepath(), $file->get_filename())->out()
     ];
 }

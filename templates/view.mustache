@@ -105,14 +105,14 @@
                     <div class="material-file-item">
                         <input type="checkbox" class="file-checkbox" value="{{id}}" checked>
                         <div class="material-file">
-                            <i class="fa fa-file-pdf-o"></i>
+                            <i class="fa {{#icon}}{{icon}}{{/icon}}{{^icon}}fa-file-pdf-o{{/icon}}"></i>
                             <a href="{{url}}" target="_blank">{{filename}}</a>
                         </div>
                     </div>
                     {{/files}}
                     {{^files}}
                     <div class="empty-files-notice">
-                        <p>No PDF files uploaded for this course yet.</p>
+                        <p>No course materials uploaded for this course yet.</p>
                     </div>
                     {{/files}}
                 </div>
@@ -1104,21 +1104,23 @@
         var addMessage = function(text, type) {
             var msg = document.createElement("div");
             msg.className = "message " + type;
-            if (typeof marked !== "undefined") {
-                msg.innerHTML = marked.parse(text);
+            var parsed = (typeof marked !== "undefined") ? marked.parse(text) : text.replace(/\n/g, "<br>");
+            
+            if (type === "user") {
+                msg.innerHTML = '<div class="message-bubble-body">' +
+                    '<div class="message-meta-header"><span class="meta-author">' + studentName + '</span></div>' +
+                    '<div class="message-text">' + parsed + '</div>' +
+                '</div>';
             } else {
-                msg.innerHTML = text.replace(/\n/g, "<br>");
+                msg.innerHTML = '<div class="ai-avatar-icon">DEMI</div>' +
+                '<div class="message-bubble-body">' +
+                    '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span></div>' +
+                    '<div class="message-text"><div class="markdown-body">' + parsed + '</div></div>' +
+                '</div>';
             }
             messages.appendChild(msg);
             messages.scrollTop = messages.scrollHeight;
         };
-
-        // Format existing messages.
-        document.querySelectorAll(".message.ai").forEach(function(el) {
-            if (typeof marked !== "undefined" && !el.classList.contains("typing")) {
-                el.innerHTML = marked.parse(el.innerText);
-            }
-        });
 
         window.sendMessage = function(silent = false) {
             var val = input.value.trim();
@@ -1293,7 +1295,11 @@
                                                 
                                                 aiMsgDiv = document.createElement("div");
                                                 aiMsgDiv.className = "message ai";
-                                                aiMsgDiv.innerHTML = "<div class='markdown-body'></div>";
+                                                aiMsgDiv.innerHTML = '<div class="ai-avatar-icon">DEMI</div>' +
+                                                    '<div class="message-bubble-body">' +
+                                                        '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span></div>' +
+                                                        '<div class="message-text"><div class="markdown-body"></div></div>' +
+                                                    '</div>';
                                                 messages.appendChild(aiMsgDiv);
                                                 contentDiv = aiMsgDiv.querySelector('.markdown-body');
                                             }

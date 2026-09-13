@@ -126,13 +126,14 @@
                             <i class="fa fa-folder-open-o"></i>
                             <div class="topic-meta">
                                 <strong>{{name}}</strong>
-                                <span class="topic-subtitle">{{modules_count}} items</span>
+                                <span class="topic-subtitle">{{modules_count}} items{{#has_subsections}} · {{subsections_count}} subsections{{/has_subsections}}</span>
                             </div>
                             <button type="button" class="btn-focus-topic" title="Focus AI Tutor on this topic">
                                 Focus Topic
                             </button>
                         </div>
-                        {{#modules_count}}
+
+                        {{#has_modules}}
                         <div class="topic-modules-list">
                             {{#modules}}
                             <div class="topic-module-item">
@@ -141,7 +142,31 @@
                             </div>
                             {{/modules}}
                         </div>
-                        {{/modules_count}}
+                        {{/has_modules}}
+
+                        {{#has_subsections}}
+                        <div class="topic-subsections-container" style="margin-top: 8px; padding-left: 12px; border-left: 2px solid #cbd5e1;">
+                            {{#subsections}}
+                            <div class="subsection-tree-node" style="margin-bottom: 6px;">
+                                <div class="subsection-title-row" style="font-size: 11px; font-weight: 700; color: #475569; display: flex; items-center; gap: 6px; margin-bottom: 2px;">
+                                    <i class="fa fa-folder-o" style="color: #6366f1;"></i>
+                                    <span>{{name}}</span>
+                                    <span style="font-weight: normal; color: #94a3b8; font-size: 10px;">({{modules_count}} items)</span>
+                                </div>
+                                {{#has_modules}}
+                                <div class="topic-modules-list" style="padding-left: 14px;">
+                                    {{#modules}}
+                                    <div class="topic-module-item" style="padding: 2px 0;">
+                                        <i class="fa {{icon}}"></i>
+                                        <a href="{{url}}" target="_blank" onclick="event.stopPropagation()">{{name}}</a>
+                                    </div>
+                                    {{/modules}}
+                                </div>
+                                {{/has_modules}}
+                            </div>
+                            {{/subsections}}
+                        </div>
+                        {{/has_subsections}}
                     </div>
                     {{/syllabus_sections}}
 

@@ -804,7 +804,13 @@
 
             // 2. Check for MINDMAP (Mermaid).
             if (!found) {
-                var mermaidMatch = text.match(/```mermaid\s*([\s\S]*?)```/);
+                var mermaidMatch = text.match(/```mermaid\s*([\s\S]*?)```/i);
+                if (!mermaidMatch) {
+                    var rootDslMatch = text.match(/(?:^|\n)(root\s+['"].*?['"][\s\S]*?)(?=(?:\n\s*This\s+mindmap|\n\s*Explanation|\n\s*Detailed|$))/i);
+                    if (rootDslMatch) {
+                        mermaidMatch = [rootDslMatch[0], rootDslMatch[1]];
+                    }
+                }
                 if (mermaidMatch) {
                     artType = "mindmap";
                     artifact = { type: "mindmap", data: mermaidMatch[1].trim(), title: "Mindmap - " + new Date().toLocaleTimeString() };
@@ -1122,7 +1128,69 @@
 
         // ── Mermaid syntax sanitizer (mirrors PHP-side sanitize_mermaid) ─────────
         var sanitizeMermaid = function(code) {
-            var lines = code.trim().split("\n");
+            var clean = code.replace(/^```(?:mermaid)?/im, '').replace(/```$/m, '').trim();
+
+            if (/root\s+['"].*?['"]/i.test(clean) || (clean.indexOf('subgraph') !== -1 && clean.indexOf('graph TD') === -1)) {
+                var lines = clean.split("\n");
+                var graphLines = ["graph TD"];
+                var rootId = "root_node";
+                var nodeLabels = {};
+                var connections = [];
+                var currentParent = "";
+
+                lines.forEach(function(line) {
+                    var t = line.trim();
+                    if (!t) return;
+
+                    var rootMatch = t.match(/^root\s+['"](.*?)['"]\s*;?/i);
+                    if (rootMatch) {
+                        nodeLabels[rootId] = rootMatch[1].replace(/"/g, "'");
+                        return;
+                    }
+
+                    if (/^subgraph\s+/i.test(t) || t.toLowerCase() === 'end') {
+                        return;
+                    }
+
+                    var labelMatch = t.match(/^([A-Za-z0-9_]+)\s+['"](.*?)['"]\s*;?/);
+                    if (labelMatch) {
+                        var id = labelMatch[1];
+                        var label = labelMatch[2].replace(/"/g, "'");
+                        nodeLabels[id] = label;
+                        return;
+                    }
+
+                    if (/^[A-Za-z0-9_]+$/.test(t)) {
+                        currentParent = (t === 'root') ? rootId : t;
+                        return;
+                    }
+
+                    if (currentParent && /^[A-Za-z0-9_;\s]+$/.test(t)) {
+                        var children = t.split(';').map(function(c) { return c.trim(); }).filter(Boolean);
+                        children.forEach(function(child) {
+                            if (child !== currentParent && child.toLowerCase() !== 'root') {
+                                connections.push({ from: currentParent, to: child });
+                            }
+                        });
+                        return;
+                    }
+                });
+
+                Object.keys(nodeLabels).forEach(function(id) {
+                    var safeLabel = nodeLabels[id].replace(/[\[\]\(\)\{\}]/g, ' ');
+                    graphLines.push("    " + id + '["' + safeLabel + '"]');
+                });
+
+                connections.forEach(function(conn) {
+                    graphLines.push("    " + conn.from + " --> " + conn.to);
+                });
+
+                if (graphLines.length > 1) {
+                    return graphLines.join("\n");
+                }
+            }
+
+            var lines = clean.split("\n");
             var out = [];
             lines.forEach(function(line) {
                 var t = line.trimEnd();

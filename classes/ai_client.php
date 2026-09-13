@@ -40,23 +40,6 @@ class ai_client {
     }
 
     /**
-     * Main entry point for generating AI response.
-     */
-    public static function get_response(int $cmid, int $userid, string $user_message, array $selected_file_ids = [], array $config = [], bool $stream = false): array {
-        self::$streamed = false;
-        global $DB, $USER;
-
-        $cm         = self::get_cm_safe($cmid);
-        $course     = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
-        $ainotebook = $DB->get_record('ainotebook', ['id' => $cm->instance], '*', MUST_EXIST);
-
-        $fullname         = fullname($USER);
-        $binaries         = []; // FORCE EMPTY: We use RAG now, no need to send huge base64 PDFs to Gemini directly
-        $ainame           = get_config('mod_ainotebook', 'ai_name') ?: "DEMI AI Academic Tutor";
-        
-    }
-
-    /**
      * Sanitize AI output to strip raw provider brand names, API key error messages, and raw URLs,
      * ensuring responses are strictly branded as DEMI AI.
      */
@@ -81,6 +64,21 @@ class ai_client {
 
         return preg_replace(array_keys($replacements), array_values($replacements), $text);
     }
+
+    /**
+     * Main entry point for generating AI response.
+     */
+    public static function get_response(int $cmid, int $userid, string $user_message, array $selected_file_ids = [], array $config = [], bool $stream = false): array {
+        self::$streamed = false;
+        global $DB, $USER;
+
+        $cm         = self::get_cm_safe($cmid);
+        $course     = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
+        $ainotebook = $DB->get_record('ainotebook', ['id' => $cm->instance], '*', MUST_EXIST);
+
+        $fullname         = fullname($USER);
+        $binaries         = []; // FORCE EMPTY: We use RAG now, no need to send huge base64 PDFs to Gemini directly
+        $ainame           = get_config('mod_ainotebook', 'ai_name') ?: "DEMI AI Academic Tutor";
         
         // --- Smart Retrieval (RAG) & Hybrid Context Strategy ---
         $is_generator = false;

@@ -150,10 +150,6 @@ class ai_client {
         // ── Route to provider ─────────────────────────────────────────────────
         $provider = get_config('mod_ainotebook', 'ai_provider') ?: 'demi_engine';
 
-<<<<<<< HEAD
-        if ($provider !== 'moodle') {
-            return ['response' => self::custom_provider_request($provider, $system_prompt, $user_message, $history ? array_reverse($history) : [], $binaries, $stream), 'sources_count' => $sources_count];
-=======
         // 1. Mandatory DEMI Core AI Engine Integration (FastAPI Port 8001)
         if ($provider === 'demi_engine') {
             $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
@@ -193,15 +189,15 @@ class ai_client {
                             $ai_text
                         );
                     }
-                    return $ai_text;
+                    return ['response' => $ai_text, 'sources_count' => $sources_count];
                 }
             }
 
             debugging("mod_ainotebook: demi-engine request failed, falling back to direct provider. Error: " . $curl->error, DEBUG_DEVELOPER);
         }
 
-        if ($provider !== 'moodle' && $provider !== 'demi_engine') {
-            return self::custom_provider_request($provider, $system_prompt, $user_message, $history ? array_reverse($history) : [], $binaries);
+        if ($provider !== 'moodle') {
+            return ['response' => self::custom_provider_request($provider, $system_prompt, $user_message, $history ? array_reverse($history) : [], $binaries, $stream), 'sources_count' => $sources_count];
         }
 
         // Moodle AI subsystem: flatten everything into a single prompt string

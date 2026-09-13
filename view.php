@@ -93,6 +93,7 @@ foreach ($files as $file) {
     ];
 }
 $context_data['files'] = $files_data;
+$context_data['files_count'] = count($files_data);
 
 // Format history array
 $history = \mod_ainotebook\ai_client::get_unified_history($cm->id, $target_user->id);
@@ -106,13 +107,32 @@ foreach ($history as $index => $log) {
     if (empty($clean_response)) $clean_response = "I have generated the requested material below.";
     $time_str = !empty($log->timecreated) ? date('h:i A', $log->timecreated) : date('h:i A');
 
+    $diff = time() - (!empty($log->timecreated) ? $log->timecreated : time());
+    if ($diff < 60) {
+        $rel_time = 'Just now';
+    } elseif ($diff < 3600) {
+        $mins = max(1, floor($diff / 60));
+        $rel_time = $mins . ($mins == 1 ? ' minute ago' : ' minutes ago');
+    } elseif ($diff < 86400) {
+        $hours = floor($diff / 3600);
+        $rel_time = $hours . ($hours == 1 ? ' hour ago' : ' hours ago');
+    } else {
+        $days = floor($diff / 86400);
+        $rel_time = $days . ($days == 1 ? ' day ago' : ' days ago');
+    }
+
+    $snippet = !empty($log->message) ? s($log->message) : 'Discussion session';
+
     $history_data[] = [
         'message' => nl2br(s($log->message)),
         'response' => nl2br($clean_response),
-        'time' => $time_str
+        'time' => $time_str,
+        'rel_time' => $rel_time,
+        'snippet' => $snippet
     ];
 }
 $context_data['history'] = $history_data;
+$context_data['history_count'] = count($history_data);
 
 $saved_artifacts = $DB->get_records('ainotebook_artifacts', ['ainotebookid' => $ainotebook->id, 'userid' => $target_user->id], 'timecreated DESC');
 $context_data['saved_json'] = json_encode(array_values($saved_artifacts));

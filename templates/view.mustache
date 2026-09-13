@@ -21,7 +21,7 @@
         {{/is_teacher_self}}
     {{/is_readonly}}
 
-    <!-- DEMI Top Control Bar (Matching DEMI AI Academic Tutor Portal) -->
+    <!-- DEMI Top Control Bar (Matching DEMI AI Academic Tutor Portal 100%) -->
     <div class="demi-top-control-bar">
         <div class="demi-brand-group">
             <div class="demi-avatar-badge">DEMI</div>
@@ -35,39 +35,116 @@
         </div>
         <div class="demi-header-controls">
             <div class="demi-course-pill">
-                <i class="fa fa-book" style="color: #07366c;"></i>
-                <span>{{course_fullname}}</span>
+                <span class="pill-label">Course:</span>
+                <span class="pill-value">{{course_fullname}}</span>
             </div>
             <div class="demi-status-pill">
                 <span class="pulse-dot"></span>
                 <span>DEMI AI</span>
             </div>
+            <button id="btn-new-session" class="btn-new-session-red" onclick="window.startNewSession()" title="Start New Session">
+                <i class="fa fa-plus"></i> New Session
+            </button>
             <button id="open-settings" class="btn-icon" title="Configure Chat"><i class="fa fa-cog"></i></button>
         </div>
     </div>
 
-    <!-- Main Workspace Card: Materials + Chat -->
+    <!-- Main Workspace Card: 3-Tab Sidebar + Chat Interface -->
     <div class="main-dashboard-card">
-        <!-- Sidebar Panel: Material List -->
+        <!-- 3-Tab Sidebar Panel (Matching AiTutor.tsx) -->
         <div id="ainotebook-sidebar-nav" class="ainotebook-sidebar">
-            <div class="sidebar-header">
-                <h3><i class="fa fa-folder-open"></i> Materials</h3>
-                <button id="toggle-sidebar" class="btn-icon"><i class="fa fa-angle-double-left"></i></button>
+            <div class="sidebar-tab-header">
+                <button type="button" class="tab-btn active" data-tab="history-panel" onclick="window.switchSidebarTab('history-panel', this)">
+                    <i class="fa fa-clock-o"></i> History ({{history_count}})
+                </button>
+                <button type="button" class="tab-btn" data-tab="syllabus-panel" onclick="window.switchSidebarTab('syllabus-panel', this)">
+                    <i class="fa fa-book"></i> Syllabus ({{files_count}})
+                </button>
+                <button type="button" class="tab-btn" data-tab="prompts-panel" onclick="window.switchSidebarTab('prompts-panel', this)">
+                    <i class="fa fa-lightbulb-o"></i> Prompts
+                </button>
             </div>
-            <div class="material-list">
+
+            <!-- Tab 1: History Panel -->
+            <div id="history-panel" class="sidebar-tab-content active">
+                <div class="history-scope-bar">
+                    <div class="scope-info">
+                        <span class="scope-label">History Scope:</span>
+                        <span class="scope-course">{{course_fullname}}</span>
+                    </div>
+                    <button class="btn-link-sm" onclick="window.location.reload()"><i class="fa fa-refresh"></i> Refresh</button>
+                </div>
+                <div class="session-history-list">
+                    {{#history}}
+                    <div class="session-history-card" onclick="window.sendSuggested('{{{snippet}}}', null)">
+                        <div class="session-card-header">
+                            <span class="session-course-tag">{{course_fullname}}</span>
+                            <span class="session-time-ago">{{rel_time}}</span>
+                        </div>
+                        <p class="session-snippet">"{{snippet}}"</p>
+                    </div>
+                    {{/history}}
+                    {{^history}}
+                    <div class="empty-history-notice">
+                        <i class="fa fa-comments-o"></i>
+                        <p>No past chat threads found.</p>
+                        <span class="subtext">Start asking questions below!</span>
+                    </div>
+                    {{/history}}
+                </div>
+            </div>
+
+            <!-- Tab 2: Syllabus / Materials Panel -->
+            <div id="syllabus-panel" class="sidebar-tab-content">
                 <div class="select-all-container">
                     <input type="checkbox" id="select-all-files" checked>
-                    <label for="select-all-files">Select All</label>
+                    <label for="select-all-files">Select All Materials</label>
                 </div>
-                {{#files}}
-                <div class="material-file-item">
-                    <input type="checkbox" class="file-checkbox" value="{{id}}" checked>
-                    <div class="material-file">
-                        <i class="fa fa-file-pdf-o"></i>
-                        <a href="{{url}}" target="_blank">{{filename}}</a>
+                <div class="material-list">
+                    {{#files}}
+                    <div class="material-file-item">
+                        <input type="checkbox" class="file-checkbox" value="{{id}}" checked>
+                        <div class="material-file">
+                            <i class="fa fa-file-pdf-o"></i>
+                            <a href="{{url}}" target="_blank">{{filename}}</a>
+                        </div>
+                    </div>
+                    {{/files}}
+                    {{^files}}
+                    <div class="empty-files-notice">
+                        <p>No PDF files uploaded for this course yet.</p>
+                    </div>
+                    {{/files}}
+                </div>
+            </div>
+
+            <!-- Tab 3: Structured Prompts Panel -->
+            <div id="prompts-panel" class="sidebar-tab-content">
+                <div class="structured-prompts-list">
+                    <div class="prompt-category-card core-theory" onclick="window.sendSuggested('Explain the foundational concepts and theoretical principles of {{course_fullname}}.', null)">
+                        <div class="prompt-badge">Core Theory</div>
+                        <p class="prompt-text">Explain the foundational concepts and theoretical principles of this course.</p>
+                        <span class="prompt-objective">Master key definitions & mechanisms.</span>
+                    </div>
+
+                    <div class="prompt-category-card study-summary" onclick="window.sendSuggested('Summarize the essential takeaways and lecture highlights for {{course_fullname}}.', 'summary')">
+                        <div class="prompt-badge">Study Summary</div>
+                        <p class="prompt-text">Summarize the essential takeaways and lecture slide highlights.</p>
+                        <span class="prompt-objective">Quick review for high-yield exam preparation.</span>
+                    </div>
+
+                    <div class="prompt-category-card case-study" onclick="window.sendSuggested('Provide practical real-world industry case studies for {{course_fullname}}.', null)">
+                        <div class="prompt-badge">Case Study</div>
+                        <p class="prompt-text">Provide practical real-world industry case studies & hands-on examples.</p>
+                        <span class="prompt-objective">Bridge academic theory with industry practice.</span>
+                    </div>
+
+                    <div class="prompt-category-card plo-outcome" onclick="window.sendSuggested('How does mastering {{course_fullname}} directly satisfy our Program Learning Outcomes (PLO)?', null)">
+                        <div class="prompt-badge">PLO Outcome</div>
+                        <p class="prompt-text">Map course outcomes to Program Learning Outcomes & career readiness.</p>
+                        <span class="prompt-objective">Connect competencies to future roles.</span>
                     </div>
                 </div>
-                {{/files}}
             </div>
         </div>
 
@@ -77,24 +154,41 @@
                 <div class="chat-brand-section">
                     <div class="chat-info">
                         <h2>{{course_fullname}}</h2>
-                        <p class="chat-subtitle">Topic Focus: {{activity_name}}</p>
+                        <p class="chat-subtitle">All Course Materials · Direct Discussion Thread</p>
                     </div>
                 </div>
-                <span class="academic-mode-tag"><i class="fa fa-graduation-cap"></i> Academic Study Thread</span>
+                <span class="academic-mode-tag"><i class="fa fa-graduation-cap"></i> Academic Study Mode</span>
             </div>
+
             <div id="chat-messages" class="chat-messages">
                 <div class="message ai">
                     <div class="ai-avatar-icon">DEMI</div>
                     <div class="message-bubble-body">
                         <div class="message-meta-header">
-                            <span class="meta-author">DEMI AI Academic Tutor</span>
+                            <span class="meta-author">DEMI AI Tutor</span>
                         </div>
                         <div class="message-text">
-                            Hello <strong>{{target_fullname}}</strong>! I am your DEMI AI Academic Tutor for <strong>{{course_fullname}}</strong> ({{activity_name}}).<br><br>
+                            Hello <strong>{{target_firstname}}</strong>! I am your DEMI AI Academic Tutor for <strong>{{course_fullname}}</strong>.<br><br>
                             I am connected to your lecture modules, presentation slides, and syllabus on E-Campus. Ask any questions about concepts, or trigger a study tool below!
+                            
+                            <div class="study-tools-inline-box">
+                                <span class="tools-title">Study Tools:</span>
+                                <div class="tools-chips-group">
+                                    <button class="study-tool-chip" onclick="window.sendSuggested('Generate an interactive quiz from my materials.', 'quiz')">
+                                        📝 Interactive Quiz
+                                    </button>
+                                    <button class="study-tool-chip" onclick="window.sendSuggested('Generate a concept mindmap structure.', 'mindmap')">
+                                        📊 Concept Mindmap
+                                    </button>
+                                    <button class="study-tool-chip" onclick="window.sendSuggested('Generate a detailed study summary.', 'summary')">
+                                        📄 Study Summary
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
+
                 {{#history}}
                 <div class="message user">
                     <div class="message-bubble-body">
@@ -105,7 +199,7 @@
                 <div class="message ai">
                     <div class="ai-avatar-icon">DEMI</div>
                     <div class="message-bubble-body">
-                        <div class="message-meta-header"><span class="meta-author">DEMI AI Academic Tutor</span>{{#time}}<span class="meta-time">{{time}}</span>{{/time}}</div>
+                        <div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span>{{#time}}<span class="meta-time">{{time}}</span>{{/time}}</div>
                         <div class="message-text"><div class="markdown-body">{{{response}}}</div></div>
                     </div>
                 </div>
@@ -113,25 +207,9 @@
                 {{/history}}
             </div>
 
-            <!-- Quick Action Academic Prompt Chips Bar -->
-            <div class="suggested-prompts-bar">
-                <button class="prompt-chip" onclick="window.sendSuggested('Explain key concepts and pseudocode conventions from lecture slides.', null)">
-                    💡 Explain Concepts
-                </button>
-                <button class="prompt-chip" onclick="window.sendSuggested('Generate a comprehensive quiz from my materials.', 'quiz')">
-                    📝 Interactive Quiz
-                </button>
-                <button class="prompt-chip" onclick="window.sendSuggested('Generate a mindmap structure.', 'mindmap')">
-                    📊 Concept Mindmap
-                </button>
-                <button class="prompt-chip" onclick="window.sendSuggested('Generate a detailed study report.', 'report')">
-                    📄 Module Summary
-                </button>
-            </div>
-
             <div class="input-wrapper-container">
                 <div class="input-wrapper" {{#is_readonly}}style="opacity: 0.6; pointer-events: none;"{{/is_readonly}}>
-                    <input type="text" id="chat-input" placeholder="{{str_asksomething}}" {{#is_readonly}}disabled{{/is_readonly}}>
+                    <input type="text" id="chat-input" placeholder="Ask DEMI AI Tutor about {{course_fullname}}... (Enter to send, Shift+Enter for newline)" {{#is_readonly}}disabled{{/is_readonly}}>
                     <span id="source-count" class="source-pill">0 sources attached</span>
                     <button id="send-btn" {{#is_readonly}}disabled{{/is_readonly}}>
                         <i class="fa fa-paper-plane"></i>
@@ -340,6 +418,40 @@
     }
 
     /* Global handlers available immediately. */
+    window.switchSidebarTab = function(tabId, btnEl) {
+        document.querySelectorAll('.sidebar-tab-content').forEach(function(el) {
+            el.classList.remove('active');
+        });
+        document.querySelectorAll('.sidebar-tab-header .tab-btn').forEach(function(el) {
+            el.classList.remove('active');
+        });
+        var target = document.getElementById(tabId);
+        if (target) target.classList.add('active');
+        if (btnEl) btnEl.classList.add('active');
+    };
+
+    window.startNewSession = function() {
+        var messages = document.getElementById("chat-messages");
+        if (messages) {
+            var initialAi = messages.querySelector('.message.ai');
+            messages.innerHTML = '';
+            if (initialAi) {
+                messages.appendChild(initialAi.cloneNode(true));
+            }
+        }
+        var input = document.getElementById("chat-input");
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+        require(['core/notification'], function(Notification) {
+            Notification.addNotification({
+                message: 'New Tutoring Session Started! Active discussion thread cleared.',
+                type: 'info'
+            });
+        });
+    };
+
     window.sendSuggested = function(text, toolType = null) {
         var input = document.getElementById("chat-input");
         if (input) {

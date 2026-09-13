@@ -354,12 +354,12 @@
     var cmid = {{cmid}};
     var sesskey = '{{sesskey}}';
     var wwwroot = '{{wwwroot}}';
-    var activityName = {{{activityname}}};
+    var activityName = {{#activityname}}{{{activityname}}}{{/activityname}}{{^activityname}}'DEMI AI Tutor'{{/activityname}};
     var pdfLogoUrl = '{{pdf_logo_url}}';
     var studentName = '{{target_fullname}}';
     var studentId = '{{target_idnumber}}';
-    var notebookName = {{{activityname}}};
-    var savedArtifacts = {{{saved_json}}};
+    var notebookName = {{#activityname}}{{{activityname}}}{{/activityname}}{{^activityname}}'DEMI AI Tutor'{{/activityname}};
+    var savedArtifacts = {{#saved_json}}{{{saved_json}}}{{/saved_json}}{{^saved_json}}[]{{/saved_json}};
     var isReadonly = {{#is_readonly}}true{{/is_readonly}}{{^is_readonly}}false{{/is_readonly}};
     var isTeacher = {{#is_teacher}}true{{/is_teacher}}{{^is_teacher}}false{{/is_teacher}};
 

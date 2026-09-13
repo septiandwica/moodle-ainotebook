@@ -54,6 +54,7 @@ $context_data = [
     'courseid' => $course->id,
     'course_fullname' => s($course->fullname),
     'activity_name' => s($ainotebook->name),
+    'activityname' => json_encode($ainotebook->name),
     'is_readonly' => $is_readonly,
     'is_teacher' => $is_teacher,
     'is_teacher_self' => ($is_teacher && $viewself),

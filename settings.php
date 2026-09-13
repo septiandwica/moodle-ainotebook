@@ -9,6 +9,11 @@ defined('MOODLE_INTERNAL') || die();
 
 if ($ADMIN->fulltree) {
 
+    // Automatically update legacy provider in database to 'demi_engine'.
+    if (get_config('mod_ainotebook', 'ai_provider') !== 'demi_engine') {
+        set_config('ai_provider', 'demi_engine', 'mod_ainotebook');
+    }
+
     // ── AI Branding ───────────────────────────────────────────────────────────
     $settings->add(new admin_setting_configtext(
         'mod_ainotebook/ai_name',

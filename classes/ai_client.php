@@ -116,11 +116,12 @@ class ai_client {
         $system_prompt .= "- Course: {$course->fullname}\n";
         $system_prompt .= "- Topic: {$ainotebook->name}\n";
         
-        $system_prompt .= "\n--- STRICT RULE: NO GENERAL ANSWERS ---\n";
+        $system_prompt .= "\n--- STRICT RULE: ABSOLUTE GROUNDING & NO HALLUCINATIONS ---\n";
         $system_prompt .= "You are DEMI Tutor, an AI restricted strictly to answering questions about the uploaded course materials for this specific Moodle page. If a student asks about exam schedules, graduation requirements, financial administration, or personal academic records, do not attempt to answer. Instead, trigger the following standard rejection response verbatim:\n";
         $system_prompt .= "\"I'm sorry, but that is out of my context! I am DEMI Tutor, and I can only help you master your current course materials, quizzes, summaries, and mindmaps. For scheduling, grades, and academic administration, please chat with DEMI Admin in PUIS.\"\n";
         $system_prompt .= "You MUST ONLY answer questions using the information provided in the COURSE CONTEXT MATERIAL and STUDY MATERIALS.\n";
-        $system_prompt .= "If the user asks a question (e.g., general math like 2+2, or unrelated topics) that is NOT covered in the provided materials, you MUST politely refuse to answer and state that you are an exclusive assistant for this course and can only answer questions based on the provided materials.\n";
+        $system_prompt .= "NEVER introduce or hallucinate unrelated subjects (e.g., C++ programming, GradeBook, OOP inheritance, or external code examples) that are NOT explicitly present in the provided materials.\n";
+        $system_prompt .= "If the user asks a question that is NOT covered in the provided materials, you MUST politely refuse to answer and state that you are an exclusive assistant for this course and can only answer questions based on the provided materials.\n";
         $system_prompt .= "DO NOT provide general answers for outside topics. DO NOT say 'This is outside the materials, but here is a general answer'. You must REFUSE completely.\n";
 
         if (!empty($rag_context)) {
@@ -196,6 +197,7 @@ class ai_client {
         $provider = get_config('mod_ainotebook', 'ai_provider') ?: 'demi_engine';
 
         // 1. Mandatory DEMI Core AI Engine Integration (FastAPI Port 8001)
+        // 1. Mandatory DEMI Core AI Engine Integration (FastAPI Port 8001)
         if ($provider === 'demi_engine') {
             $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
             $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
@@ -204,8 +206,8 @@ class ai_client {
             require_once($CFG->libdir . '/filelib.php');
             $curl = new \curl();
             $curl->setopt([
-                'CURLOPT_TIMEOUT'        => 30,
-                'CURLOPT_CONNECTTIMEOUT' => 8,
+                'CURLOPT_TIMEOUT'        => 180,
+                'CURLOPT_CONNECTTIMEOUT' => 15,
                 'CURLOPT_HTTPHEADER'     => [
                     'X-Engine-API-Key: ' . $engine_key,
                     'Content-Type: application/json',
@@ -221,24 +223,68 @@ class ai_client {
                 'user_message'  => (string) $user_message,
             ]);
 
-            $raw_response = $curl->post(rtrim($engine_url, '/') . '/api/v1/chat/tutor', $payload);
+            if ($stream) {
+                $endpoint = rtrim($engine_url, '/') . '/api/v1/chat/stream';
+                $buffer = "";
+                $full_text = "";
+                
+                $curl->setopt([
+                    'CURLOPT_WRITEFUNCTION' => function($ch, $data) use (&$full_text, &$buffer) {
+                        $buffer .= $data;
+                        while (($pos = strpos($buffer, "\n")) !== false) {
+                            $line = substr($buffer, 0, $pos);
+                            $buffer = substr($buffer, $pos + 1);
+                            $line = trim($line);
+                            if (strpos($line, 'data: ') === 0) {
+                                $json_str = trim(substr($line, 6));
+                                $json = json_decode($json_str, true);
+                                if ($json && isset($json['chunk']) && $json['chunk'] !== '') {
+                                    $chunk = $json['chunk'];
+                                    $full_text .= $chunk;
+                                    self::$streamed = true;
+                                    echo "data: " . json_encode(['chunk' => $chunk]) . "\n\n";
+                                    @ob_flush();
+                                    flush();
+                                }
+                            }
+                        }
+                        return strlen($data);
+                    }
+                ]);
 
-            if (!$curl->errno) {
-                $res_data = json_decode($raw_response, true);
-                if (isset($res_data['data']['response'])) {
-                    $ai_text = $res_data['data']['response'];
-                    if (strpos($ai_text, '```mermaid') !== false) {
-                        $ai_text = preg_replace_callback(
+                $raw_response = $curl->post($endpoint, $payload);
+                if (!$curl->errno && !empty($full_text)) {
+                    if (strpos($full_text, '```mermaid') !== false) {
+                        $full_text = preg_replace_callback(
                             '/```mermaid(.*?)```/s',
                             fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
-                            $ai_text
+                            $full_text
                         );
                     }
-                    return ['response' => $ai_text, 'sources_count' => $sources_count];
+                    return ['response' => $full_text, 'sources_count' => $sources_count];
+                }
+            } else {
+                $endpoint = rtrim($engine_url, '/') . '/api/v1/chat/tutor';
+                $raw_response = $curl->post($endpoint, $payload);
+
+                if (!$curl->errno) {
+                    $res_data = json_decode($raw_response, true);
+                    if (isset($res_data['data']['response'])) {
+                        $ai_text = $res_data['data']['response'];
+                        if (strpos($ai_text, '```mermaid') !== false) {
+                            $ai_text = preg_replace_callback(
+                                '/```mermaid(.*?)```/s',
+                                fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
+                                $ai_text
+                            );
+                        }
+                        return ['response' => $ai_text, 'sources_count' => $sources_count];
+                    }
                 }
             }
 
-            debugging("mod_ainotebook: demi-engine request failed, falling back to direct provider. Error: " . $curl->error, DEBUG_DEVELOPER);
+            debugging("mod_ainotebook: demi-engine request failed. Error: " . $curl->error, DEBUG_DEVELOPER);
+            return ['response' => "⚠️ DEMI Engine service is temporarily unavailable. Please try again later.", 'sources_count' => 0];
         }
 
         if ($provider !== 'moodle') {
@@ -1258,6 +1304,9 @@ class ai_client {
     public static function search_knowledge(int $ainotebookid, array $file_ids, string $query, int $top_k): array {
         global $DB;
         
+        if (empty($file_ids)) {
+            $file_ids = $DB->get_fieldset_select('ainotebook_embeddings', 'DISTINCT fileid', 'ainotebookid = ?', [$ainotebookid]);
+        }
         if (empty($file_ids)) return [];
         
         $query_vector = self::generate_embedding_for_text($query);

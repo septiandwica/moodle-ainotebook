@@ -708,7 +708,7 @@
 
             // 3. Check for SUMMARY.
             if (!found) {
-                var summaryMatch = text.match(/\[SUMMARY_START\]([\s\S]*?)\[SUMMARY_END\]/);
+                var summaryMatch = text.match(/\[(?:SUMMARY|REPORT)_START\]([\s\S]*?)\[(?:SUMMARY|REPORT)_END\]/);
                 if (summaryMatch) {
                     artType = "summary";
                     artifact = { type: "summary", data: summaryMatch[1].trim(), title: "Summary - " + new Date().toLocaleTimeString() };
@@ -1328,46 +1328,60 @@
                         }
                     }, 30);
                     
+                    var isFinalized = false;
+                    function finalizeCompletion() {
+                        if (isFinalized) return;
+                        isFinalized = true;
+                        
+                        clearInterval(typeInterval);
+                        if (loadingInterval) clearInterval(loadingInterval);
+                        if (typing && typing.parentNode) messages.removeChild(typing);
+                        
+                        input.disabled = false;
+                        sendBtn.disabled = false;
+                        input.focus();
+                        
+                        if (!aiMsgDiv) {
+                            addMessage("No response received from the AI.", "ai");
+                            return;
+                        }
+                        
+                        try {
+                            var result = detectAndRenderArtifacts(fullText, "ai", true);
+                            var displayMsg = result.cleanText;
+                            
+                            // Extract suggestions tag from AI response
+                            var sugMatch = displayMsg.match(/<suggestions>([\s\S]*?)<\/suggestions>/i);
+                            var extractedSuggestions = [];
+                            if (sugMatch) {
+                                var suggestionsStr = sugMatch[1];
+                                extractedSuggestions = suggestionsStr.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+                                displayMsg = displayMsg.replace(sugMatch[0], "").trim();
+                            }
+                            
+                            if (result.found) {
+                                displayMsg += "\n\n*(I have also generated a " + result.type + " for you in the Creator section below)*";
+                            }
+                            if (sourcesCount > 0) {
+                                displayMsg += "\n\n<div class=\"context-source-badge\"><i class=\"fa fa-check-circle\"></i> Smart Context: Answer is generated using " + sourcesCount + " relevant material sources.</div>";
+                            }
+                            
+                            if (contentDiv) {
+                                contentDiv.innerHTML = window.marked.parse(displayMsg);
+                            }
+                            
+                            if (extractedSuggestions.length > 0) {
+                                renderSuggestions(extractedSuggestions, aiMsgDiv);
+                            }
+                        } catch (err) {
+                            console.error("Error finalizing stream completion:", err);
+                        }
+                    }
+                    
                     function read() {
                         reader.read().then(function({done, value}) {
                             if (done) {
-                                clearInterval(typeInterval);
-                                if (loadingInterval) clearInterval(loadingInterval);
-                                if (typing && typing.parentNode) messages.removeChild(typing);
-                                
-                                input.disabled = false;
-                                sendBtn.disabled = false;
-                                input.focus();
-                                
-                                if (!aiMsgDiv) {
-                                    addMessage("No response received from the AI.", "ai");
-                                    return;
-                                }
-                                
-                                var result = detectAndRenderArtifacts(fullText, "ai", true);
-                                var displayMsg = result.cleanText;
-                                
-                                // Extract suggestions tag from AI response
-                                var sugMatch = displayMsg.match(/<suggestions>([\s\S]*?)<\/suggestions>/i);
-                                var extractedSuggestions = [];
-                                if (sugMatch) {
-                                    var suggestionsStr = sugMatch[1];
-                                    extractedSuggestions = suggestionsStr.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
-                                    displayMsg = displayMsg.replace(sugMatch[0], "").trim();
-                                }
-                                
-                                if (result.found) {
-                                    displayMsg += "\n\n*(I have also generated a " + result.type + " for you in the Creator section below)*";
-                                }
-                                if (sourcesCount > 0) {
-                                    displayMsg += "\n\n<div class=\"context-source-badge\"><i class=\"fa fa-check-circle\"></i> Smart Context: Answer is generated using " + sourcesCount + " relevant material sources.</div>";
-                                }
-                                
-                                contentDiv.innerHTML = window.marked.parse(displayMsg);
-                                
-                                if (extractedSuggestions.length > 0) {
-                                    renderSuggestions(extractedSuggestions, aiMsgDiv);
-                                }
+                                finalizeCompletion();
                                 return;
                             }
                             
@@ -1402,6 +1416,9 @@
                                         if (data.sources_count !== undefined) {
                                             sourcesCount = data.sources_count;
                                         }
+                                        if (data.done) {
+                                            finalizeCompletion();
+                                        }
                                     } catch (e) {
                                         console.error("JSON parse error on line: ", line, e);
                                     }
@@ -1410,12 +1427,17 @@
                             read();
                         }).catch(function(error) {
                             console.error("Stream reading error:", error);
-                            clearInterval(typeInterval);
-                            if (loadingInterval) clearInterval(loadingInterval);
-                            if (typing && typing.parentNode) messages.removeChild(typing);
-                            input.disabled = false;
-                            sendBtn.disabled = false;
-                            addMessage("Error reading AI stream.", "ai");
+                            if (fullText && fullText.length > 0) {
+                                // If response was already received, finalize stream gracefully without showing false error
+                                finalizeCompletion();
+                            } else {
+                                clearInterval(typeInterval);
+                                if (loadingInterval) clearInterval(loadingInterval);
+                                if (typing && typing.parentNode) messages.removeChild(typing);
+                                input.disabled = false;
+                                sendBtn.disabled = false;
+                                addMessage("Error reading AI stream.", "ai");
+                            }
                         });
                     }
                     read();

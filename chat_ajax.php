@@ -139,6 +139,9 @@ if ($action === 'submit_quiz_grade') {
 
 // --- SSE STREAMING ACTION ---
 if ($action === 'chat_stream') {
+    @set_time_limit(300);
+    @ini_set('display_errors', '0');
+    
     $message = required_param('message', PARAM_TEXT);
     $selected_files = optional_param('selected_files', '[]', PARAM_RAW);
     $file_ids = json_decode($selected_files, true) ?: [];
@@ -171,38 +174,42 @@ if ($action === 'chat_stream') {
     echo str_repeat(' ', 2048) . "\n";
     flush();
     
-    // Send initial metadata chunk (like sources_count)
-    // We will do a quick non-streaming pre-fetch for sources? No, get_response handles sources internally.
-    // get_response with stream=true will output chunks via curl callback directly!
-    $result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config, true);
-    
-    $response_text = $result['response'] ?? "";
-    $sources_count = $result['sources_count'] ?? 0;
-    
-    if (!\mod_ainotebook\ai_client::was_streamed()) {
-        echo "data: " . json_encode(['chunk' => $response_text]) . "\n\n";
+    try {
+        $result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config, true);
+        
+        $response_text = $result['response'] ?? "";
+        $sources_count = $result['sources_count'] ?? 0;
+        
+        if (!\mod_ainotebook\ai_client::was_streamed()) {
+            echo "data: " . json_encode(['chunk' => $response_text]) . "\n\n";
+            @ob_flush();
+            flush();
+        }
+        
+        // Send final metadata chunk
+        echo "data: " . json_encode(['sources_count' => $sources_count, 'done' => true]) . "\n\n";
         @ob_flush();
         flush();
-    }
-    
-    // Send final metadata chunk
-    echo "data: " . json_encode(['sources_count' => $sources_count, 'done' => true]) . "\n\n";
-    @ob_flush();
-    flush();
-    
-    $silent = optional_param('silent', 0, PARAM_INT);
-    if (!$silent && !empty($response_text)) {
-        // Log token usage
-        $total_tokens = $estimated_input_tokens + \mod_ainotebook\rate_limiter::estimate_tokens($response_text);
-        \mod_ainotebook\rate_limiter::log_request($USER->id, $total_tokens);
+        
+        $silent = optional_param('silent', 0, PARAM_INT);
+        if (!$silent && !empty($response_text)) {
+            // Log token usage
+            $total_tokens = $estimated_input_tokens + \mod_ainotebook\rate_limiter::estimate_tokens($response_text);
+            \mod_ainotebook\rate_limiter::log_request($USER->id, $total_tokens);
 
-        $log = new stdClass();
-        $log->ainotebookid = $cm->instance;
-        $log->userid = $USER->id;
-        $log->message = $message;
-        $log->response = $response_text;
-        $log->timecreated = time();
-        $DB->insert_record('ainotebook_chat', $log);
+            $log = new stdClass();
+            $log->ainotebookid = $cm->instance;
+            $log->userid = $USER->id;
+            $log->message = $message;
+            $log->response = $response_text;
+            $log->timecreated = time();
+            $DB->insert_record('ainotebook_chat', $log);
+        }
+    } catch (\Throwable $e) {
+        echo "data: " . json_encode(['chunk' => "⚠️ Error processing request: " . $e->getMessage()]) . "\n\n";
+        echo "data: " . json_encode(['done' => true]) . "\n\n";
+        @ob_flush();
+        flush();
     }
     exit;
 }

@@ -949,17 +949,47 @@
                             var percent = (score / data.questions.length) * 100;
                             var feedback = "Keep Learning!";
                             var desc = "Every mistake is a step forward. Review the materials and try again to master the topic.";
+                            var iconClass = "fa-lightbulb-o";
+                            var badgeColor = "#3b82f6";
+                            
                             if (percent >= 100) {
                                 feedback = "Excellent!";
                                 desc = "Perfect score! You have a solid understanding of the materials. Well done!";
+                                iconClass = "fa-trophy";
+                                badgeColor = "#eab308";
                             } else if (percent >= 80) {
                                 feedback = "Great Job!";
                                 desc = "You've mastered most of the concepts. Just a few details left to polish!";
+                                iconClass = "fa-star";
+                                badgeColor = "#10b981";
                             } else if (percent >= 60) {
                                 feedback = "Good Progress!";
                                 desc = "You're on the right track. A quick review of the material should get you to the top.";
+                                iconClass = "fa-thumbs-up";
+                                badgeColor = "#3b82f6";
                             }
                             
+                            container.innerHTML = '<div class="quiz-score-card">' +
+                                '<div class="quiz-result-header-badge" style="background:' + badgeColor + '20; color:' + badgeColor + ';">' +
+                                    '<i class="fa ' + iconClass + '"></i> ' + Math.round(percent) + '% Score' +
+                                '</div>' +
+                                '<div class="score-circle-wrapper">' +
+                                    '<svg viewBox="0 0 36 36" class="circular-chart-premium">' +
+                                        '<path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />' +
+                                        '<path class="circle-progress" stroke-dasharray="' + Math.round(percent) + ', 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />' +
+                                    '</svg>' +
+                                    '<div class="score-number-display">' +
+                                        '<span class="score-val">' + score + '</span>' +
+                                        '<span class="score-max">/' + data.questions.length + '</span>' +
+                                    '</div>' +
+                                '</div>' +
+                                '<h3 class="quiz-feedback-title">' + feedback + '</h3>' +
+                                '<p class="quiz-feedback-desc">' + desc + '</p>' +
+                                '<div class="quiz-result-actions">' +
+                                    '<button class="btn-retake-quiz" onclick="window.renderHistoryItem(window.lastRenderedIdx)"><i class="fa fa-refresh"></i> Retake Quiz</button>' +
+                                '</div>' +
+                            '</div>';
+
                             /* Send score to Gradebook */
                             if (!isReadonly) {
                                 var formData = new FormData();
@@ -973,29 +1003,14 @@
                                     body: formData
                                 }).then(r => r.json()).then(res => {
                                     if(res.success) {
-                                        var p = document.createElement("p");
-                                        p.className = "gradebook-sync-msg";
-                                        p.style.color = "#00d084";
-                                        p.style.fontWeight = "bold";
-                                        p.style.marginTop = "10px";
-                                        p.innerHTML = "<i class=\'fa fa-check-circle\'></i> Score synchronized with Gradebook!";
-                                        container.querySelector(".quiz-score-container").appendChild(p);
+                                        var div = document.createElement("div");
+                                        div.className = "gradebook-sync-msg";
+                                        div.innerHTML = "<i class=\'fa fa-check-circle\'></i> Score synchronized with Gradebook!";
+                                        var actionsDiv = container.querySelector(".quiz-result-actions");
+                                        if (actionsDiv) actionsDiv.appendChild(div);
                                     }
                                 });
                             }
-                            
-                            container.innerHTML = '<div class="quiz-score-container text-center">' +
-                                '<div class="score-circle">' +
-                                    '<svg viewBox="0 0 36 36" class="circular-chart">' +
-                                        '<path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />' +
-                                        '<path class="circle" stroke-dasharray="' + percent + ', 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />' +
-                                    '</svg>' +
-                                    '<div class="score-text">' + score + '/' + data.questions.length + '</div>' +
-                                '</div>' +
-                                '<h3>' + feedback + '</h3>' +
-                                '<p class="text-muted" style="margin-bottom:20px;">' + desc + '</p>' +
-                                '<button class="btn-outline" onclick="window.renderHistoryItem(window.lastRenderedIdx)"><i class="fa fa-refresh"></i> Retake Quiz</button>' +
-                            '</div>';
                         }
                     };
                     qDiv.appendChild(nextBtn);

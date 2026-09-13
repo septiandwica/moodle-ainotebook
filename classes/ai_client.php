@@ -284,8 +284,15 @@ class ai_client {
                 }
             }
 
+            // Automatic Fallback: If demi-engine is unhosted or unreachable, fall back to direct provider (gemini/groq/openai)
+            $apikey = get_config('mod_ainotebook', 'api_key');
+            if (!empty($apikey)) {
+                $fallback_provider = get_config('mod_ainotebook', 'ai_provider_fallback') ?: 'gemini';
+                return ['response' => self::custom_provider_request($fallback_provider, $system_prompt, $user_message, $history ? array_reverse($history) : [], $binaries, $stream), 'sources_count' => $sources_count];
+            }
+
             debugging("mod_ainotebook: demi-engine request failed. Error: " . $curl->error, DEBUG_DEVELOPER);
-            return ['response' => "⚠️ DEMI Engine service is temporarily unavailable. Please try again later.", 'sources_count' => 0];
+            return ['response' => "⚠️ DEMI Engine service is temporarily unavailable. Please set an API Key in Site Administration > Activity Modules > AI Notebook.", 'sources_count' => 0];
         }
 
         if ($provider !== 'moodle') {

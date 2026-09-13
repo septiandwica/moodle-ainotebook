@@ -175,10 +175,10 @@ if ($action === 'chat_stream') {
     $config_raw = optional_param('config', '[]', PARAM_RAW);
     $config = json_decode($config_raw, true) ?: [];
     
-    // Check rate limits
+    // Check rate limits & trial limits
     try {
         $estimated_input_tokens = \mod_ainotebook\rate_limiter::estimate_tokens($message);
-        \mod_ainotebook\rate_limiter::enforce_limits($USER->id, $estimated_input_tokens);
+        \mod_ainotebook\rate_limiter::enforce_limits($USER->id, $estimated_input_tokens, $course);
     } catch (\Exception $e) {
         header('Content-Type: text/event-stream');
         header('Cache-Control: no-cache');

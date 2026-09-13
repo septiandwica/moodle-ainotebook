@@ -118,4 +118,20 @@ if ($ADMIN->fulltree) {
         '4000',
         PARAM_INT
     ));
+
+    $settings->add(new admin_setting_configtext(
+        'mod_ainotebook/limit_trial_rpd',
+        'Trial / Candidate Student Daily Limit (RPD)',
+        'Maximum number of chat questions a trial or candidate student can ask per 24 hours (default: 10 questions/day).',
+        '10',
+        PARAM_INT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'mod_ainotebook/trial_category_id',
+        'Trial Course Category ID',
+        'The Moodle Course Category ID designated for trial courses (default: Category 11).',
+        '11',
+        PARAM_INT
+    ));
 }

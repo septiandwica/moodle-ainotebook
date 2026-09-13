@@ -350,6 +350,22 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: s
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.session-history-card.active {
+    border-color: #2563eb;
+    background: #eff6ff;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+.session-history-card.active .session-snippet {
+    color: #1e3a8a;
+    font-weight: 700;
+}
+.session-msg-count {
+    display: inline-block;
+    font-size: 0.65rem;
+    color: #64748b;
+    font-weight: 600;
+    margin-top: 4px;
+}
 
 .empty-history-notice {
     text-align: center;

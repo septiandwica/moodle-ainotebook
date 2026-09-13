@@ -55,7 +55,7 @@
         <div id="ainotebook-sidebar-nav" class="ainotebook-sidebar">
             <div class="sidebar-tab-header">
                 <button type="button" class="tab-btn active" data-tab="history-panel" onclick="window.switchSidebarTab('history-panel', this)">
-                    <i class="fa fa-clock-o"></i> History ({{history_count}})
+                    <i class="fa fa-clock-o"></i> History ({{sessions_count}})
                 </button>
                 <button type="button" class="tab-btn" data-tab="syllabus-panel" onclick="window.switchSidebarTab('syllabus-panel', this)">
                     <i class="fa fa-book"></i> Syllabus ({{files_count}})
@@ -65,32 +65,33 @@
                 </button>
             </div>
 
-            <!-- Tab 1: History Panel -->
+            <!-- Tab 1: History Panel (Session Threads) -->
             <div id="history-panel" class="sidebar-tab-content active">
                 <div class="history-scope-bar">
                     <div class="scope-info">
                         <span class="scope-label">History Scope:</span>
                         <span class="scope-course">{{course_fullname}}</span>
                     </div>
-                    <button class="btn-link-sm" onclick="window.location.reload()"><i class="fa fa-refresh"></i> Refresh</button>
+                    <button class="btn-link-sm" onclick="window.refreshSessionsList()"><i class="fa fa-refresh"></i> Refresh</button>
                 </div>
-                <div class="session-history-list">
-                    {{#history}}
-                    <div class="session-history-card" onclick="window.sendSuggested('{{{snippet}}}', null)">
+                <div class="session-history-list" id="session-history-list">
+                    {{#sessions}}
+                    <div class="session-history-card {{#is_active}}active{{/is_active}}" data-session-id="{{session_id}}" onclick="window.loadSession('{{session_id}}', this)">
                         <div class="session-card-header">
                             <span class="session-course-tag">{{course_fullname}}</span>
                             <span class="session-time-ago">{{rel_time}}</span>
                         </div>
-                        <p class="session-snippet">"{{snippet}}"</p>
+                        <p class="session-snippet">{{title}}</p>
+                        <span class="session-msg-count"><i class="fa fa-comments-o"></i> {{message_count}} messages</span>
                     </div>
-                    {{/history}}
-                    {{^history}}
+                    {{/sessions}}
+                    {{^sessions}}
                     <div class="empty-history-notice">
                         <i class="fa fa-comments-o"></i>
-                        <p>No past chat threads found.</p>
+                        <p>No past chat sessions found.</p>
                         <span class="subtext">Start asking questions below!</span>
                     </div>
-                    {{/history}}
+                    {{/sessions}}
                 </div>
             </div>
 
@@ -249,22 +250,21 @@
                     </div>
                 </div>
 
-                {{#history}}
+                {{#initial_messages}}
                 <div class="message user">
                     <div class="message-bubble-body">
                         <div class="message-meta-header"><span class="meta-author">{{target_fullname}}</span>{{#time}}<span class="meta-time">{{time}}</span>{{/time}}</div>
-                        <div class="message-text">{{{message}}}</div>
+                        <div class="message-text">{{{user_message}}}</div>
                     </div>
                 </div>
                 <div class="message ai">
                     <div class="ai-avatar-icon">DEMI</div>
                     <div class="message-bubble-body">
                         <div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span>{{#time}}<span class="meta-time">{{time}}</span>{{/time}}</div>
-                        <div class="message-text"><div class="markdown-body">{{{response}}}</div></div>
+                        <div class="message-text"><div class="markdown-body">{{{ai_response}}}</div></div>
                     </div>
                 </div>
-                {{{suggestions_html}}}
-                {{/history}}
+                {{/initial_messages}}
             </div>
 
             <div class="input-wrapper-container">
@@ -470,36 +470,140 @@
         });
     };
 
-    window.startNewSession = function() {
-        var messages = document.getElementById("chat-messages");
-        if (messages) {
-            var initialAi = messages.querySelector('.message.ai');
-            messages.innerHTML = '';
-            if (initialAi) {
-                messages.appendChild(initialAi.cloneNode(true));
-            }
-        }
-        var input = document.getElementById("chat-input");
-        if (input) {
-            input.value = '';
-            input.focus();
-        }
-        require(['core/notification'], function(Notification) {
-            Notification.addNotification({
-                message: 'New Tutoring Session Started! Active discussion thread cleared.',
-                type: 'info'
-            });
-        });
-    };
+        var currentSessionId = "{{active_session_id}}" || null;
 
-    window.sendSuggested = function(text, toolType = null) {
-        var input = document.getElementById("chat-input");
-        if (input) {
-            input.value = text;
-            var btn = document.getElementById("send-btn");
-            if (btn) btn.click();
-        }
-    };
+        window.startNewSession = function() {
+            currentSessionId = "sess_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
+            var messages = document.getElementById("chat-messages");
+            if (messages) {
+                var welcomeHTML = '<div class="message ai welcome-msg">' +
+                    '<div class="ai-avatar-icon">DEMI</div>' +
+                    '<div class="message-bubble-body">' +
+                        '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span></div>' +
+                        '<div class="message-text">' +
+                            'Hello <strong>' + studentFirstName + '</strong>! I am your DEMI AI Academic Tutor for <strong>' + courseFullname + '</strong>.<br><br>' +
+                            'I am connected to your lecture modules, presentation slides, and syllabus on E-Campus. Ask any questions about concepts, or trigger a study tool below!' +
+                            '<div class="study-tools-inline-box">' +
+                                '<span class="tools-title">Study Tools:</span>' +
+                                '<div class="tools-chips-group">' +
+                                    '<button class="study-tool-chip" onclick="window.sendSuggested(\'Generate an interactive quiz from my materials.\', \'quiz\')">📝 Interactive Quiz</button>' +
+                                    '<button class="study-tool-chip" onclick="window.sendSuggested(\'Generate a concept mindmap structure.\', \'mindmap\')">📊 Concept Mindmap</button>' +
+                                    '<button class="study-tool-chip" onclick="window.sendSuggested(\'Generate a detailed study summary.\', \'summary\')">📄 Study Summary</button>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+                messages.innerHTML = welcomeHTML;
+            }
+            document.querySelectorAll("#session-history-list .session-history-card").forEach(function(el) {
+                el.classList.remove("active");
+            });
+            var input = document.getElementById("chat-input");
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+            require(['core/notification'], function(Notification) {
+                Notification.addNotification({
+                    message: 'New Tutoring Session Started! Active discussion thread cleared.',
+                    type: 'info'
+                });
+            });
+        };
+
+        window.loadSession = function(sessionId, cardEl) {
+            if (!sessionId) return;
+            currentSessionId = sessionId;
+
+            document.querySelectorAll("#session-history-list .session-history-card").forEach(function(el) {
+                el.classList.remove("active");
+            });
+            if (cardEl) cardEl.classList.add("active");
+
+            var messages = document.getElementById("chat-messages");
+            if (messages) {
+                messages.innerHTML = '<div class="message ai typing"><i class="fa fa-circle-o-notch fa-spin"></i> Loading session messages...</div>';
+            }
+
+            fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?cmid=" + cmid + "&action=fetch_session_messages&session_id=" + encodeURIComponent(sessionId) + "&sesskey=" + sesskey)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success && d.messages && messages) {
+                    var html = '<div class="message ai welcome-msg">' +
+                        '<div class="ai-avatar-icon">DEMI</div>' +
+                        '<div class="message-bubble-body">' +
+                            '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span></div>' +
+                            '<div class="message-text">Session loaded. Continue your discussion below!</div>' +
+                        '</div>' +
+                    '</div>';
+
+                    d.messages.forEach(function(m) {
+                        var parsedUser = m.user_message.replace(/\n/g, '<br>');
+                        var parsedAi = (typeof marked !== 'undefined') ? marked.parse(m.ai_response) : m.ai_response.replace(/\n/g, '<br>');
+
+                        html += '<div class="message user">' +
+                            '<div class="message-bubble-body">' +
+                                '<div class="message-meta-header"><span class="meta-author">' + studentName + '</span><span class="meta-time">' + m.time + '</span></div>' +
+                                '<div class="message-text">' + parsedUser + '</div>' +
+                            '</div>' +
+                        '</div>';
+
+                        html += '<div class="message ai">' +
+                            '<div class="ai-avatar-icon">DEMI</div>' +
+                            '<div class="message-bubble-body">' +
+                                '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span><span class="meta-time">' + m.time + '</span></div>' +
+                                '<div class="message-text"><div class="markdown-body">' + parsedAi + '</div></div>' +
+                            '</div>' +
+                        '</div>';
+                    });
+
+                    messages.innerHTML = html;
+                    scanHistoryForArtifacts();
+                    messages.scrollTop = messages.scrollHeight;
+                }
+            })
+            .catch(function(err) {
+                console.error("Error loading session:", err);
+            });
+        };
+
+        window.refreshSessionsList = function() {
+            fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?cmid=" + cmid + "&action=fetch_sessions&sesskey=" + sesskey)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success && d.sessions) {
+                    var container = document.getElementById("session-history-list");
+                    if (!container) return;
+                    if (d.sessions.length === 0) {
+                        container.innerHTML = '<div class="empty-history-notice"><i class="fa fa-comments-o"></i><p>No past chat sessions found.</p><span class="subtext">Start asking questions below!</span></div>';
+                        return;
+                    }
+                    var html = '';
+                    d.sessions.forEach(function(s) {
+                        var isActive = s.session_id === currentSessionId ? ' active' : '';
+                        html += '<div class="session-history-card' + isActive + '" data-session-id="' + s.session_id + '" onclick="window.loadSession(\'' + s.session_id + '\', this)">' +
+                            '<div class="session-card-header">' +
+                                '<span class="session-course-tag">' + s.course_fullname + '</span>' +
+                                '<span class="session-time-ago">' + s.rel_time + '</span>' +
+                            '</div>' +
+                            '<p class="session-snippet">' + s.title + '</p>' +
+                            '<span class="session-msg-count"><i class="fa fa-comments-o"></i> ' + s.message_count + ' messages</span>' +
+                        '</div>';
+                    });
+                    container.innerHTML = html;
+                }
+            });
+        };
+
+        window.sendSuggested = function(text, toolType = null) {
+            var input = document.getElementById("chat-input");
+            if (input) {
+                input.value = text;
+                var btn = document.getElementById("send-btn");
+                if (btn) btn.click();
+            }
+        };
 
     window.openMoodleQuizGenerator = function() {
         var modal = document.getElementById("moodle-quiz-modal");
@@ -1176,6 +1280,9 @@
             formData.append("sesskey", sesskey);
             formData.append("selected_files", JSON.stringify(selectedFiles));
             formData.append("silent", silent ? 1 : 0);
+            if (currentSessionId) {
+                formData.append("session_id", currentSessionId);
+            }
             
             var savedConfig = localStorage.getItem("ainotebook_config") || "{}";
             formData.append("config", savedConfig);
@@ -1335,6 +1442,10 @@
                                         }
                                         if (data.sources_count !== undefined) {
                                             sourcesCount = data.sources_count;
+                                        }
+                                        if (data.session_id) {
+                                            currentSessionId = data.session_id;
+                                            refreshSessionsList();
                                         }
                                         if (data.done) {
                                             finalizeCompletion();

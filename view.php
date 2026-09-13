@@ -315,44 +315,37 @@ foreach ($sections_data_map as $secnum => $secData) {
 $context_data['syllabus_sections'] = $sections_data;
 $context_data['files_count'] = count($sections_data);
 
-// Format history array
-$history = \mod_ainotebook\ai_client::get_unified_history($cm->id, $target_user->id);
-$history_data = [];
+// Format sessions history array
+$sessions = \mod_ainotebook\ai_client::get_sessions($cm->id, $target_user->id);
+$active_session_id = '';
+$initial_messages = [];
 
-foreach ($history as $index => $log) {
-    $clean_response = preg_replace('/```json-quiz[\s\S]*?```/', '', $log->response);
-    $clean_response = preg_replace('/```mermaid[\s\S]*?```/', '', $clean_response);
-    $clean_response = preg_replace('/\[REPORT_START\][\s\S]*?\[REPORT_END\]/', '', $clean_response);
-    $clean_response = trim($clean_response);
-    if (empty($clean_response)) $clean_response = "I have generated the requested material below.";
-    $time_str = !empty($log->timecreated) ? date('h:i A', $log->timecreated) : date('h:i A');
-
-    $diff = time() - (!empty($log->timecreated) ? $log->timecreated : time());
-    if ($diff < 60) {
-        $rel_time = 'Just now';
-    } elseif ($diff < 3600) {
-        $mins = max(1, floor($diff / 60));
-        $rel_time = $mins . ($mins == 1 ? ' minute ago' : ' minutes ago');
-    } elseif ($diff < 86400) {
-        $hours = floor($diff / 3600);
-        $rel_time = $hours . ($hours == 1 ? ' hour ago' : ' hours ago');
-    } else {
-        $days = floor($diff / 86400);
-        $rel_time = $days . ($days == 1 ? ' day ago' : ' days ago');
+if (!empty($sessions)) {
+    $active_session_id = $sessions[0]['session_id'];
+    $sessions[0]['is_active'] = true;
+    $raw_msgs = \mod_ainotebook\ai_client::get_session_messages($cm->id, $target_user->id, $active_session_id);
+    foreach ($raw_msgs as $m) {
+        $clean_resp = preg_replace('/```json-quiz[\s\S]*?```/', '', $m['ai_response']);
+        $clean_resp = preg_replace('/```mermaid[\s\S]*?```/', '', $clean_resp);
+        $clean_resp = preg_replace('/\[REPORT_START\][\s\S]*?\[REPORT_END\]/', '', $clean_resp);
+        $clean_resp = trim($clean_resp);
+        if (empty($clean_resp)) $clean_resp = "I have generated the requested material below.";
+        
+        $initial_messages[] = [
+            'user_message' => nl2br(s($m['user_message'])),
+            'ai_response' => nl2br($clean_resp),
+            'raw_user' => $m['user_message'],
+            'raw_ai' => $m['ai_response'],
+            'time' => $m['time']
+        ];
     }
-
-    $snippet = !empty($log->message) ? s($log->message) : 'Discussion session';
-
-    $history_data[] = [
-        'message' => nl2br(s($log->message)),
-        'response' => nl2br($clean_response),
-        'time' => $time_str,
-        'rel_time' => $rel_time,
-        'snippet' => $snippet
-    ];
 }
-$context_data['history'] = $history_data;
-$context_data['history_count'] = count($history_data);
+
+$context_data['sessions'] = $sessions;
+$context_data['sessions_count'] = count($sessions);
+$context_data['active_session_id'] = $active_session_id;
+$context_data['initial_messages'] = $initial_messages;
+
 
 $saved_artifacts = $DB->get_records('ainotebook_artifacts', ['ainotebookid' => $ainotebook->id, 'userid' => $target_user->id], 'timecreated DESC');
 $context_data['saved_json'] = json_encode(array_values($saved_artifacts));

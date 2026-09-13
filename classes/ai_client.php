@@ -384,6 +384,112 @@ class ai_client {
         return array_values($local_history);
     }
 
+    /**
+     * Ensure session_id column exists in ainotebook_chat table.
+     */
+    public static function ensure_session_id_field(): void {
+        global $DB;
+        $dbman = $DB->get_manager();
+        $table = new \xmldb_table('ainotebook_chat');
+        $field = new \xmldb_field('session_id', XMLDB_TYPE_CHAR, '64', null, null, null, null);
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+    }
+
+    /**
+     * Get list of chat sessions for a user, grouped by session_id.
+     */
+    public static function get_sessions(int $cmid, int $userid): array {
+        global $DB;
+        self::ensure_session_id_field();
+        $cm = self::get_cm_safe($cmid);
+        $course = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
+
+        // Backfill legacy records if any exist without session_id
+        $empty_records = $DB->get_records_select('ainotebook_chat', "ainotebookid = ? AND userid = ? AND (session_id IS NULL OR session_id = '')", [$cm->instance, $userid], 'timecreated ASC');
+        if (!empty($empty_records)) {
+            $current_sess = '';
+            $last_time = 0;
+            foreach ($empty_records as $rec) {
+                if (empty($current_sess) || ($rec->timecreated - $last_time > 1800)) {
+                    $current_sess = 'sess_' . $rec->userid . '_' . $rec->timecreated;
+                }
+                $DB->set_field('ainotebook_chat', 'session_id', $current_sess, ['id' => $rec->id]);
+                $last_time = $rec->timecreated;
+            }
+        }
+
+        $records = $DB->get_records_sql("
+            SELECT session_id,
+                   MIN(id) AS first_id,
+                   MAX(timecreated) AS last_timecreated,
+                   COUNT(*) AS msg_count
+              FROM {ainotebook_chat}
+             WHERE ainotebookid = :ainotebookid AND userid = :userid AND session_id IS NOT NULL AND session_id != ''
+          GROUP BY session_id
+          ORDER BY last_timecreated DESC
+        ", ['ainotebookid' => $cm->instance, 'userid' => $userid]);
+
+        $sessions = [];
+        foreach ($records as $r) {
+            $first_msg = $DB->get_record('ainotebook_chat', ['id' => $r->first_id]);
+            $title = 'Tutoring Session';
+            if ($first_msg && !empty($first_msg->message)) {
+                $raw_title = trim(strip_tags($first_msg->message));
+                $raw_title = preg_replace('/```[\s\S]*?```/', '', $raw_title);
+                $title = strlen($raw_title) > 50 ? substr($raw_title, 0, 47) . '...' : $raw_title;
+                if (empty($title)) $title = 'Tutoring Session';
+            }
+
+            $diff = time() - $r->last_timecreated;
+            if ($diff < 60) $rel_time = 'Just now';
+            elseif ($diff < 3600) $rel_time = floor($diff / 60) . ' mins ago';
+            elseif ($diff < 86400) $rel_time = floor($diff / 3600) . ' hours ago';
+            else $rel_time = floor($diff / 86400) . ' days ago';
+
+            $sessions[] = [
+                'session_id'      => $r->session_id,
+                'course_fullname' => s($course->fullname),
+                'title'           => s($title),
+                'time'            => date('h:i A', $r->last_timecreated),
+                'rel_time'        => $rel_time,
+                'message_count'   => (int) $r->msg_count,
+                'updated_at_ts'   => $r->last_timecreated
+            ];
+        }
+        return $sessions;
+    }
+
+    /**
+     * Get messages belonging to a specific session_id.
+     */
+    public static function get_session_messages(int $cmid, int $userid, string $session_id): array {
+        global $DB;
+        self::ensure_session_id_field();
+        $cm = self::get_cm_safe($cmid);
+
+        $records = $DB->get_records('ainotebook_chat', [
+            'ainotebookid' => $cm->instance,
+            'userid' => $userid,
+            'session_id' => $session_id
+        ], 'timecreated ASC');
+
+        $messages = [];
+        foreach ($records as $r) {
+            $clean_response = preg_replace('/<script[\s\S]*?<\/script>/i', '', $r->response);
+            $messages[] = [
+                'id'           => $r->id,
+                'user_message' => $r->message,
+                'ai_response'  => $clean_response,
+                'time'         => date('h:i A', $r->timecreated),
+                'timecreated'  => $r->timecreated
+            ];
+        }
+        return $messages;
+    }
+
+
     // ─────────────────────────────────────────────────────────────────────────
     // Custom provider request
     // Now accepts a structured messages array for proper multi-turn history.
@@ -514,7 +620,7 @@ class ai_client {
                         if (stripos($error_msg, 'quota') !== false || stripos($error_msg, 'rate limit') !== false || stripos($error_msg, '429') !== false) {
                             return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
                         }
-                        return "The AI service is currently unavailable. Please try again later.<script>console.error('AI Error (Gemini): " . addslashes($error_msg) . "');</script>";
+                        return "The AI service is currently unavailable. Please try again later or notify your instructor/admin.";
                     }
                     return "No response received from the AI.";
                 }
@@ -535,7 +641,7 @@ class ai_client {
                 if (stripos($error_msg, 'quota') !== false || stripos($error_msg, 'rate limit') !== false || stripos($error_msg, '429') !== false) {
                     return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
                 }
-                return "The AI service is currently unavailable. Please try again later.<script>console.error('AI Error (Gemini): " . addslashes($error_msg) . "');</script>";
+                return "The AI service is currently unavailable. Please try again later or notify your instructor/admin.";
             }
 
             if (isset($result->candidates[0]->content->parts[0]->text)) {
@@ -636,7 +742,7 @@ class ai_client {
                         if (stripos($err_type, 'rate_limit') !== false || stripos($err, 'rate limit') !== false || stripos($err, 'quota') !== false) {
                             return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
                         }
-                        return "DEMI AI service is currently unavailable. Please try again later.<script>console.error('DEMI AI Error: " . addslashes(self::sanitize_ai_output($err)) . "');</script>";
+                        return "DEMI AI service is currently unavailable. Please try again later or notify your instructor/admin.";
                     }
                     return "No response received from DEMI AI.";
                 }
@@ -682,7 +788,7 @@ class ai_client {
                     return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
                 }
                 // Show actual error in console, but generic clean message in UI.
-                return "DEMI AI service is currently unavailable. Please try again later.<script>console.error('DEMI AI Error: " . addslashes(self::sanitize_ai_output($err)) . "');</script>";
+                return "DEMI AI service is currently unavailable. Please try again later or notify your instructor/admin.";
             }
 
             debugging("ainotebook: unexpected response shape from {$provider}: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);

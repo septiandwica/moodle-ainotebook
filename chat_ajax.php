@@ -137,12 +137,39 @@ if ($action === 'submit_quiz_grade') {
     exit;
 }
 
+if ($action === 'fetch_sessions') {
+    $target_userid = optional_param('userid', $USER->id, PARAM_INT);
+    if ($target_userid != $USER->id) {
+        $context = context_module::instance($cm->id);
+        require_capability('mod/ainotebook:viewprogress', $context);
+    }
+    $sessions = \mod_ainotebook\ai_client::get_sessions($cmid, $target_userid);
+    echo json_encode(['success' => true, 'sessions' => $sessions]);
+    exit;
+}
+
+if ($action === 'fetch_session_messages') {
+    $session_id = required_param('session_id', PARAM_RAW);
+    $target_userid = optional_param('userid', $USER->id, PARAM_INT);
+    if ($target_userid != $USER->id) {
+        $context = context_module::instance($cm->id);
+        require_capability('mod/ainotebook:viewprogress', $context);
+    }
+    $messages = \mod_ainotebook\ai_client::get_session_messages($cmid, $target_userid, $session_id);
+    echo json_encode(['success' => true, 'messages' => $messages]);
+    exit;
+}
+
 // --- SSE STREAMING ACTION ---
 if ($action === 'chat_stream') {
     @set_time_limit(300);
     @ini_set('display_errors', '0');
     
     $message = required_param('message', PARAM_TEXT);
+    $session_id = optional_param('session_id', '', PARAM_RAW);
+    if (empty($session_id)) {
+        $session_id = 'sess_' . $USER->id . '_' . time() . '_' . substr(md5(uniqid()), 0, 6);
+    }
     $selected_files = optional_param('selected_files', '[]', PARAM_RAW);
     $file_ids = json_decode($selected_files, true) ?: [];
     $config_raw = optional_param('config', '[]', PARAM_RAW);
@@ -186,8 +213,8 @@ if ($action === 'chat_stream') {
             flush();
         }
         
-        // Send final metadata chunk
-        echo "data: " . json_encode(['sources_count' => $sources_count, 'done' => true]) . "\n\n";
+        // Send final metadata chunk with session_id
+        echo "data: " . json_encode(['sources_count' => $sources_count, 'session_id' => $session_id, 'done' => true]) . "\n\n";
         @ob_flush();
         flush();
         
@@ -197,9 +224,11 @@ if ($action === 'chat_stream') {
             $total_tokens = $estimated_input_tokens + \mod_ainotebook\rate_limiter::estimate_tokens($response_text);
             \mod_ainotebook\rate_limiter::log_request($USER->id, $total_tokens);
 
+            \mod_ainotebook\ai_client::ensure_session_id_field();
             $log = new stdClass();
             $log->ainotebookid = $cm->instance;
             $log->userid = $USER->id;
+            $log->session_id = $session_id;
             $log->message = $message;
             $log->response = $response_text;
             $log->timecreated = time();
@@ -216,6 +245,10 @@ if ($action === 'chat_stream') {
 
 // Fallback to synchronous chat action
 $message = required_param('message', PARAM_TEXT);
+$session_id = optional_param('session_id', '', PARAM_RAW);
+if (empty($session_id)) {
+    $session_id = 'sess_' . $USER->id . '_' . time() . '_' . substr(md5(uniqid()), 0, 6);
+}
 $selected_files = optional_param('selected_files', '[]', PARAM_RAW);
 $file_ids = json_decode($selected_files, true) ?: [];
 $config_raw = optional_param('config', '[]', PARAM_RAW);
@@ -242,9 +275,11 @@ if (!$silent) {
     $total_tokens = $estimated_input_tokens + \mod_ainotebook\rate_limiter::estimate_tokens($response_text);
     \mod_ainotebook\rate_limiter::log_request($USER->id, $total_tokens);
 
+    \mod_ainotebook\ai_client::ensure_session_id_field();
     $log = new stdClass();
     $log->ainotebookid = $cm->instance;
     $log->userid = $USER->id;
+    $log->session_id = $session_id;
     $log->message = $message;
     $log->response = $response_text;
     $log->timecreated = time();
@@ -254,5 +289,7 @@ if (!$silent) {
 echo json_encode([
     'success' => true,
     'response' => $response_text,
-    'sources_count' => $sources_count
+    'sources_count' => $sources_count,
+    'session_id' => $session_id
 ]);
+

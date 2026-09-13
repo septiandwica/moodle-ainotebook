@@ -9,11 +9,6 @@ defined('MOODLE_INTERNAL') || die();
 
 if ($ADMIN->fulltree) {
 
-    // Automatically update legacy provider in database to 'demi_engine'.
-    if (get_config('mod_ainotebook', 'ai_provider') !== 'demi_engine') {
-        set_config('ai_provider', 'demi_engine', 'mod_ainotebook');
-    }
-
     // ── AI Branding ───────────────────────────────────────────────────────────
     $settings->add(new admin_setting_configtext(
         'mod_ainotebook/ai_name',
@@ -35,17 +30,21 @@ if ($ADMIN->fulltree) {
     // ── Provider Config ───────────────────────────────────────────────────────
     $settings->add(new admin_setting_heading(
         'mod_ainotebook/engine_heading',
-        'DEMI Core AI Engine Integration',
-        'Centralized AI routing and agent model selection handled via DEMI Core AI Engine.'
+        'DEMI Core AI Engine & Fallback Routing',
+        'Centralized AI routing and agent model selection handled via DEMI Core AI Engine with optional direct fallbacks.'
     ));
 
     $settings->add(new admin_setting_configselect(
         'mod_ainotebook/ai_provider',
         'AI Provider',
-        'Select AI Provider. DEMI Core AI Engine automatically handles model routing and agent selection.',
+        'Select AI Provider. DEMI Core AI Engine automatically handles central model routing, student context, and agent selection.',
         'demi_engine',
         [
-            'demi_engine' => 'DEMI Core AI Engine (Central Endpoint - Port 8001)',
+            'demi_engine' => 'DEMI Core AI Engine (Recommended - Central Endpoint Port 8001)',
+            'groq'        => 'Groq (Direct Fallback)',
+            'openai'      => 'OpenAI (Direct Fallback)',
+            'gemini'      => 'Google Gemini (Direct Fallback)',
+            'moodle'      => 'Moodle AI Subsystem',
         ]
     ));
 
@@ -63,6 +62,13 @@ if ($ADMIN->fulltree) {
         'DEMI AI Engine Secret Key (X-Engine-API-Key)',
         'Authentication key used to communicate with DEMI Core AI Engine.',
         'demi_secret_engine_key_2026'
+    ));
+
+    $settings->add(new admin_setting_configpasswordunmask(
+        'mod_ainotebook/api_key',
+        'Direct Provider API Key',
+        'Direct API Key for fallback providers (Groq/OpenAI/Gemini) if DEMI Engine is unavailable.',
+        ''
     ));
 
     // ── General Settings ──────────────────────────────────────────────────────

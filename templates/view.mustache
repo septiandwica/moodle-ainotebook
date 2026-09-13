@@ -669,7 +669,7 @@
             };
         }
 
-        var detectAndRenderArtifacts = function(text, type, addToHistory = true) {
+        var detectAndRenderArtifacts = function(text, type, addToHistory = true, customTarget = null) {
             var found = false;
             var artifact = null;
             var cleanText = text;
@@ -723,7 +723,7 @@
                     artifactHistory.push(artifact);
                     updateHistoryList();
                 }
-                renderArtifact(artifact);
+                renderArtifact(artifact, customTarget);
                 return { found: true, type: artType, cleanText: cleanText };
             }
 
@@ -801,15 +801,15 @@
             }
         };
 
-        var renderArtifact = function(art) {
+        var renderArtifact = function(art, customTarget = null) {
             window.lastRenderedIdx = artifactHistory.indexOf(art);
             if (art.type === "mindmap") {
                 setPrintLandscape(true);
-                renderMindmap(art.data);
+                renderMindmap(art.data, customTarget);
             } else {
                 setPrintLandscape(false);
-                if (art.type === "quiz") renderQuiz(art.data);
-                if (art.type === "summary") renderSummary(art.data);
+                if (art.type === "quiz") renderQuiz(art.data, customTarget);
+                if (art.type === "summary") renderSummary(art.data, customTarget);
             }
         };
 
@@ -820,12 +820,13 @@
             return null;
         };
 
-        var renderQuiz = function(data) {
-            if (resultsContainer) resultsContainer.style.display = "block";
-            var target = getOrCreateTargetContainer();
+        var renderQuiz = function(data, customTarget = null) {
+            if (resultsContainer && !customTarget) resultsContainer.style.display = "block";
+            var target = customTarget || getOrCreateTargetContainer();
             if (!target) return;
             
-            target.innerHTML = "<div class=\'quiz-results-header\'><h3>Interactive Quiz</h3><div class=\'quiz-score\' id=\'quiz-score\'>Score: 0/" + data.questions.length + "</div></div><div id=\'quiz-container\'></div>";
+            var containerId = "quiz-container-" + Math.random().toString(36).substring(2, 9);
+            target.innerHTML = "<div class=\'quiz-results-header\'><h3>Interactive Quiz</h3><div class=\'quiz-score\' id=\'quiz-score\'>Score: 0/" + data.questions.length + "</div></div><div id=\'" + containerId + "\'></div>";
             
             var convertBtnMarkup = "";
             if (isTeacher && !isReadonly) {
@@ -905,7 +906,7 @@
                 }
             }
 
-            var container = document.getElementById("quiz-container");
+            var container = document.getElementById(containerId);
             var currentIdx = 0;
             var score = 0;
 
@@ -1349,7 +1350,16 @@
                         if (contentDiv && displayedText.length < fullText.length) {
                             var charsToAdd = Math.max(1, Math.floor((fullText.length - displayedText.length) / 3));
                             displayedText += fullText.substring(displayedText.length, displayedText.length + charsToAdd);
-                            contentDiv.innerHTML = window.marked.parse(displayedText + " ▊");
+                            
+                            // Sanitize raw codeblocks and raw suggestions during typing
+                            var cleanTyping = displayedText
+                                .replace(/```(?:json-quiz|json)[\s\S]*?(?:```|$)/gi, '\n\n*(⚡ Generating Interactive Quiz...)*')
+                                .replace(/```mermaid[\s\S]*?(?:```|$)/gi, '\n\n*(⚡ Generating Mindmap...)*')
+                                .replace(/\[(?:SUMMARY|REPORT)_START\][\s\S]*?(?:\[(?:SUMMARY|REPORT)_END\]|$)/gi, '\n\n*(⚡ Generating Summary...)*')
+                                .replace(/<suggestions>[\s\S]*?(?:<\/suggestions>|$)/gi, '')
+                                .replace(/(?:^|\n|\r)\s*[^\n\r\|]{2,}\|[^\n\r\|]{2,}(?:\|[^\n\r\|]{2,})?\s*$/gim, '');
+                                
+                            contentDiv.innerHTML = window.marked.parse(cleanTyping + " ▊");
                             messages.scrollTop = messages.scrollHeight;
                         }
                     }, 30);
@@ -1373,27 +1383,40 @@
                         }
                         
                         try {
-                            var result = detectAndRenderArtifacts(fullText, "ai", true);
+                            // Container box for inline artifact inside chat bubble
+                            var artifactBox = document.createElement("div");
+                            artifactBox.className = "inline-artifact-container";
+                            artifactBox.style.marginTop = "16px";
+                            
+                            var result = detectAndRenderArtifacts(fullText, "ai", true, artifactBox);
                             var displayMsg = result.cleanText;
                             
-                            // Extract suggestions tag from AI response
-                            var sugMatch = displayMsg.match(/<suggestions>([\s\S]*?)<\/suggestions>/i);
+                            // Robust Suggestion Extraction (Support <suggestions> AND raw pipe-separated strings)
                             var extractedSuggestions = [];
+                            var sugMatch = displayMsg.match(/<suggestions>([\s\S]*?)<\/suggestions>/i);
                             if (sugMatch) {
                                 var suggestionsStr = sugMatch[1];
-                                extractedSuggestions = suggestionsStr.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
                                 displayMsg = displayMsg.replace(sugMatch[0], "").trim();
+                                extractedSuggestions = suggestionsStr.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+                            } else {
+                                var pipeRegex = /(?:^|\n|\r)\s*([^\n\r\|]{2,}\|[^\n\r\|]{2,}(?:\|[^\n\r\|]{2,})?)\s*(?=\n|\r|$)/g;
+                                var pipeMatch = pipeRegex.exec(displayMsg);
+                                if (pipeMatch) {
+                                    var rawPipeStr = pipeMatch[1];
+                                    displayMsg = displayMsg.replace(pipeMatch[0], "").trim();
+                                    extractedSuggestions = rawPipeStr.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+                                }
                             }
                             
-                            if (result.found) {
-                                displayMsg += "\n\n*(I have also generated a " + result.type + " for you in the Creator section below)*";
-                            }
                             if (sourcesCount > 0) {
                                 displayMsg += "\n\n<div class=\"context-source-badge\"><i class=\"fa fa-check-circle\"></i> Smart Context: Answer is generated using " + sourcesCount + " relevant material sources.</div>";
                             }
                             
                             if (contentDiv) {
                                 contentDiv.innerHTML = window.marked.parse(displayMsg);
+                                if (result.found) {
+                                    contentDiv.appendChild(artifactBox);
+                                }
                             }
                             
                             if (extractedSuggestions.length > 0) {

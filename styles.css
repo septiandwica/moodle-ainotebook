@@ -135,6 +135,77 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: s
     font-weight: 700;
 }
 
+.demi-course-pill {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    padding: 6px 12px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+}
+
+.demi-status-pill {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #047857;
+    padding: 6px 12px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #10b981;
+    border-radius: 50%;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    }
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+    }
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+}
+
+/* Main Dashboard Card (Flex container for 3-Tab Sidebar + Chat Interface) */
+.main-dashboard-card {
+    display: flex;
+    background: var(--pres-surface);
+    border: 1px solid var(--pres-border);
+    border-radius: 16px;
+    overflow: hidden;
+    height: 720px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+/* Base Sidebar Panel Styling */
+.ainotebook-sidebar {
+    width: 340px;
+    min-width: 340px;
+    background: #ffffff;
+    border-right: 1px solid var(--pres-border);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-sizing: border-box;
+}
+
 /* 3-Tab Sidebar Styling (Matching Portal AiTutor.tsx) */
 .sidebar-tab-header {
     display: flex;
@@ -377,6 +448,8 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: s
     font-size: 0.78rem;
     font-weight: 700;
     cursor: pointer;
+}
+
 /* Floating Study Tools Bar directly above input box (Matching AiTutor.tsx) */
 .floating-study-tools-bar {
     display: flex;

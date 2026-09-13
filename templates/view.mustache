@@ -817,304 +817,172 @@
             if (resultsContent) return resultsContent;
             var aiMsgs = document.querySelectorAll(".message.ai .markdown-body, .message.ai .message-text");
             if (aiMsgs.length > 0) return aiMsgs[aiMsgs.length - 1];
-            return null;
-        };
-
-        var renderQuiz = function(data, customTarget = null) {
+            ret        var renderQuiz = function(data, customTarget = null) {
             if (resultsContainer && !customTarget) resultsContainer.style.display = "block";
             var target = customTarget || getOrCreateTargetContainer();
             if (!target) return;
             
+            if (!data || !data.questions || data.questions.length === 0) return;
+
             var containerId = "quiz-container-" + Math.random().toString(36).substring(2, 9);
-            target.innerHTML = "<div class=\'quiz-results-header\'><h3>Interactive Quiz</h3><div class=\'quiz-score\' id=\'quiz-score\'>Score: 0/" + data.questions.length + "</div></div><div id=\'" + containerId + "\'></div>";
-            
-            var convertBtnMarkup = "";
-            if (isTeacher && !isReadonly) {
-                convertBtnMarkup = '<button id="btn-convert-moodle-quiz" class="btn-premium" style="background: var(--pres-primary); margin-left: 10px;"><i class="fa fa-graduation-cap"></i> Convert to Moodle Quiz</button>';
-            }
-            
-            if (downloadBtn) {
-                downloadBtn.innerHTML = "<i class=\'fa fa-download\'></i> Download Text";
-                downloadBtn.onclick = function() {
-                    downloadFile("quiz.txt", data.questions.map((q,i) => (i+1) + ". " + (q.text || q.question || "No question") + "\n   " + (q.options ? q.options.join("\n   ") : "")).join("\n\n"));
-                };
-            }
-            
-            /* Re-render toolbar to include the convert button */
-            var toolbar = document.querySelector(".preview-toolbar");
-            if (toolbar) {
-                /* Ensure we don't append multiple times if they switch tabs */
-                var existingConvert = document.getElementById("btn-convert-moodle-quiz");
-                if (existingConvert) existingConvert.remove();
-                if (isTeacher && !isReadonly) {
-                    toolbar.insertAdjacentHTML('beforeend', convertBtnMarkup);
-                    
-                    document.getElementById("btn-convert-moodle-quiz").onclick = function() {
-                        var modal = document.getElementById("convert-quiz-modal");
-                        if (!modal) return;
-                        modal.classList.add("active");
-                        
-                        var closeBtn = document.getElementById("close-convert-quiz");
-                        var confirmBtn = document.getElementById("confirm-convert-quiz");
-                        
-                        var btn = this;
-                        
-                        if (closeBtn) closeBtn.onclick = function() { modal.classList.remove("active"); };
-                        
-                        if (confirmBtn) {
-                            confirmBtn.onclick = function() {
-                                var qName = document.getElementById("cq-name").value;
-                                var qIntro = document.getElementById("cq-intro").value;
-                                
-                                if (!qName) {
-                                    require(['core/notification'], function(Notification) { Notification.addNotification({message: 'Quiz name is required!', type: 'error'}); });
-                                    return;
-                                }
-                                
-                                modal.classList.remove("active");
-                                btn.innerHTML = "<i class='fa fa-spinner fa-spin'></i> Converting...";
-                                btn.disabled = true;
-
-                                var formData = new FormData();
-                                formData.append("cmid", cmid);
-                                formData.append("sesskey", sesskey);
-                                formData.append("name", qName);
-                                formData.append("intro", qIntro);
-                                formData.append("quizdata", JSON.stringify(data));
-
-                                fetch(wwwroot + "/mod/ainotebook/create_moodle_quiz_ajax.php", {
-                                    method: "POST",
-                                    body: formData
-                                })
-                                .then(function(r) { return r.json(); })
-                                .then(function(res) {
-                                    if (res.success && res.url) {
-                                        window.location.href = res.url;
-                                    } else {
-                                        require(['core/notification'], function(Notification) { Notification.addNotification({message: 'Failed to convert quiz: ' + (res.error || 'Unknown error'), type: 'error'}); });
-                                        btn.innerHTML = "<i class='fa fa-graduation-cap'></i> Convert to Moodle Quiz";
-                                        btn.disabled = false;
-                                    }
-                                }).catch(function(e) {
-                                    require(['core/notification'], function(Notification) { Notification.addNotification({message: 'Network error occurred.', type: 'error'}); });
-                                    btn.innerHTML = "<i class='fa fa-graduation-cap'></i> Convert to Moodle Quiz";
-                                    btn.disabled = false;
-                                });
-                            };
-                        }
-                    };
-                }
-            }
-
+            target.innerHTML = "<div id='" + containerId + "' class='interactive-quiz-wrapper'></div>";
             var container = document.getElementById(containerId);
+            
             var currentIdx = 0;
             var score = 0;
+            var total = data.questions.length;
+            var isAnswered = false;
+            var selectedOption = null;
 
             var showQuestion = function(idx) {
-                var headerScoreEl = document.getElementById("quiz-score");
-                if (headerScoreEl) {
-                    headerScoreEl.style.display = "inline-block";
-                    headerScoreEl.innerText = "Score: " + score + "/" + data.questions.length;
-                }
-
+                isAnswered = false;
+                selectedOption = null;
                 container.innerHTML = "";
+
                 var q = data.questions[idx];
-                var qDiv = document.createElement("div");
-                qDiv.className = "quiz-question active-question";
-                
-                /* Normalize answer (handle 0-3, "0"-"3", or "A"-"E") */
                 var correctAnswer = q.answer;
                 if (typeof correctAnswer === "string") {
                     var upper = correctAnswer.trim().toUpperCase();
                     if (upper.length === 1 && upper >= "A" && upper <= "E") {
                         correctAnswer = upper.charCodeAt(0) - 65;
                     } else {
-                        correctAnswer = parseInt(upper);
+                        correctAnswer = parseInt(upper) || 0;
                     }
                 }
-                
+
                 var qText = q.text || q.question || "No question text provided.";
-                var type = (q.type || "multichoice").toLowerCase();
-                
-                qDiv.innerHTML = '<h5>Question ' + (idx+1) + ' of ' + data.questions.length + ' <span style="font-size:0.7em; color:#64748b; background:#f1f5f9; padding:2px 6px; border-radius:4px; margin-left:10px;">' + type + '</span></h5>' +
-                                 '<p class="quiz-text">' + qText + '</p>' +
-                                 '<div class="quiz-options"></div>' +
-                                 '<div class="quiz-footer">' +
-                                    '<button class="btn-hint" onclick="var h=this.parentNode.querySelector(\'.quiz-hint\'); if(h){h.style.display=\'block\'; this.style.display=\'none\';}"><i class="fa fa-lightbulb-o"></i> Show Hint</button>' +
-                                    '<div class="quiz-hint" style="display:none;"><strong>Hint:</strong> ' + (q.hint || "Try to recall the main concept from the study materials.") + '</div>' +
-                                 '</div>';
-                var optionsDiv = qDiv.querySelector(".quiz-options");
-                
-                var handleNext = function() {
-                    var nextBtn = document.createElement("button");
-                    nextBtn.className = "btn-premium btn-quiz-next";
-                    nextBtn.innerHTML = (idx === data.questions.length - 1) ? "Finish & View Results" : "Next Question <i class=\'fa fa-chevron-right\'></i>";
-                    nextBtn.onclick = function() {
-                        if (idx < data.questions.length - 1) {
-                            showQuestion(idx + 1);
-                        } else {
-                            var headerScoreEl = document.getElementById("quiz-score");
-                            if (headerScoreEl) {
-                                headerScoreEl.style.display = "none";
-                            }
+                var alpha = ["A", "B", "C", "D", "E"];
+                var opts = q.options || ["True", "False"];
 
-                            var percent = (score / data.questions.length) * 100;
-                            var feedback = "Keep Learning!";
-                            var desc = "Every mistake is a step forward. Review the materials and try again to master the topic.";
-                            var iconClass = "fa-lightbulb-o";
-                            var badgeColor = "#3b82f6";
-                            
-                            if (percent >= 100) {
-                                feedback = "Excellent!";
-                                desc = "Perfect score! You have a solid understanding of the materials. Well done!";
-                                iconClass = "fa-trophy";
-                                badgeColor = "#eab308";
-                            } else if (percent >= 80) {
-                                feedback = "Great Job!";
-                                desc = "You've mastered most of the concepts. Just a few details left to polish!";
-                                iconClass = "fa-star";
-                                badgeColor = "#10b981";
-                            } else if (percent >= 60) {
-                                feedback = "Good Progress!";
-                                desc = "You're on the right track. A quick review of the material should get you to the top.";
-                                iconClass = "fa-thumbs-up";
-                                badgeColor = "#3b82f6";
-                            }
-                            
-                            container.innerHTML = '<div class="quiz-score-card">' +
-                                '<div class="quiz-result-header-badge" style="background:' + badgeColor + '20; color:' + badgeColor + ';">' +
-                                    '<i class="fa ' + iconClass + '"></i> ' + Math.round(percent) + '% Score' +
-                                '</div>' +
-                                '<div class="score-circle-wrapper">' +
-                                    '<svg viewBox="0 0 36 36" class="circular-chart-premium">' +
-                                        '<path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />' +
-                                        '<path class="circle-progress" stroke-dasharray="' + Math.round(percent) + ', 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />' +
-                                    '</svg>' +
-                                    '<div class="score-number-display">' +
-                                        '<span class="score-val">' + score + '</span>' +
-                                        '<span class="score-max">/' + data.questions.length + '</span>' +
-                                    '</div>' +
-                                '</div>' +
-                                '<h3 class="quiz-feedback-title">' + feedback + '</h3>' +
-                                '<p class="quiz-feedback-desc">' + desc + '</p>' +
-                                '<div class="quiz-result-actions">' +
-                                    '<button class="btn-retake-quiz" onclick="window.renderHistoryItem(window.lastRenderedIdx)"><i class="fa fa-refresh"></i> Retake Quiz</button>' +
-                                '</div>' +
-                            '</div>';
+                var card = document.createElement("div");
+                card.className = "demi-quiz-card";
 
-                            /* Send score to Gradebook */
-                            if (!isReadonly) {
-                                var formData = new FormData();
-                                formData.append("cmid", cmid);
-                                formData.append("action", "submit_quiz_grade");
-                                formData.append("score", score);
-                                formData.append("maxscore", data.questions.length);
-                                formData.append("sesskey", sesskey);
-                                fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?t=" + Date.now(), {
-                                    method: "POST",
-                                    body: formData
-                                }).then(r => r.json()).then(res => {
-                                    if(res.success) {
-                                        var div = document.createElement("div");
-                                        div.className = "gradebook-sync-msg";
-                                        div.innerHTML = "<i class=\'fa fa-check-circle\'></i> Score synchronized with Gradebook!";
-                                        var actionsDiv = container.querySelector(".quiz-result-actions");
-                                        if (actionsDiv) actionsDiv.appendChild(div);
-                                    }
-                                });
+                var headerHTML = '<div class="demi-quiz-header">' +
+                    '<span class="demi-quiz-step">Question ' + (idx + 1) + ' of ' + total + '</span>' +
+                    '<span class="demi-quiz-score">Current Score: ' + score + '/' + total + '</span>' +
+                '</div>';
+
+                var qTextHTML = '<h4 class="demi-quiz-question">' + qText + '</h4>';
+
+                var optionsHTML = '<div class="demi-quiz-options">';
+                opts.forEach(function(opt, oi) {
+                    optionsHTML += '<button type="button" class="demi-quiz-opt-btn" data-idx="' + oi + '">' +
+                        '<span class="demi-quiz-opt-badge">' + (alpha[oi] || oi) + '</span>' +
+                        '<span class="demi-quiz-opt-text">' + opt + '</span>' +
+                    '</button>';
+                });
+                optionsHTML += '</div>';
+
+                var footerHTML = '<div class="demi-quiz-footer">' +
+                    '<div class="demi-quiz-hint-wrap">' +
+                        (q.hint ? '<button type="button" class="demi-quiz-hint-btn">💡 Need a Hint?</button><div class="demi-quiz-hint-box" style="display:none;"><strong>Hint:</strong> ' + q.hint + '</div>' : '') +
+                    '</div>' +
+                    '<button type="button" class="demi-quiz-next-btn" style="display:none;">' + (idx === total - 1 ? 'Finish Quiz' : 'Next Question →') + '</button>' +
+                '</div>';
+
+                card.innerHTML = headerHTML + qTextHTML + optionsHTML + footerHTML;
+                container.appendChild(card);
+
+                var optBtns = card.querySelectorAll(".demi-quiz-opt-btn");
+                var nextBtn = card.querySelector(".demi-quiz-next-btn");
+                var hintBtn = card.querySelector(".demi-quiz-hint-btn");
+                var hintBox = card.querySelector(".demi-quiz-hint-box");
+
+                if (hintBtn && hintBox) {
+                    hintBtn.onclick = function() {
+                        hintBox.style.display = "block";
+                        hintBtn.style.display = "none";
+                    };
+                }
+
+                optBtns.forEach(function(btn) {
+                    btn.onclick = function() {
+                        if (isAnswered) return;
+                        isAnswered = true;
+                        var chosenIdx = parseInt(this.getAttribute("data-idx"));
+                        selectedOption = chosenIdx;
+
+                        if (chosenIdx === correctAnswer) {
+                            score++;
+                        }
+
+                        optBtns.forEach(function(b, oi) {
+                            b.disabled = true;
+                            if (oi === correctAnswer) {
+                                b.classList.add("correct");
+                            } else if (oi === chosenIdx) {
+                                b.classList.add("incorrect");
+                            } else {
+                                b.classList.add("dimmed");
                             }
+                        });
+
+                        if (nextBtn) {
+                            nextBtn.style.display = "inline-flex";
                         }
                     };
-                    qDiv.appendChild(nextBtn);
-                };
+                });
 
-                if (type === "essay" || type === "shortanswer") {
-                    var inputEl = type === "essay" ? document.createElement("textarea") : document.createElement("input");
-                    inputEl.className = "form-control";
-                    inputEl.style.marginBottom = "15px";
-                    if (type === "essay") {
-                        inputEl.rows = 4;
-                        inputEl.placeholder = "Type your essay answer here...";
-                    } else {
-                        inputEl.type = "text";
-                        inputEl.placeholder = "Type your short answer here...";
-                    }
-                    optionsDiv.appendChild(inputEl);
-                    
-                    var submitBtn = document.createElement("button");
-                    submitBtn.className = "btn-premium";
-                    submitBtn.innerHTML = "Submit Answer";
-                    submitBtn.onclick = function() {
-                        if (qDiv.classList.contains("answered")) return;
-                        qDiv.classList.add("answered");
-                        inputEl.disabled = true;
-                        submitBtn.style.display = "none";
-                        
-                        var feedbackDiv = document.createElement("div");
-                        feedbackDiv.className = "quiz-option correct";
-                        feedbackDiv.style.marginTop = "10px";
-                        feedbackDiv.innerHTML = "<strong>Suggested Answer/Rubric:</strong><br>" + (q.answer || "No specific answer provided by AI.");
-                        optionsDiv.appendChild(feedbackDiv);
-                        
-                        /* Treat as correct for participation */
-                        score++;
-                        document.getElementById("quiz-score").innerText = "Score: " + score + "/" + data.questions.length;
-                        handleNext();
+                if (nextBtn) {
+                    nextBtn.onclick = function() {
+                        if (idx < total - 1) {
+                            showQuestion(idx + 1);
+                        } else {
+                            showCompletionCard();
+                        }
                     };
-                    optionsDiv.appendChild(submitBtn);
-                } else {
-                    // Multiple Choice / True False
-                    var alpha = ["A", "B", "C", "D", "E", "F"];
-                    var opts = q.options || (type === "truefalse" ? ["True", "False"] : []);
-                    
-                    opts.forEach((opt, oi) => {
-                        var optDiv = document.createElement("div");
-                        optDiv.className = "quiz-option";
-                        optDiv.innerHTML = '<span class="opt-label">' + (alpha[oi] || oi) + '</span> <span class="opt-text">' + opt + '</span>';
-                        optDiv.onclick = function() {
-                            if (qDiv.classList.contains("answered")) return;
-                            qDiv.classList.add("answered");
-                            optDiv.classList.add("selected");
-                            
-                            // Check answer
-                            var isCorrect = false;
-                            if (type === "truefalse") {
-                                var ansStr = String(correctAnswer).toLowerCase();
-                                var chosenStr = opt.toLowerCase();
-                                if (ansStr === chosenStr || (ansStr === "1" && chosenStr === "true") || (ansStr === "0" && chosenStr === "false")) {
-                                    isCorrect = true;
-                                }
-                            } else {
-                                if (oi === correctAnswer) isCorrect = true;
-                            }
-                            
-                            if (isCorrect) {
-                                optDiv.classList.add("correct");
-                                score++;
-                            } else {
-                                optDiv.classList.add("incorrect");
-                                var allOpts = optionsDiv.querySelectorAll(".quiz-option");
-                                if (type === "truefalse") {
-                                    // Find correct opt
-                                    var correctIdx = String(correctAnswer).toLowerCase() === "false" || String(correctAnswer) === "0" ? 1 : 0;
-                                    if (allOpts[correctIdx]) allOpts[correctIdx].classList.add("correct");
-                                } else {
-                                    if (allOpts[correctAnswer]) {
-                                        allOpts[correctAnswer].classList.add("correct");
-                                    }
-                                }
-                            }
-                            document.getElementById("quiz-score").innerText = "Score: " + score + "/" + data.questions.length;
-                            handleNext();
-                        };
-                        optionsDiv.appendChild(optDiv);
+                }
+            };
+
+            var showCompletionCard = function() {
+                var pct = Math.round((score / total) * 100);
+                container.innerHTML = '<div class="demi-quiz-completed-card">' +
+                    '<div class="demi-quiz-completed-header">' +
+                        '<div class="demi-quiz-completed-title">' +
+                            '<i class="fa fa-question-circle" style="color:#d97706; font-size:1.1rem;"></i>' +
+                            '<h4 style="margin:0; font-size:0.95rem; font-weight:700;">Quiz Completed!</h4>' +
+                        '</div>' +
+                        '<span class="demi-quiz-completed-badge">' + pct + '% Score</span>' +
+                    '</div>' +
+                    '<p class="demi-quiz-completed-desc">' +
+                        'You answered <strong>' + score + '</strong> out of <strong>' + total + '</strong> questions correctly.' +
+                    '</p>' +
+                    '<div class="demi-quiz-completed-actions">' +
+                        '<button type="button" class="demi-quiz-tryagain-btn"><i class="fa fa-refresh"></i> Try Again</button>' +
+                    '</div>' +
+                '</div>';
+
+                var tryAgainBtn = container.querySelector(".demi-quiz-tryagain-btn");
+                if (tryAgainBtn) {
+                    tryAgainBtn.onclick = function() {
+                        score = 0;
+                        showQuestion(0);
+                    };
+                }
+
+                if (!isReadonly) {
+                    var formData = new FormData();
+                    formData.append("cmid", cmid);
+                    formData.append("action", "submit_quiz_grade");
+                    formData.append("score", score);
+                    formData.append("maxscore", total);
+                    formData.append("sesskey", sesskey);
+                    fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?t=" + Date.now(), {
+                        method: "POST",
+                        body: formData
+                    }).then(r => r.json()).then(res => {
+                        if(res.success) {
+                            var div = document.createElement("div");
+                            div.className = "gradebook-sync-msg";
+                            div.innerHTML = "<i class='fa fa-check-circle'></i> Score synchronized with Gradebook!";
+                            var actionsDiv = container.querySelector(".demi-quiz-completed-actions");
+                            if (actionsDiv) actionsDiv.appendChild(div);
+                        }
                     });
                 }
-                container.appendChild(qDiv);
             };
 
             showQuestion(0);
-            resultsContainer.scrollIntoView({ behavior: "smooth" });
         };
 
         var prepareFormalHeader = function(title) {

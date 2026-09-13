@@ -188,8 +188,9 @@ class ai_client {
         // Clean history artifacts to save tokens
         if ($history) {
             foreach ($history as $h) {
-                $h->response = preg_replace('/```(?:json-quiz|json|mermaid)[\s\S]*?```/', '[AI Generated Artifact Hidden]', $h->response);
-                $h->response = preg_replace('/\[REPORT_START\][\s\S]*?\[REPORT_END\]/', '[AI Generated Report Hidden]', $h->response);
+                $h->response = preg_replace('/```(?:json-quiz|json|mermaid)[\s\S]*?```/', '', $h->response);
+                $h->response = preg_replace('/\[(?:SUMMARY|REPORT)_START\][\s\S]*?\[(?:SUMMARY|REPORT)_END\]/', '', $h->response);
+                $h->response = preg_replace('/<suggestions>[\s\S]*?<\/suggestions>/', '', $h->response);
             }
         }
 

@@ -1,0 +1,1785 @@
+
+<div id="ainotebook-wrapper">
+    {{#is_readonly}}
+    <div class="readonly-banner">
+        <div class="readonly-info">
+            <i class="fa fa-eye"></i> 
+            <span><strong>{{str_readonlymode}}</strong> - {{str_viewingprogressfor}} {{target_fullname}} ({{target_email}})</span>
+        </div>
+        <a href="?id={{cmid}}" class="btn-premium btn-small"><i class="fa fa-arrow-left"></i> {{str_backtodashboard}}</a>
+    </div>
+    {{/is_readonly}}
+    {{^is_readonly}}
+        {{#is_teacher_self}}
+        <div class="readonly-banner" style="background: #e0f2fe; border-color: #7dd3fc;">
+            <div class="readonly-info" style="color: #0369a1;">
+                <i class="fa fa-user"></i> 
+                <span><strong>Personal Workspace</strong> - You are currently using your own AI Notebook.</span>
+            </div>
+            <a href="?id={{cmid}}" class="btn-premium btn-small"><i class="fa fa-arrow-left"></i> {{str_backtodashboard}}</a>
+        </div>
+        {{/is_teacher_self}}
+    {{/is_readonly}}
+
+    <!-- DEMI Top Control Bar (Matching DEMI AI Academic Tutor Portal 100%) -->
+    <div class="demi-top-control-bar">
+        <div class="demi-brand-group">
+            <div class="demi-avatar-badge">DEMI</div>
+            <div class="demi-brand-meta">
+                <div class="demi-title-row">
+                    <h2>24/7 Academic AI Tutor</h2>
+                    <span class="demi-mode-badge">STUDY MODE</span>
+                </div>
+                <p class="demi-subtitle">Grounded in your E-Campus course modules, slides & professor syllabus.</p>
+            </div>
+        </div>
+        <div class="demi-header-controls">
+            <div class="demi-course-pill">
+                <span class="pill-label">Course:</span>
+                <span class="pill-value">{{course_fullname}}</span>
+            </div>
+            <div class="demi-status-pill">
+                <span class="pulse-dot"></span>
+                <span>DEMI AI</span>
+            </div>
+            <button id="btn-new-session" class="btn-new-session-red" onclick="window.startNewSession()" title="Start New Session">
+                <i class="fa fa-plus"></i> New Session
+            </button>
+            <button id="open-settings" class="btn-icon" title="Configure Chat"><i class="fa fa-cog"></i></button>
+        </div>
+    </div>
+
+    <!-- Main Workspace Card: 3-Tab Sidebar + Chat Interface -->
+    <div class="main-dashboard-card">
+        <!-- 3-Tab Sidebar Panel (Matching AiTutor.tsx) -->
+        <div id="ainotebook-sidebar-nav" class="ainotebook-sidebar">
+            <div class="sidebar-tab-header">
+                <button type="button" class="tab-btn active" data-tab="history-panel" onclick="window.switchSidebarTab('history-panel', this)">
+                    <i class="fa fa-clock-o"></i> History ({{sessions_count}})
+                </button>
+                <button type="button" class="tab-btn" data-tab="syllabus-panel" onclick="window.switchSidebarTab('syllabus-panel', this)">
+                    <i class="fa fa-book"></i> Syllabus ({{files_count}})
+                </button>
+                <button type="button" class="tab-btn" data-tab="prompts-panel" onclick="window.switchSidebarTab('prompts-panel', this)">
+                    <i class="fa fa-lightbulb-o"></i> Prompts
+                </button>
+            </div>
+
+            <!-- Tab 1: History Panel (Session Threads) -->
+            <div id="history-panel" class="sidebar-tab-content active">
+                <div class="history-scope-bar">
+                    <div class="scope-info">
+                        <span class="scope-label">History Scope:</span>
+                        <span class="scope-course">{{course_fullname}}</span>
+                    </div>
+                    <button class="btn-link-sm" onclick="window.refreshSessionsList()"><i class="fa fa-refresh"></i> Refresh</button>
+                </div>
+                <div class="session-history-list" id="session-history-list">
+                    {{#sessions}}
+                    <div class="session-history-card {{#is_active}}active{{/is_active}}" data-session-id="{{session_id}}" onclick="window.loadSession('{{session_id}}', this)">
+                        <div class="session-card-header">
+                            <span class="session-course-tag">{{course_fullname}}</span>
+                            <span class="session-time-ago">{{rel_time}}</span>
+                        </div>
+                        <p class="session-snippet">{{title}}</p>
+                        <span class="session-msg-count"><i class="fa fa-comments-o"></i> {{message_count}} messages</span>
+                    </div>
+                    {{/sessions}}
+                    {{^sessions}}
+                    <div class="empty-history-notice">
+                        <i class="fa fa-comments-o"></i>
+                        <p>No past chat sessions found.</p>
+                        <span class="subtext">Start asking questions below!</span>
+                    </div>
+                    {{/sessions}}
+                </div>
+            </div>
+
+            <!-- Tab 2: Syllabus / Course Modules Panel (Matching AiTutor.tsx 100%) -->
+            <div id="syllabus-panel" class="sidebar-tab-content">
+                <div class="syllabus-header-card">
+                    <div class="syllabus-header-title">
+                        <i class="fa fa-book"></i>
+                        <div>
+                            <h4>Course Syllabus & Lecture Slides</h4>
+                            <span class="syllabus-badge">{{files_count}} Modules</span>
+                        </div>
+                    </div>
+                    <p class="syllabus-instruction">Select a specific week/topic to filter the AI tutor focus:</p>
+                </div>
+
+                <div class="syllabus-list">
+                    <!-- All Course Materials (Full Scope) -->
+                    <div class="syllabus-topic-card active" onclick="window.filterTopicFocus('All Course Materials', this)">
+                        <div class="topic-header">
+                            <i class="fa fa-university"></i>
+                            <div class="topic-meta">
+                                <strong>📚 All Course Materials</strong>
+                                <span class="topic-subtitle">Full Scope</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section / Topic Cards -->
+                    {{#syllabus_sections}}
+                    <div class="syllabus-topic-card" onclick="window.filterTopicFocus('{{{name}}}', this)">
+                        <div class="topic-header">
+                            <i class="fa fa-folder-open-o"></i>
+                            <div class="topic-meta">
+                                <strong>{{name}}</strong>
+                                <span class="topic-subtitle">{{modules_count}} items{{#has_subsections}} · {{subsections_count}} subsections{{/has_subsections}}</span>
+                            </div>
+                            <button type="button" class="btn-focus-topic" title="Focus AI Tutor on this topic">
+                                Focus Topic
+                            </button>
+                        </div>
+
+                        {{#has_modules}}
+                        <div class="topic-modules-list">
+                            {{#modules}}
+                            <div class="topic-module-item">
+                                <i class="fa {{icon}}"></i>
+                                <a href="{{url}}" target="_blank" onclick="event.stopPropagation()">{{name}}</a>
+                            </div>
+                            {{/modules}}
+                        </div>
+                        {{/has_modules}}
+
+                        {{#has_subsections}}
+                        <div class="topic-subsections-container" style="margin-top: 8px; padding-left: 12px; border-left: 2px solid #cbd5e1;">
+                            {{#subsections}}
+                            <div class="subsection-tree-node" style="margin-bottom: 6px;">
+                                <div class="subsection-title-row" style="font-size: 11px; font-weight: 700; color: #475569; display: flex; items-center; gap: 6px; margin-bottom: 2px;">
+                                    <i class="fa fa-folder-o" style="color: #6366f1;"></i>
+                                    <span>{{name}}</span>
+                                    <span style="font-weight: normal; color: #94a3b8; font-size: 10px;">({{modules_count}} items)</span>
+                                </div>
+                                {{#has_modules}}
+                                <div class="topic-modules-list" style="padding-left: 14px;">
+                                    {{#modules}}
+                                    <div class="topic-module-item" style="padding: 2px 0;">
+                                        <i class="fa {{icon}}"></i>
+                                        <a href="{{url}}" target="_blank" onclick="event.stopPropagation()">{{name}}</a>
+                                    </div>
+                                    {{/modules}}
+                                </div>
+                                {{/has_modules}}
+                            </div>
+                            {{/subsections}}
+                        </div>
+                        {{/has_subsections}}
+                    </div>
+                    {{/syllabus_sections}}
+
+                    {{^syllabus_sections}}
+                    <div class="empty-files-notice">
+                        <p>No course syllabus topics found yet.</p>
+                    </div>
+                    {{/syllabus_sections}}
+                </div>
+            </div>
+
+            <!-- Tab 3: Structured Prompts Panel -->
+            <div id="prompts-panel" class="sidebar-tab-content">
+                <div class="structured-prompts-list">
+                    <div class="prompt-category-card core-theory" onclick="window.sendSuggested('Explain the foundational concepts and theoretical principles of {{course_fullname}}.', null)">
+                        <div class="prompt-badge">Core Theory</div>
+                        <p class="prompt-text">Explain the foundational concepts and theoretical principles of this course.</p>
+                        <span class="prompt-objective">Master key definitions & mechanisms.</span>
+                    </div>
+
+                    <div class="prompt-category-card study-summary" onclick="window.sendSuggested('Summarize the essential takeaways and lecture highlights for {{course_fullname}}.', 'summary')">
+                        <div class="prompt-badge">Study Summary</div>
+                        <p class="prompt-text">Summarize the essential takeaways and lecture slide highlights.</p>
+                        <span class="prompt-objective">Quick review for high-yield exam preparation.</span>
+                    </div>
+
+                    <div class="prompt-category-card case-study" onclick="window.sendSuggested('Provide practical real-world industry case studies for {{course_fullname}}.', null)">
+                        <div class="prompt-badge">Case Study</div>
+                        <p class="prompt-text">Provide practical real-world industry case studies & hands-on examples.</p>
+                        <span class="prompt-objective">Bridge academic theory with industry practice.</span>
+                    </div>
+
+                    <div class="prompt-category-card plo-outcome" onclick="window.sendSuggested('How does mastering {{course_fullname}} directly satisfy our Program Learning Outcomes (PLO)?', null)">
+                        <div class="prompt-badge">PLO Outcome</div>
+                        <p class="prompt-text">Map course outcomes to Program Learning Outcomes & career readiness.</p>
+                        <span class="prompt-objective">Connect competencies to future roles.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Panel: The AI Interface -->
+        <div class="ainotebook-chat">
+            <div class="chat-header">
+                <div class="chat-brand-section">
+                    <div class="chat-info">
+                        <h2>{{course_fullname}}</h2>
+                        <p class="chat-subtitle">All Course Materials · Direct Discussion Thread</p>
+                    </div>
+                </div>
+                <span class="academic-mode-tag"><i class="fa fa-graduation-cap"></i> Academic Study Mode</span>
+            </div>
+
+            <div id="chat-messages" class="chat-messages">
+                <div class="message ai">
+                    <div class="ai-avatar-icon">DEMI</div>
+                    <div class="message-bubble-body">
+                        <div class="message-meta-header">
+                            <span class="meta-author">DEMI AI Tutor</span>
+                        </div>
+                        <div class="message-text">
+                            Hello <strong>{{target_firstname}}</strong>! I am your DEMI AI Academic Tutor for <strong>{{course_fullname}}</strong>.<br><br>
+                            I am connected to your lecture modules, presentation slides, and syllabus on E-Campus. Ask any questions about concepts, or trigger a study tool below!
+                            
+                            <div class="study-tools-inline-box">
+                                <span class="tools-title">Study Tools:</span>
+                                <div class="tools-chips-group">
+                                    <button class="study-tool-chip" onclick="window.sendSuggested('Generate an interactive quiz from my materials.', 'quiz')">
+                                        📝 Interactive Quiz
+                                    </button>
+                                    <button class="study-tool-chip" onclick="window.sendSuggested('Generate a concept mindmap structure.', 'mindmap')">
+                                        📊 Concept Mindmap
+                                    </button>
+                                    <button class="study-tool-chip" onclick="window.sendSuggested('Generate a detailed study summary.', 'summary')">
+                                        📄 Study Summary
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{#initial_messages}}
+                <div class="message user">
+                    <div class="message-bubble-body">
+                        <div class="message-meta-header"><span class="meta-author">{{target_fullname}}</span>{{#time}}<span class="meta-time">{{time}}</span>{{/time}}</div>
+                        <div class="message-text">{{{user_message}}}</div>
+                    </div>
+                </div>
+                <div class="message ai">
+                    <div class="ai-avatar-icon">DEMI</div>
+                    <div class="message-bubble-body">
+                        <div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span>{{#time}}<span class="meta-time">{{time}}</span>{{/time}}</div>
+                        <div class="message-text"><div class="markdown-body">{{{ai_response}}}</div></div>
+                    </div>
+                </div>
+                {{/initial_messages}}
+            </div>
+
+            <div class="input-wrapper-container">
+                <!-- Floating Study Tools Bar directly above input box (Matching Portal AiTutor.tsx) -->
+                <div class="floating-study-tools-bar">
+                    <span class="tools-label">Study Tools:</span>
+                    <button type="button" class="tool-btn quiz" onclick="window.sendSuggested('Generate an authentic interactive practice quiz with multiple-choice questions strictly synthesized from lecture slides for {{course_fullname}}.', 'quiz')">
+                        📝 Interactive Quiz
+                    </button>
+                    <button type="button" class="tool-btn mindmap" onclick="window.sendSuggested('Generate a comprehensive visual concept mindmap synthesizing the lecture slides for {{course_fullname}}.', 'mindmap')">
+                        📊 Concept Mindmap
+                    </button>
+                    <button type="button" class="tool-btn summary" onclick="window.sendSuggested('Generate a comprehensive executive study summary report for {{course_fullname}}.', 'summary')">
+                        📄 Study Summary
+                    </button>
+                </div>
+
+                <div class="input-wrapper" {{#is_readonly}}style="opacity: 0.6; pointer-events: none;"{{/is_readonly}}>
+                    <input type="text" id="chat-input" placeholder="Ask DEMI AI Tutor about {{course_fullname}}... (Enter to send, Shift+Enter for newline)" {{#is_readonly}}disabled{{/is_readonly}}>
+                    <span id="source-count" class="source-pill">0 sources attached</span>
+                    <button id="send-btn" {{#is_readonly}}disabled{{/is_readonly}}>
+                        <i class="fa fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Quiz Generator Settings -->
+{{#is_teacher}}
+{{^is_readonly}}
+<div id="moodle-quiz-modal" class="ain-modal-overlay">
+    <div class="ain-modal-content" style="max-width: 500px;">
+        <div class="ain-modal-header">
+            <h3><i class="fa fa-cogs"></i> Quiz Generator Settings</h3>
+            <button id="close-moodle-quiz" class="btn-icon"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="ain-modal-body form-vertical">
+            <div class="form-group">
+                <label>Total Questions</label>
+                <input type="number" id="mq-count" class="form-control" value="10" min="1" max="50">
+            </div>
+            
+            <div class="form-group">
+                <label>Difficulty Distribution</label>
+                <select id="mq-diff-mode" class="form-control" onchange="document.getElementById('mq-diff-custom').style.display = this.value === 'custom' ? 'block' : 'none';">
+                    <option value="auto" selected>Auto / Random</option>
+                    <option value="custom">Custom Distribution</option>
+                </select>
+                <div id="mq-diff-custom" style="display:none; margin-top:10px; background:#f8fafc; padding:10px; border-radius:5px; border:1px solid #e2e8f0;">
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">Easy</label><input type="number" id="mq-diff-easy" class="form-control form-control-sm" value="2" min="0"></div>
+                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">Medium</label><input type="number" id="mq-diff-medium" class="form-control form-control-sm" value="0" min="0"></div>
+                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">Hard</label><input type="number" id="mq-diff-hard" class="form-control form-control-sm" value="5" min="0"></div>
+                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">Expert</label><input type="number" id="mq-diff-expert" class="form-control form-control-sm" value="3" min="0"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Question Type</label>
+                <select id="mq-type-mode" class="form-control" onchange="document.getElementById('mq-type-custom').style.display = this.value === 'custom' ? 'block' : 'none';">
+                    <option value="auto" selected>Auto / Mixed</option>
+                    <option value="custom">Custom Distribution</option>
+                </select>
+                <div id="mq-type-custom" style="display:none; margin-top:10px; background:#f8fafc; padding:10px; border-radius:5px; border:1px solid #e2e8f0;">
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">Multiple Choice</label><input type="number" id="mq-type-mc" class="form-control form-control-sm" value="8" min="0"></div>
+                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">True/False</label><input type="number" id="mq-type-tf" class="form-control form-control-sm" value="1" min="0"></div>
+                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">Essay</label><input type="number" id="mq-type-es" class="form-control form-control-sm" value="1" min="0"></div>
+                        <div style="flex:1; min-width:80px;"><label style="font-size:0.8em">Short Ans</label><input type="number" id="mq-type-sa" class="form-control form-control-sm" value="0" min="0"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="ain-modal-footer">
+            <button id="generate-moodle-quiz" class="btn-premium w-100"><i class="fa fa-magic"></i> Generate Quiz</button>
+        </div>
+    </div>
+</div>
+{{/is_readonly}}
+{{/is_teacher}}
+
+<!-- Configuration Modal -->
+<div id="settings-modal" class="ain-modal-overlay">
+    <div class="ain-modal-content">
+        <div class="ain-modal-header">
+            <h3>Configure chat</h3>
+            <button id="close-settings" class="btn-icon"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="ain-modal-body">
+            <p class="ain-modal-desc">Notebooks can be customised to help you achieve different goals: do research, help learn, show various perspectives or converse in a particular style and tone.</p>
+            
+            <div class="setting-group">
+                <label>Define your conversational goal, style or role</label>
+                <select id="chat-style" class="custom-select">
+                    <option value="general">Best for general purpose research and brainstorming tasks.</option>
+                    <option value="tutor">Professional Tutor - patient and encouraging.</option>
+                    <option value="critic">Critical Thinker - challenges your assumptions.</option>
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <label>Choose your response length</label>
+                <select id="chat-length" class="custom-select">
+                    <option value="short">Short & Concise</option>
+                    <option value="medium" selected>Balanced</option>
+                    <option value="long">Detailed & Comprehensive</option>
+                </select>
+            </div>
+        </div>
+        <div class="ain-modal-footer">
+            <button id="save-settings" class="btn-premium">Save Settings</button>
+        </div>
+    </div>
+</div>
+
+<!-- Convert to Quiz Modal -->
+{{#is_teacher}}
+{{^is_readonly}}
+<div id="convert-quiz-modal" class="ain-modal-overlay">
+    <div class="ain-modal-content" style="max-width: 500px;">
+        <div class="ain-modal-header">
+            <h3><i class="fa fa-graduation-cap"></i> Convert to Moodle Quiz</h3>
+            <button id="close-convert-quiz" class="btn-icon"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="ain-modal-body form-vertical">
+            <div class="form-group">
+                <label>Quiz Name</label>
+                <input type="text" id="cq-name" class="form-control" value="AI Generated Quiz">
+            </div>
+            <div class="form-group">
+                <label>Quiz Description/Intro</label>
+                <textarea id="cq-intro" class="form-control" rows="3">Please answer the following questions carefully.</textarea>
+            </div>
+        </div>
+        <div class="ain-modal-footer">
+            <button id="confirm-convert-quiz" class="btn-premium w-100"><i class="fa fa-check"></i> Create Quiz</button>
+        </div>
+    </div>
+</div>
+{{/is_readonly}}
+{{/is_teacher}}
+
+{{#js}}
+    var cmid = {{cmid}};
+    var sesskey = '{{sesskey}}';
+    var wwwroot = '{{wwwroot}}';
+    var activityName = {{#activityname}}{{{activityname}}}{{/activityname}}{{^activityname}}'DEMI AI Tutor'{{/activityname}};
+    var pdfLogoUrl = '{{pdf_logo_url}}';
+    var studentName = '{{target_fullname}}';
+    var studentFirstName = '{{target_firstname}}';
+    var courseFullname = '{{course_fullname}}';
+    var studentId = '{{target_idnumber}}';
+    var notebookName = {{#activityname}}{{{activityname}}}{{/activityname}}{{^activityname}}'DEMI AI Tutor'{{/activityname}};
+    var savedArtifacts = {{#saved_json}}{{{saved_json}}}{{/saved_json}}{{^saved_json}}[]{{/saved_json}};
+    var isReadonly = {{#is_readonly}}true{{/is_readonly}}{{^is_readonly}}false{{/is_readonly}};
+    var isTeacher = {{#is_teacher}}true{{/is_teacher}}{{^is_teacher}}false{{/is_teacher}};
+
+    console.log("AI Notebook JS Loaded. CMID: " + cmid);
+
+    if (typeof mermaid !== "undefined") {
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: "default",
+            securityLevel: "loose",
+            flowchart: { useMaxWidth: false, htmlLabels: true }
+        });
+    }
+
+    /* Global handlers available immediately. */
+    window.switchSidebarTab = function(tabId, btnEl) {
+        document.querySelectorAll('.sidebar-tab-content').forEach(function(el) {
+            el.classList.remove('active');
+        });
+        document.querySelectorAll('.sidebar-tab-header .tab-btn').forEach(function(el) {
+            el.classList.remove('active');
+        });
+        var target = document.getElementById(tabId);
+        if (target) target.classList.add('active');
+        if (btnEl) btnEl.classList.add('active');
+    };
+
+    window.filterTopicFocus = function(topicName, cardEl) {
+        document.querySelectorAll('.syllabus-topic-card').forEach(function(c) {
+            c.classList.remove('active');
+        });
+        if (cardEl) cardEl.classList.add('active');
+
+        var headerSub = document.querySelector('.chat-header .chat-subtitle');
+        if (headerSub) {
+            if (topicName === 'All Course Materials') {
+                headerSub.innerText = 'All Course Materials · Direct Discussion Thread';
+            } else {
+                headerSub.innerText = 'Topic Focus: ' + topicName + ' · Direct Discussion Thread';
+            }
+        }
+
+        require(['core/notification'], function(Notification) {
+            Notification.addNotification({
+                message: 'DEMI AI Tutor focus set to: ' + topicName,
+                type: 'info'
+            });
+        });
+    };
+
+        var currentSessionId = "{{active_session_id}}" || null;
+
+        window.startNewSession = function() {
+            currentSessionId = "sess_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
+            var messages = document.getElementById("chat-messages");
+            if (messages) {
+                var welcomeHTML = '<div class="message ai welcome-msg">' +
+                    '<div class="ai-avatar-icon">DEMI</div>' +
+                    '<div class="message-bubble-body">' +
+                        '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span></div>' +
+                        '<div class="message-text">' +
+                            'Hello <strong>' + studentFirstName + '</strong>! I am your DEMI AI Academic Tutor for <strong>' + courseFullname + '</strong>.<br><br>' +
+                            'I am connected to your lecture modules, presentation slides, and syllabus on E-Campus. Ask any questions about concepts, or trigger a study tool below!' +
+                            '<div class="study-tools-inline-box">' +
+                                '<span class="tools-title">Study Tools:</span>' +
+                                '<div class="tools-chips-group">' +
+                                    '<button class="study-tool-chip" onclick="window.sendSuggested(\'Generate an interactive quiz from my materials.\', \'quiz\')">📝 Interactive Quiz</button>' +
+                                    '<button class="study-tool-chip" onclick="window.sendSuggested(\'Generate a concept mindmap structure.\', \'mindmap\')">📊 Concept Mindmap</button>' +
+                                    '<button class="study-tool-chip" onclick="window.sendSuggested(\'Generate a detailed study summary.\', \'summary\')">📄 Study Summary</button>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+                messages.innerHTML = welcomeHTML;
+            }
+            document.querySelectorAll("#session-history-list .session-history-card").forEach(function(el) {
+                el.classList.remove("active");
+            });
+            var input = document.getElementById("chat-input");
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+            require(['core/notification'], function(Notification) {
+                Notification.addNotification({
+                    message: 'New Tutoring Session Started! Active discussion thread cleared.',
+                    type: 'info'
+                });
+            });
+        };
+
+        window.loadSession = function(sessionId, cardEl) {
+            if (!sessionId) return;
+            currentSessionId = sessionId;
+
+            document.querySelectorAll("#session-history-list .session-history-card").forEach(function(el) {
+                el.classList.remove("active");
+            });
+            if (cardEl) cardEl.classList.add("active");
+
+            var messages = document.getElementById("chat-messages");
+            if (messages) {
+                messages.innerHTML = '<div class="message ai typing"><i class="fa fa-circle-o-notch fa-spin"></i> Loading session messages...</div>';
+            }
+
+            fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?cmid=" + cmid + "&action=fetch_session_messages&session_id=" + encodeURIComponent(sessionId) + "&sesskey=" + sesskey)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success && d.messages && messages) {
+                    var html = '<div class="message ai welcome-msg">' +
+                        '<div class="ai-avatar-icon">DEMI</div>' +
+                        '<div class="message-bubble-body">' +
+                            '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span></div>' +
+                            '<div class="message-text">Session loaded. Continue your discussion below!</div>' +
+                        '</div>' +
+                    '</div>';
+
+                    d.messages.forEach(function(m) {
+                        var parsedUser = m.user_message.replace(/\n/g, '<br>');
+                        var parsedAi = (typeof marked !== 'undefined') ? marked.parse(m.ai_response) : m.ai_response.replace(/\n/g, '<br>');
+
+                        html += '<div class="message user">' +
+                            '<div class="message-bubble-body">' +
+                                '<div class="message-meta-header"><span class="meta-author">' + studentName + '</span><span class="meta-time">' + m.time + '</span></div>' +
+                                '<div class="message-text">' + parsedUser + '</div>' +
+                            '</div>' +
+                        '</div>';
+
+                        html += '<div class="message ai">' +
+                            '<div class="ai-avatar-icon">DEMI</div>' +
+                            '<div class="message-bubble-body">' +
+                                '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span><span class="meta-time">' + m.time + '</span></div>' +
+                                '<div class="message-text"><div class="markdown-body">' + parsedAi + '</div></div>' +
+                            '</div>' +
+                        '</div>';
+                    });
+
+                    messages.innerHTML = html;
+                    if (typeof window.scanHistoryForArtifacts === "function") {
+                        window.scanHistoryForArtifacts();
+                    }
+                    messages.scrollTop = messages.scrollHeight;
+                }
+            })
+            .catch(function(err) {
+                console.error("Error loading session:", err);
+            });
+        };
+
+        window.refreshSessionsList = function() {
+            fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?cmid=" + cmid + "&action=fetch_sessions&sesskey=" + sesskey)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success && d.sessions) {
+                    var container = document.getElementById("session-history-list");
+                    if (!container) return;
+                    if (d.sessions.length === 0) {
+                        container.innerHTML = '<div class="empty-history-notice"><i class="fa fa-comments-o"></i><p>No past chat sessions found.</p><span class="subtext">Start asking questions below!</span></div>';
+                        return;
+                    }
+                    var html = '';
+                    d.sessions.forEach(function(s) {
+                        var isActive = s.session_id === currentSessionId ? ' active' : '';
+                        html += '<div class="session-history-card' + isActive + '" data-session-id="' + s.session_id + '" onclick="window.loadSession(\'' + s.session_id + '\', this)">' +
+                            '<div class="session-card-header">' +
+                                '<span class="session-course-tag">' + s.course_fullname + '</span>' +
+                                '<span class="session-time-ago">' + s.rel_time + '</span>' +
+                            '</div>' +
+                            '<p class="session-snippet">' + s.title + '</p>' +
+                            '<span class="session-msg-count"><i class="fa fa-comments-o"></i> ' + s.message_count + ' messages</span>' +
+                        '</div>';
+                    });
+                    container.innerHTML = html;
+                }
+            });
+        };
+
+        window.sendSuggested = function(text, toolType = null) {
+            var input = document.getElementById("chat-input");
+            if (input) {
+                input.value = text;
+                var btn = document.getElementById("send-btn");
+                if (btn) btn.click();
+            }
+        };
+
+    window.openMoodleQuizGenerator = function() {
+        var modal = document.getElementById("moodle-quiz-modal");
+        if (modal) modal.classList.add("active");
+    };
+
+    var initChat = function() {
+        console.log("Initializing Chat UI...");
+        var sendBtn = document.getElementById("send-btn");
+        var input = document.getElementById("chat-input");
+        var messages = document.getElementById("chat-messages");
+        var resultsContainer = document.getElementById("creator-results");
+        var resultsContent = document.getElementById("results-content");
+        var downloadBtn = document.getElementById("download-result");
+
+        if (!sendBtn || !input || !messages) return false;
+
+        /* Attach listeners early! */
+        sendBtn.onclick = function(e) {
+            e.preventDefault();
+            sendMessage();
+        };
+
+        input.onkeypress = function(e) {
+            if (e.keyCode === 13) {
+                e.preventDefault();
+                sendMessage();
+            }
+        };
+
+        if (typeof mermaid !== "undefined") {
+            mermaid.initialize({ startOnLoad: false, theme: "base", securityLevel: "loose" });
+        }
+
+        var artifactHistory = [];
+
+        var getIcon = function(type) {
+            if (type === "quiz") return "fa-question-circle";
+            if (type === "mindmap") return "fa-sitemap";
+            if (type === "summary") return "fa-file-text-o";
+            return "fa-magic";
+        };
+
+        var updateHistoryList = function() {
+            var list = document.getElementById("history-list");
+            if (!list) return;
+            if (artifactHistory.length === 0) {
+                list.innerHTML = '<p class="no-history">No materials generated yet.</p>';
+                return;
+            }
+            list.innerHTML = "";
+            artifactHistory.slice().reverse().forEach((art, i) => {
+                var realIdx = artifactHistory.length - 1 - i;
+                var item = document.createElement("div");
+                item.className = "history-item " + art.type + (art.saved ? " is-saved" : "");
+                item.innerHTML = '<div class="history-main" onclick="window.renderHistoryItem(' + realIdx + ')">' +
+                    '<i class="fa ' + getIcon(art.type) + '"></i>' +
+                    '<span>' + art.title + '</span>' +
+                '</div>' +
+                '<div class="history-actions">' +
+                    (!art.saved && !isReadonly ? '<button title="Save to Database" onclick="window.saveArtifact(' + realIdx + ')"><i class="fa fa-save"></i></button>' : '<span class="saved-badge"><i class="fa fa-check-circle"></i></span>') +
+                    (!isReadonly ? '<button title="Delete" onclick="window.deleteArtifact(' + realIdx + ')"><i class="fa fa-trash"></i></button>' : '') +
+                '</div>';
+                list.appendChild(item);
+            });
+        };
+        /* Load from DB. */
+        if (savedArtifacts && savedArtifacts.length > 0) {
+            savedArtifacts.forEach(a => {
+                artifactHistory.push({
+                    dbid: a.id,
+                    type: a.type,
+                    data: JSON.parse(a.content),
+                    title: a.title,
+                    saved: true
+                });
+            });
+            updateHistoryList();
+        }
+
+        /* UI Handlers. */
+        var modal = document.getElementById("settings-modal");
+        var openBtn = document.getElementById("open-settings");
+        var closeBtn = document.getElementById("close-settings");
+        var saveBtn = document.getElementById("save-settings");
+
+        if (openBtn && modal) {
+            openBtn.onclick = function() { modal.classList.add("active"); };
+        }
+        if (closeBtn && modal) {
+            closeBtn.onclick = function() { modal.classList.remove("active"); };
+        }
+        if (saveBtn && modal) {
+            saveBtn.onclick = function() {
+                var config = {
+                    style: document.getElementById("chat-style").value,
+                    length: document.getElementById("chat-length").value
+                };
+                localStorage.setItem("ainotebook_config", JSON.stringify(config));
+                modal.classList.remove("active");
+                
+                /* Visual feedback. */
+                var originalText = saveBtn.innerHTML;
+                saveBtn.innerHTML = "<i class='fa fa-check'></i> Saved!";
+                setTimeout(() => { saveBtn.innerHTML = originalText; }, 2000);
+            };
+        }
+
+        /* Load existing config. */
+        var savedConfig = localStorage.getItem("ainotebook_config");
+        if (savedConfig) {
+            var config = JSON.parse(savedConfig);
+            if (document.getElementById("chat-style")) document.getElementById("chat-style").value = config.style;
+            if (document.getElementById("chat-length")) document.getElementById("chat-length").value = config.length;
+        }
+
+        var mqModal = document.getElementById("moodle-quiz-modal");
+        var mqCloseBtn = document.getElementById("close-moodle-quiz");
+        var mqGenerateBtn = document.getElementById("generate-moodle-quiz");
+        
+        window.openQuizGenerator = function() {
+            if (mqModal) mqModal.classList.add("active");
+        };
+
+        if (mqCloseBtn && mqModal) {
+            mqCloseBtn.onclick = function() { mqModal.classList.remove("active"); };
+        }
+        if (mqGenerateBtn && mqModal) {
+            mqGenerateBtn.onclick = function() {
+                var count = parseInt(document.getElementById("mq-count").value) || 10;
+                
+                var diffMode = document.getElementById("mq-diff-mode").value;
+                var diffStr = "Auto / Random";
+                if (diffMode === "custom") {
+                    var e = document.getElementById("mq-diff-easy").value || 0;
+                    var m = document.getElementById("mq-diff-medium").value || 0;
+                    var h = document.getElementById("mq-diff-hard").value || 0;
+                    var x = document.getElementById("mq-diff-expert").value || 0;
+                    diffStr = "Exactly " + e + " Easy, " + m + " Medium, " + h + " Hard, and " + x + " Expert questions.";
+                }
+                
+                var typeMode = document.getElementById("mq-type-mode").value;
+                var typeStr = "Mixed / Random";
+                if (typeMode === "custom") {
+                    var mc = document.getElementById("mq-type-mc").value || 0;
+                    var tf = document.getElementById("mq-type-tf").value || 0;
+                    var es = document.getElementById("mq-type-es").value || 0;
+                    var sa = document.getElementById("mq-type-sa").value || 0;
+                    typeStr = "Exactly " + mc + " Multiple Choice, " + tf + " True/False, " + es + " Essay, and " + sa + " Short Answer questions.";
+                }
+
+                mqModal.classList.remove("active");
+                
+                var prompt = "Generate a quiz with exactly " + count + " questions based on the materials.\n\n";
+                prompt += "Difficulty Distribution: " + diffStr + "\n";
+                prompt += "Question Type Distribution: " + typeStr + "\n\n";
+                prompt += "CRITICAL INSTRUCTION: You MUST follow these exact numbers. Do not generate more or fewer questions than requested. Include 'type' property in the JSON for each question ('multichoice', 'truefalse', 'essay', or 'shortanswer').";
+                
+                window.sendSuggested(prompt, 'quiz');
+            };
+        }
+        
+        var selectAll = document.getElementById("select-all-files");
+        if (selectAll) {
+            selectAll.onchange = function() {
+                document.querySelectorAll(".file-checkbox").forEach(cb => cb.checked = selectAll.checked);
+            };
+        }
+
+        var detectAndRenderArtifacts = function(text, type, addToHistory = true, customTarget = null) {
+            var found = false;
+            var artifact = null;
+            var cleanText = text;
+            var artType = null;
+
+            // 1. Check for QUIZ (Support both json-quiz and plain json tags).
+            var quizMatch = text.match(/```(?:json-quiz|json)\s*([\s\S]*?)```/);
+            if (quizMatch) {
+                try {
+                    var raw = quizMatch[1].trim();
+                    var parsed = JSON.parse(raw);
+                    var quizData = parsed.quiz || (parsed.questions ? parsed : null);
+                    if (quizData && quizData.questions) {
+                        artType = "quiz";
+                        artifact = { type: "quiz", data: quizData, title: "Quiz - " + new Date().toLocaleTimeString() };
+                        cleanText = text.replace(quizMatch[0], "").trim();
+                        found = true;
+                        console.log("Detected Quiz artifact.");
+                    }
+                } catch (e) {
+                    console.error("Quiz JSON parse error:", e);
+                }
+            }
+
+            // 2. Check for MINDMAP (Mermaid).
+            if (!found) {
+                var mermaidMatch = text.match(/```mermaid\s*([\s\S]*?)```/i);
+                if (!mermaidMatch) {
+                    var rootDslMatch = text.match(/(?:^|\n)(root\s+['"].*?['"][\s\S]*?)(?=(?:\n\s*This\s+mindmap|\n\s*Explanation|\n\s*Detailed|$))/i);
+                    if (rootDslMatch) {
+                        mermaidMatch = [rootDslMatch[0], rootDslMatch[1]];
+                    }
+                }
+                if (mermaidMatch) {
+                    artType = "mindmap";
+                    artifact = { type: "mindmap", data: mermaidMatch[1].trim(), title: "Mindmap - " + new Date().toLocaleTimeString() };
+                    cleanText = text.replace(mermaidMatch[0], "").trim();
+                    found = true;
+                    console.log("Detected Mindmap artifact.");
+                }
+            }
+
+            // 3. Check for SUMMARY.
+            if (!found) {
+                var summaryMatch = text.match(/\[(?:SUMMARY|REPORT)_START\]([\s\S]*?)\[(?:SUMMARY|REPORT)_END\]/);
+                if (summaryMatch) {
+                    artType = "summary";
+                    artifact = { type: "summary", data: summaryMatch[1].trim(), title: "Summary - " + new Date().toLocaleTimeString() };
+                    cleanText = text.replace(summaryMatch[0], "").trim();
+                    found = true;
+                    console.log("Detected Summary artifact.");
+                }
+            }
+
+            if (found && artifact) {
+                if (addToHistory) {
+                    artifactHistory.push(artifact);
+                    updateHistoryList();
+                }
+                renderArtifact(artifact, customTarget);
+                return { found: true, type: artType, cleanText: cleanText };
+            }
+
+            return { found: false, cleanText: text };
+        };
+
+
+        window.renderHistoryItem = function(idx) {
+            window.lastRenderedIdx = idx;
+            renderArtifact(artifactHistory[idx]);
+        };
+
+        window.saveArtifact = function(idx) {
+            var art = artifactHistory[idx];
+            var formData = new FormData();
+            formData.append("cmid", cmid);
+            formData.append("sesskey", sesskey);
+            formData.append("type", art.type);
+            formData.append("title", art.title);
+            formData.append("content", JSON.stringify(art.data));
+
+            fetch(wwwroot + "/mod/ainotebook/save_artifact_ajax.php", {
+                method: "POST",
+                body: formData
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    art.saved = true;
+                    art.dbid = d.id;
+                    updateHistoryList();
+                    require(['core/notification'], function(Notification) { Notification.addNotification({message: 'Successfully saved to database!', type: 'success'}); });
+                } else require(['core/notification'], function(Notification) { Notification.addNotification({message: 'Error saving: ' + d.error, type: 'error'}); });
+            });
+        };
+
+        window.deleteArtifact = function(idx) {
+            var art = artifactHistory[idx];
+            require(['core/notification'], function(Notification) {
+                Notification.confirm("Delete Artifact", "Are you sure you want to delete this generated item?", "Delete", "Cancel", function() {
+                if (art.saved && art.dbid) {
+                    var formData = new FormData();
+                    formData.append("artifactid", art.dbid);
+                    formData.append("sesskey", sesskey);
+                    fetch(wwwroot + "/mod/ainotebook/delete_artifact_ajax.php", {
+                        method: "POST",
+                        body: formData
+                    })
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.success) {
+                            artifactHistory.splice(idx, 1);
+                            updateHistoryList();
+                        }
+                    });
+                } else {
+                    artifactHistory.splice(idx, 1);
+                    updateHistoryList();
+                }
+                });
+            });
+        };
+
+        var setPrintLandscape = function(isLandscape) {
+            var styleEl = document.getElementById("print-orientation-style");
+            if (!styleEl) {
+                styleEl = document.createElement("style");
+                styleEl.id = "print-orientation-style";
+                document.head.appendChild(styleEl);
+            }
+            if (isLandscape) {
+                styleEl.innerHTML = "@media print { @page { size: landscape; margin: 0.5cm; } }";
+            } else {
+                styleEl.innerHTML = "";
+            }
+        };
+
+        var renderArtifact = function(art, customTarget = null) {
+            window.lastRenderedIdx = artifactHistory.indexOf(art);
+            if (art.type === "mindmap") {
+                setPrintLandscape(true);
+                renderMindmap(art.data, customTarget);
+            } else {
+                setPrintLandscape(false);
+                if (art.type === "quiz") renderQuiz(art.data, customTarget);
+                if (art.type === "summary") renderSummary(art.data, customTarget);
+            }
+        };
+
+        var getOrCreateTargetContainer = function() {
+            if (resultsContent) return resultsContent;
+            var aiMsgs = document.querySelectorAll(".message.ai .markdown-body, .message.ai .message-text");
+            if (aiMsgs.length > 0) return aiMsgs[aiMsgs.length - 1];
+            return null;
+        };
+
+        var renderQuiz = function(data, customTarget = null) {
+            if (resultsContainer && !customTarget) resultsContainer.style.display = "block";
+            var target = customTarget || getOrCreateTargetContainer();
+            if (!target) return;
+            
+            if (!data || !data.questions || data.questions.length === 0) return;
+
+            var containerId = "quiz-container-" + Math.random().toString(36).substring(2, 9);
+            target.innerHTML = "<div id='" + containerId + "' class='interactive-quiz-wrapper'></div>";
+            var container = target.querySelector("#" + containerId) || target;
+            
+            var currentIdx = 0;
+            var score = 0;
+            var total = data.questions.length;
+            var isAnswered = false;
+            var selectedOption = null;
+
+            var showQuestion = function(idx) {
+                isAnswered = false;
+                selectedOption = null;
+                container.innerHTML = "";
+
+                var q = data.questions[idx];
+                var correctAnswer = q.answer;
+                if (typeof correctAnswer === "string") {
+                    var upper = correctAnswer.trim().toUpperCase();
+                    if (upper.length === 1 && upper >= "A" && upper <= "E") {
+                        correctAnswer = upper.charCodeAt(0) - 65;
+                    } else {
+                        correctAnswer = parseInt(upper) || 0;
+                    }
+                }
+
+                var qText = q.text || q.question || "No question text provided.";
+                var alpha = ["A", "B", "C", "D", "E"];
+                var opts = q.options || ["True", "False"];
+
+                var card = document.createElement("div");
+                card.className = "demi-quiz-card";
+
+                var headerHTML = '<div class="demi-quiz-header">' +
+                    '<span class="demi-quiz-step">Question ' + (idx + 1) + ' of ' + total + '</span>' +
+                    '<span class="demi-quiz-score">Current Score: ' + score + '/' + total + '</span>' +
+                '</div>';
+
+                var qTextHTML = '<h4 class="demi-quiz-question">' + qText + '</h4>';
+
+                var optionsHTML = '<div class="demi-quiz-options">';
+                opts.forEach(function(opt, oi) {
+                    optionsHTML += '<button type="button" class="demi-quiz-opt-btn" data-idx="' + oi + '">' +
+                        '<span class="demi-quiz-opt-badge">' + (alpha[oi] || oi) + '</span>' +
+                        '<span class="demi-quiz-opt-text">' + opt + '</span>' +
+                    '</button>';
+                });
+                optionsHTML += '</div>';
+
+                var footerHTML = '<div class="demi-quiz-footer">' +
+                    '<div class="demi-quiz-hint-wrap">' +
+                        (q.hint ? '<button type="button" class="demi-quiz-hint-btn">💡 Need a Hint?</button><div class="demi-quiz-hint-box" style="display:none;"><strong>Hint:</strong> ' + q.hint + '</div>' : '') +
+                    '</div>' +
+                    '<button type="button" class="demi-quiz-next-btn" style="display:none;">' + (idx === total - 1 ? 'Finish Quiz' : 'Next Question →') + '</button>' +
+                '</div>';
+
+                card.innerHTML = headerHTML + qTextHTML + optionsHTML + footerHTML;
+                container.appendChild(card);
+
+                var optBtns = card.querySelectorAll(".demi-quiz-opt-btn");
+                var nextBtn = card.querySelector(".demi-quiz-next-btn");
+                var hintBtn = card.querySelector(".demi-quiz-hint-btn");
+                var hintBox = card.querySelector(".demi-quiz-hint-box");
+
+                if (hintBtn && hintBox) {
+                    hintBtn.onclick = function() {
+                        hintBox.style.display = "block";
+                        hintBtn.style.display = "none";
+                    };
+                }
+
+                optBtns.forEach(function(btn) {
+                    btn.onclick = function() {
+                        if (isAnswered) return;
+                        isAnswered = true;
+                        var chosenIdx = parseInt(this.getAttribute("data-idx"));
+                        selectedOption = chosenIdx;
+
+                        if (chosenIdx === correctAnswer) {
+                            score++;
+                        }
+
+                        optBtns.forEach(function(b, oi) {
+                            b.disabled = true;
+                            if (oi === correctAnswer) {
+                                b.classList.add("correct");
+                            } else if (oi === chosenIdx) {
+                                b.classList.add("incorrect");
+                            } else {
+                                b.classList.add("dimmed");
+                            }
+                        });
+
+                        if (nextBtn) {
+                            nextBtn.style.display = "inline-flex";
+                        }
+                    };
+                });
+
+                if (nextBtn) {
+                    nextBtn.onclick = function() {
+                        if (idx < total - 1) {
+                            showQuestion(idx + 1);
+                        } else {
+                            showCompletionCard();
+                        }
+                    };
+                }
+            };
+
+            var showCompletionCard = function() {
+                var pct = Math.round((score / total) * 100);
+                container.innerHTML = '<div class="demi-quiz-completed-card">' +
+                    '<div class="demi-quiz-completed-header">' +
+                        '<div class="demi-quiz-completed-title">' +
+                            '<i class="fa fa-question-circle" style="color:#d97706; font-size:1.1rem;"></i>' +
+                            '<h4 style="margin:0; font-size:0.95rem; font-weight:700;">Quiz Completed!</h4>' +
+                        '</div>' +
+                        '<span class="demi-quiz-completed-badge">' + pct + '% Score</span>' +
+                    '</div>' +
+                    '<p class="demi-quiz-completed-desc">' +
+                        'You answered <strong>' + score + '</strong> out of <strong>' + total + '</strong> questions correctly.' +
+                    '</p>' +
+                    '<div class="demi-quiz-completed-actions">' +
+                        '<button type="button" class="demi-quiz-tryagain-btn"><i class="fa fa-refresh"></i> Try Again</button>' +
+                    '</div>' +
+                '</div>';
+
+                var tryAgainBtn = container.querySelector(".demi-quiz-tryagain-btn");
+                if (tryAgainBtn) {
+                    tryAgainBtn.onclick = function() {
+                        score = 0;
+                        showQuestion(0);
+                    };
+                }
+
+                if (!isReadonly) {
+                    var formData = new FormData();
+                    formData.append("cmid", cmid);
+                    formData.append("action", "submit_quiz_grade");
+                    formData.append("score", score);
+                    formData.append("maxscore", total);
+                    formData.append("sesskey", sesskey);
+                    fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?t=" + Date.now(), {
+                        method: "POST",
+                        body: formData
+                    }).then(r => r.json()).then(res => {
+                        if(res.success) {
+                            var div = document.createElement("div");
+                            div.className = "gradebook-sync-msg";
+                            div.innerHTML = "<i class='fa fa-check-circle'></i> Score synchronized with Gradebook!";
+                            var actionsDiv = container.querySelector(".demi-quiz-completed-actions");
+                            if (actionsDiv) actionsDiv.appendChild(div);
+                        }
+                    });
+                }
+            };
+
+            showQuestion(0);
+        };
+
+        var prepareFormalHeader = function(title) {
+            var now = new Date().toLocaleDateString();
+            return '<div class="pdf-cover-page">' +
+                '<div class="pdf-cover-logo">' +
+                    '<img src="' + pdfLogoUrl + '" class="pdf-brand-logo-large">' +
+                    '<div class="pdf-brand-text-large">' +
+                        '<h1 class="pdf-univ-title">PRESIDENT</h1>' +
+                        '<h1 class="pdf-univ-subtitle">UNIVERSITY</h1>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="pdf-cover-main">' +
+                    '<h1 class="pdf-report-title">' + (title ? title.toUpperCase() : '') + ':<br/>' + (activityName ? activityName.toUpperCase() : '') + '</h1>' +
+                '</div>' +
+                '<div class="pdf-cover-footer">' +
+                    '<div class="pdf-info-card">' +
+                        '<div class="info-row" style="font-weight: 800;">' + studentName + '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="pdf-page-header">' +
+                '<div class="pdf-header-label">' + (title ? title.toUpperCase() : '') + '</div>' +
+            '</div>';
+        };
+
+        // ── Mermaid syntax sanitizer (mirrors PHP-side sanitize_mermaid) ─────────
+        var sanitizeMermaid = function(code) {
+            var clean = code.replace(/^```(?:mermaid)?/im, '').replace(/```$/m, '').trim();
+
+            if (/root\s+['"].*?['"]/i.test(clean) || (clean.indexOf('subgraph') !== -1 && clean.indexOf('graph TD') === -1)) {
+                var lines = clean.split("\n");
+                var graphLines = ["graph TD"];
+                var rootId = "root_node";
+                var nodeLabels = {};
+                var connections = [];
+                var currentParent = "";
+
+                lines.forEach(function(line) {
+                    var t = line.trim();
+                    if (!t) return;
+
+                    var rootMatch = t.match(/^root\s+['"](.*?)['"]\s*;?/i);
+                    if (rootMatch) {
+                        nodeLabels[rootId] = rootMatch[1].replace(/"/g, "'");
+                        return;
+                    }
+
+                    if (/^subgraph\s+/i.test(t) || t.toLowerCase() === 'end') {
+                        return;
+                    }
+
+                    var labelMatch = t.match(/^([A-Za-z0-9_]+)\s+['"](.*?)['"]\s*;?/);
+                    if (labelMatch) {
+                        var id = labelMatch[1];
+                        var label = labelMatch[2].replace(/"/g, "'");
+                        nodeLabels[id] = label;
+                        return;
+                    }
+
+                    if (/^[A-Za-z0-9_]+$/.test(t)) {
+                        currentParent = (t === 'root') ? rootId : t;
+                        return;
+                    }
+
+                    if (currentParent && /^[A-Za-z0-9_;\s]+$/.test(t)) {
+                        var children = t.split(';').map(function(c) { return c.trim(); }).filter(Boolean);
+                        children.forEach(function(child) {
+                            if (child !== currentParent && child.toLowerCase() !== 'root') {
+                                connections.push({ from: currentParent, to: child });
+                            }
+                        });
+                        return;
+                    }
+                });
+
+                Object.keys(nodeLabels).forEach(function(id) {
+                    var safeLabel = nodeLabels[id].replace(/[\[\]\(\)\{\}]/g, ' ');
+                    graphLines.push("    " + id + '["' + safeLabel + '"]');
+                });
+
+                connections.forEach(function(conn) {
+                    graphLines.push("    " + conn.from + " --> " + conn.to);
+                });
+
+                if (graphLines.length > 1) {
+                    return graphLines.join("\n");
+                }
+            }
+
+            var lines = clean.split("\n");
+            var out = [];
+            lines.forEach(function(line) {
+                var t = line.trimEnd();
+                // 1. Node labels with () must be quoted: A[X (Y)]  →  A["X (Y)"]
+                t = t.replace(/([A-Za-z0-9_]+)\[([^\]"]*\([^\]]*\)[^\]"]*)\]/g, function(_, id, label) {
+                    return id + '["' + label.replace(/"/g, "'") + '"]';
+                });
+                // 2. Stray > after pipe: -->|Label|>  →  -->|Label| 
+                t = t.replace(/\|>\s*/g, "| ");
+                // 3. Missing space before target: -->|Label|B[  →  -->|Label| B[
+                t = t.replace(/(\|)([A-Za-z_][A-Za-z0-9_]*)\[/g, "$1 $2[");
+                // 4. Split chained arrows: A[x] -->|y| B[z] -->|w| C  →  separate lines
+                if ((t.match(/-->/g) || []).length > 1) {
+                    // Split after ] or identifier when followed by another --> chain
+                    var parts = t.split(/(?<=[\]A-Za-z0-9_])\s+(?=[A-Za-z0-9_]+(\s*-->|\s*\[))/);
+                    if (parts.length > 1) {
+                        parts.forEach(function(p) { if (p.trim()) out.push("    " + p.trim()); });
+                        return;
+                    }
+                }
+                // 5. Remove trailing connector with no target
+                t = t.replace(/-->\s*\|[^|]+\|\s*$/, "");
+                // 6. Remove duplicate arrows
+                t = t.replace(/-->\s*-->/g, "-->");
+                if (t.trim()) out.push(t);
+            });
+            return out.join("\n");
+        };
+
+        var renderMindmap = function(data, customTarget = null) {
+            if (resultsContainer && !customTarget) resultsContainer.style.display = "block";
+            var target = customTarget || getOrCreateTargetContainer();
+            if (!target) return;
+            var cleanData = sanitizeMermaid(data);
+
+            target.innerHTML = prepareFormalHeader("Mindmap Visualization") + "<h3>Mindmap Concept</h3><div id='mermaid-container' class='mermaid'>" + cleanData + "</div>";
+            try {
+                mermaid.init(undefined, target.querySelectorAll(".mermaid"));
+            } catch (err) {
+                console.error("Mermaid init error:", err);
+                var container = target.querySelector("#mermaid-container") || target;
+                if (container) container.innerHTML = "<div class='alert alert-warning'>Failed to render Mindmap. The AI generated invalid syntax. Please try again.</div>";
+            }
+            if (resultsContainer && !customTarget) resultsContainer.scrollIntoView({ behavior: "smooth" });
+
+            if (downloadBtn) {
+                downloadBtn.innerHTML = "<i class='fa fa-file-pdf-o'></i> Export as PDF";
+                downloadBtn.onclick = function() { window.print(); };
+            }
+        };
+
+        var renderSummary = function(content, customTarget = null) {
+            if (resultsContainer && !customTarget) resultsContainer.style.display = "block";
+            var target = customTarget || getOrCreateTargetContainer();
+            if (!target) return;
+
+            target.innerHTML = prepareFormalHeader("Study Summary") + "<div class=\'report-markdown\'>" + marked.parse(content) + "</div>";
+            if (resultsContainer && !customTarget) resultsContainer.scrollIntoView({ behavior: "smooth" });
+            
+            if (downloadBtn) {
+                downloadBtn.innerHTML = "<i class=\'fa fa-file-pdf-o\'></i> Export as PDF";
+                downloadBtn.onclick = function() {
+                    window.print();
+                };
+            }
+        };
+
+        var downloadFile = function(filename, text) {
+            var element = document.createElement("a");
+            element.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(text));
+            element.setAttribute("download", filename);
+            element.style.display = "none";
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        };
+
+        var addMessage = function(text, type) {
+            var msg = document.createElement("div");
+            msg.className = "message " + type;
+            var parsed = (typeof marked !== "undefined") ? marked.parse(text) : text.replace(/\n/g, "<br>");
+            
+            if (type === "user") {
+                msg.innerHTML = '<div class="message-bubble-body">' +
+                    '<div class="message-meta-header"><span class="meta-author">' + studentName + '</span></div>' +
+                    '<div class="message-text">' + parsed + '</div>' +
+                '</div>';
+            } else {
+                msg.innerHTML = '<div class="ai-avatar-icon">DEMI</div>' +
+                '<div class="message-bubble-body">' +
+                    '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span></div>' +
+                    '<div class="message-text"><div class="markdown-body">' + parsed + '</div></div>' +
+                '</div>';
+            }
+            messages.appendChild(msg);
+            messages.scrollTop = messages.scrollHeight;
+        };
+
+        window.sendMessage = function(silent = false) {
+            var val = input.value.trim();
+            if (val === "") return;
+
+            // Auto-detect tool keywords in chat to trigger loading states (ONLY if not silent).
+            if (!silent) {
+                var lowerVal = val.toLowerCase();
+                var toolType = null;
+                if (lowerVal.includes("quiz")) toolType = "quiz";
+                else if (lowerVal.includes("summary")) toolType = "summary";
+                else if (lowerVal.includes("mindmap") || lowerVal.includes("mind map")) toolType = "mindmap";
+
+                if (toolType) {
+                    var card = document.querySelector(".creator-card." + toolType);
+                    if (card) {
+                        card.classList.add("loading");
+                        var icon = card.querySelector(".card-icon i");
+                        if (icon) icon.className = "fa fa-circle-o-notch fa-spin";
+                    }
+                }
+                addMessage(val, "user");
+            }
+
+            input.value = "";
+            input.style.height = "auto";
+            
+            var typing = null;
+            var loadingInterval = null;
+            if (!silent) {
+                var loadingMessages = [
+                    "DEMI TUTOR is exploring materials...",
+                    "DEMI TUTOR is analyzing context...",
+                    "DEMI TUTOR is synthesizing knowledge...",
+                    "DEMI TUTOR is preparing your response..."
+                ];
+                var msgIdx = 0;
+                
+                typing = document.createElement("div");
+                typing.className = "message ai typing";
+                typing.innerHTML = "<i class=\'fa fa-circle-o-notch fa-spin\'></i> " + loadingMessages[0];
+                messages.appendChild(typing);
+                messages.scrollTop = messages.scrollHeight;
+
+                loadingInterval = setInterval(function() {
+                    msgIdx = (msgIdx + 1) % loadingMessages.length;
+                    typing.innerHTML = "<i class=\'fa fa-circle-o-notch fa-spin\'></i> " + loadingMessages[msgIdx];
+                }, 2000);
+            }
+
+            input.disabled = true;
+            sendBtn.disabled = true;
+
+            var selectedFiles = [];
+            document.querySelectorAll(".file-checkbox:checked").forEach(function(cb) {
+                selectedFiles.push(cb.value);
+            });
+
+            var formData = new FormData();
+            formData.append("cmid", cmid);
+            formData.append("message", val);
+            formData.append("sesskey", sesskey);
+            formData.append("selected_files", JSON.stringify(selectedFiles));
+            formData.append("silent", silent ? 1 : 0);
+            if (currentSessionId) {
+                formData.append("session_id", currentSessionId);
+            }
+            
+            var savedConfig = localStorage.getItem("ainotebook_config") || "{}";
+            formData.append("config", savedConfig);
+            
+            if (!silent) {
+                formData.append("action", "chat_stream");
+                
+                fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?t=" + Date.now(), {
+                    method: "POST",
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        if (loadingInterval) clearInterval(loadingInterval);
+                        if (typing && typing.parentNode) messages.removeChild(typing);
+                        addMessage("Error: Server returned status " + response.status, "ai");
+                        input.disabled = false;
+                        sendBtn.disabled = false;
+                        input.focus();
+                        return;
+                    }
+                    if (!response.body) {
+                        if (loadingInterval) clearInterval(loadingInterval);
+                        if (typing && typing.parentNode) messages.removeChild(typing);
+                        addMessage("Error: Browser does not support streaming.", "ai");
+                        input.disabled = false;
+                        sendBtn.disabled = false;
+                        input.focus();
+                        return;
+                    }
+                    
+                    var aiMsgDiv = null;
+                    var contentDiv = null;
+                    
+                    var reader = response.body.getReader();
+                    var decoder = new TextDecoder();
+                    var fullText = "";
+                    var displayedText = "";
+                    var sourcesCount = 0;
+                    var streamBuffer = "";
+                    
+                    var typeInterval = setInterval(function() {
+                        if (contentDiv && displayedText.length < fullText.length) {
+                            var charsToAdd = Math.max(1, Math.floor((fullText.length - displayedText.length) / 3));
+                            displayedText += fullText.substring(displayedText.length, displayedText.length + charsToAdd);
+                            
+                            // Sanitize raw codeblocks and raw suggestions during typing
+                            var cleanTyping = displayedText
+                                .replace(/```(?:json-quiz|json)[\s\S]*?(?:```|$)/gi, '\n\n*(⚡ Generating Interactive Quiz...)*')
+                                .replace(/```mermaid[\s\S]*?(?:```|$)/gi, '\n\n*(⚡ Generating Mindmap...)*')
+                                .replace(/\[(?:SUMMARY|REPORT)_START\][\s\S]*?(?:\[(?:SUMMARY|REPORT)_END\]|$)/gi, '\n\n*(⚡ Generating Summary...)*')
+                                .replace(/<suggestions>[\s\S]*?(?:<\/suggestions>|$)/gi, '')
+                                .replace(/(?:^|\n|\r)\s*[^\n\r\|]{2,}\|[^\n\r\|]{2,}(?:\|[^\n\r\|]{2,})?\s*$/gim, '');
+                                
+                            contentDiv.innerHTML = window.marked.parse(cleanTyping + " ▊");
+                            messages.scrollTop = messages.scrollHeight;
+                        }
+                    }, 30);
+                    
+                    var isFinalized = false;
+                    function finalizeCompletion() {
+                        if (isFinalized) return;
+                        isFinalized = true;
+                        
+                        clearInterval(typeInterval);
+                        if (loadingInterval) clearInterval(loadingInterval);
+                        if (typing && typing.parentNode) messages.removeChild(typing);
+                        
+                        input.disabled = false;
+                        sendBtn.disabled = false;
+                        input.focus();
+                        
+                        if (!aiMsgDiv) {
+                            addMessage("No response received from the AI.", "ai");
+                            return;
+                        }
+                        
+                        try {
+                            // Container box for inline artifact inside chat bubble
+                            var artifactBox = document.createElement("div");
+                            artifactBox.className = "inline-artifact-container";
+                            artifactBox.style.marginTop = "16px";
+                            
+                            var result = detectAndRenderArtifacts(fullText, "ai", true, artifactBox);
+                            var displayMsg = result.cleanText;
+                            
+                            // Robust Suggestion Extraction (Support <suggestions> AND raw pipe-separated strings)
+                            var extractedSuggestions = [];
+                            var sugMatch = displayMsg.match(/<suggestions>([\s\S]*?)<\/suggestions>/i);
+                            if (sugMatch) {
+                                var suggestionsStr = sugMatch[1];
+                                displayMsg = displayMsg.replace(sugMatch[0], "").trim();
+                                extractedSuggestions = suggestionsStr.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+                            } else {
+                                var pipeRegex = /(?:^|\n|\r)\s*([^\n\r\|]{2,}\|[^\n\r\|]{2,}(?:\|[^\n\r\|]{2,})?)\s*(?=\n|\r|$)/g;
+                                var pipeMatch = pipeRegex.exec(displayMsg);
+                                if (pipeMatch) {
+                                    var rawPipeStr = pipeMatch[1];
+                                    displayMsg = displayMsg.replace(pipeMatch[0], "").trim();
+                                    extractedSuggestions = rawPipeStr.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+                                }
+                            }
+                            
+                            if (sourcesCount > 0) {
+                                displayMsg += "\n\n<div class=\"context-source-badge\"><i class=\"fa fa-check-circle\"></i> Smart Context: Answer is generated using " + sourcesCount + " relevant material sources.</div>";
+                            }
+                            
+                            if (contentDiv) {
+                                contentDiv.innerHTML = window.marked.parse(displayMsg);
+                                if (result.found) {
+                                    contentDiv.appendChild(artifactBox);
+                                }
+                            }
+                            
+                            if (extractedSuggestions.length > 0) {
+                                renderSuggestions(extractedSuggestions, aiMsgDiv);
+                            }
+                        } catch (err) {
+                            console.error("Error finalizing stream completion:", err);
+                        }
+                    }
+                    
+                    function read() {
+                        reader.read().then(function({done, value}) {
+                            if (done) {
+                                finalizeCompletion();
+                                return;
+                            }
+                            
+                            streamBuffer += decoder.decode(value, {stream: true});
+                            var pos;
+                            while ((pos = streamBuffer.indexOf("\n")) !== -1) {
+                                var line = streamBuffer.substring(0, pos).trim();
+                                streamBuffer = streamBuffer.substring(pos + 1);
+                                
+                                if (line.indexOf("data: ") === 0) {
+                                    try {
+                                        var jsonStr = line.substring(6);
+                                        var data = JSON.parse(jsonStr);
+                                        if (data.chunk) {
+                                            if (!aiMsgDiv) {
+                                                if (loadingInterval) clearInterval(loadingInterval);
+                                                if (typing && typing.parentNode) messages.removeChild(typing);
+                                                
+                                                aiMsgDiv = document.createElement("div");
+                                                aiMsgDiv.className = "message ai";
+                                                aiMsgDiv.innerHTML = '<div class="ai-avatar-icon">DEMI</div>' +
+                                                    '<div class="message-bubble-body">' +
+                                                        '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span></div>' +
+                                                        '<div class="message-text"><div class="markdown-body"></div></div>' +
+                                                    '</div>';
+                                                messages.appendChild(aiMsgDiv);
+                                                contentDiv = aiMsgDiv.querySelector('.markdown-body');
+                                            }
+                                            
+                                            fullText += data.chunk;
+                                        }
+                                        if (data.sources_count !== undefined) {
+                                            sourcesCount = data.sources_count;
+                                        }
+                                        if (data.session_id) {
+                                            currentSessionId = data.session_id;
+                                            refreshSessionsList();
+                                        }
+                                        if (data.done) {
+                                            finalizeCompletion();
+                                        }
+                                    } catch (e) {
+                                        console.error("JSON parse error on line: ", line, e);
+                                    }
+                                }
+                            }
+                            read();
+                        }).catch(function(error) {
+                            console.error("Stream reading error:", error);
+                            if (fullText && fullText.length > 0) {
+                                // If response was already received, finalize stream gracefully without showing false error
+                                finalizeCompletion();
+                            } else {
+                                clearInterval(typeInterval);
+                                if (loadingInterval) clearInterval(loadingInterval);
+                                if (typing && typing.parentNode) messages.removeChild(typing);
+                                input.disabled = false;
+                                sendBtn.disabled = false;
+                                addMessage("Error reading AI stream.", "ai");
+                            }
+                        });
+                    }
+                    read();
+                })
+                .catch(error => {
+                    console.error("Fetch error:", error);
+                    if (loadingInterval) clearInterval(loadingInterval);
+                    if (typing && typing.parentNode) messages.removeChild(typing);
+                    input.disabled = false;
+                    sendBtn.disabled = false;
+                    input.focus();
+                    addMessage("Network error or connection lost. Please try again.", "ai");
+                });
+            } else {
+                fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?t=" + Date.now(), {
+                    method: "POST",
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    input.disabled = false;
+                    sendBtn.disabled = false;
+                    input.focus();
+
+                    if (data.success) {
+                        var result = detectAndRenderArtifacts(data.response, "ai", true);
+                        if (!result.found) {
+                            resultsContainer.style.display = "block";
+                            resultsContent.innerHTML = "<div class='alert alert-warning text-center' style='margin-top:20px;'><i class='fa fa-exclamation-triangle fa-2x mb-2'></i><br><strong>Could not generate tool</strong><br>" + result.cleanText + "</div>";
+                        }
+                        
+                        document.querySelectorAll(".creator-card.loading").forEach(card => {
+                            card.classList.remove("loading");
+                            var icon = card.querySelector(".card-icon i");
+                            if (icon) {
+                                if (card.classList.contains("quiz")) icon.className = "fa fa-question-circle fa-3x brand-color";
+                                if (card.classList.contains("summary")) icon.className = "fa fa-file-text-o fa-3x brand-success";
+                                if (card.classList.contains("mindmap")) icon.className = "fa fa-sitemap fa-3x brand-info";
+                            }
+                        });
+                    } else {
+                        addMessage("Error: " + data.error, "ai");
+                    }
+                })
+                .catch(error => {
+                    if (loadingInterval) clearInterval(loadingInterval);
+                    if (typing && typing.parentNode) messages.removeChild(typing);
+                    input.disabled = false;
+                    sendBtn.disabled = false;
+                    var errMsg = "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
+                    if (!silent) {
+                        addMessage(errMsg, "ai");
+                    } else {
+                        resultsContainer.style.display = "block";
+                        resultsContent.innerHTML = "<div class='alert alert-danger text-center' style='margin-top:20px;'><i class='fa fa-exclamation-triangle fa-2x mb-2'></i><br><strong>Network Error</strong><br>" + errMsg + "</div>";
+                    }
+                    
+                    // Clear all loading states on error as well.
+                    document.querySelectorAll(".creator-card.loading").forEach(card => {
+                        card.classList.remove("loading");
+                        var icon = card.querySelector(".card-icon i");
+                        if (icon) {
+                            if (card.classList.contains("quiz")) icon.className = "fa fa-question-circle fa-3x brand-color";
+                            if (card.classList.contains("report")) icon.className = "fa fa-file-text-o fa-3x brand-success";
+                            if (card.classList.contains("mindmap")) icon.className = "fa fa-sitemap fa-3x brand-info";
+                        }
+                    });
+                });
+            }
+        };
+
+        function renderSuggestions(suggestionsArray, parentMsgNode) {
+            // Remove existing container if any
+            var existingContainer = document.querySelector(".suggestion-container");
+            if (existingContainer) existingContainer.parentNode.removeChild(existingContainer);
+
+            if (!suggestionsArray || suggestionsArray.length === 0) return;
+
+            var container = document.createElement("div");
+            container.className = "suggestion-container";
+            
+            suggestionsArray.forEach(function(s) {
+                var btn = document.createElement("button");
+                btn.className = "suggestion-btn";
+                btn.innerText = s;
+                btn.onclick = function() { sendSuggested(s); };
+                container.appendChild(btn);
+            });
+            
+            if (parentMsgNode && parentMsgNode.parentNode) {
+                parentMsgNode.parentNode.insertBefore(container, parentMsgNode.nextSibling);
+            } else {
+                messages.appendChild(container);
+            }
+            if (typeof messages !== 'undefined' && messages) {
+                messages.scrollTop = messages.scrollHeight;
+            }
+        }
+
+        // Suggestion loader.
+
+        // AI Tool Buttons.
+        document.querySelectorAll(".ai-tool-btn").forEach(btn => {
+            btn.onclick = function() {
+                const action = this.getAttribute("data-action");
+                let promptText = "";
+                if (action === "quiz") promptText = "Generate a quiz from the selected materials.";
+                if (action === "summary") promptText = "Generate a study summary from the selected materials.";
+                if (action === "mindmap") promptText = "Generate a mindmap structure for the selected materials.";
+                
+                if (promptText) {
+                    input.value = promptText;
+                    sendMessage(true); // Silent generation from Creator Hub.
+                }
+            };
+        });
+
+        // Sidebar Panel Toggle (Inside the main card).
+        var sidebar = document.getElementById("ainotebook-sidebar-nav");
+        var toggleBtn = document.getElementById("toggle-sidebar");
+        if (toggleBtn && sidebar) {
+            toggleBtn.onclick = function() {
+                sidebar.classList.toggle("collapsed");
+                var icon = toggleBtn.querySelector("i");
+                icon.className = sidebar.classList.contains("collapsed") ? "fa fa-angle-double-right" : "fa fa-angle-double-left";
+            };
+        }
+
+        // Creator Hub Card Toggle.
+        var creatorToggle = document.getElementById("toggle-creator");
+        var creatorContent = document.getElementById("creator-hub-content");
+        if (creatorToggle && creatorContent) {
+            creatorToggle.onclick = function() {
+                creatorContent.classList.toggle("collapsed");
+                var icon = creatorToggle.querySelector("i");
+                icon.className = creatorContent.classList.contains("collapsed") ? "fa fa-angle-double-down" : "fa fa-angle-double-up";
+            };
+        }
+
+        // Build file mapping for inline citations
+        var fileUrls = {};
+        document.querySelectorAll("#ainotebook-sidebar-nav .material-file-item a").forEach(function(a) {
+            var filename = a.innerText.trim();
+            fileUrls[filename] = a.getAttribute("href");
+        });
+
+        // Intercept inline citations (#citation-) clicks
+        document.addEventListener("click", function(e) {
+            var a = e.target.closest("a");
+            if (a && a.getAttribute("href")) {
+                var href = a.getAttribute("href");
+                var hashIndex = href.indexOf("#citation-");
+                if (hashIndex !== -1) {
+                    e.preventDefault();
+                    var citationStr = href.substring(hashIndex + 10); // 10 is length of "#citation-"
+                    var pageIndex = citationStr.lastIndexOf("-page-");
+                    if (pageIndex !== -1) {
+                        var filename = decodeURIComponent(citationStr.substring(0, pageIndex));
+                        var page = citationStr.substring(pageIndex + 6);
+                        var baseUrl = fileUrls[filename];
+                        if (baseUrl) {
+                            window.open(baseUrl + "#page=" + page, "_blank");
+                        } else {
+                            // Fallback try in case name contains spaces or special characters
+                            var matchedKey = Object.keys(fileUrls).find(k => k.toLowerCase() === filename.toLowerCase());
+                            if (matchedKey && fileUrls[matchedKey]) {
+                                window.open(fileUrls[matchedKey] + "#page=" + page, "_blank");
+                            } else {
+                                require(['core/notification'], function(Notification) { Notification.addNotification({message: 'File not found: ' + filename, type: 'error'}); });
+                            }
+                        }
+                    } else {
+                        var filename = decodeURIComponent(citationStr);
+                        var baseUrl = fileUrls[filename];
+                        if (baseUrl) {
+                            window.open(baseUrl, "_blank");
+                        } else {
+                            var matchedKey = Object.keys(fileUrls).find(k => k.toLowerCase() === filename.toLowerCase());
+                            if (matchedKey && fileUrls[matchedKey]) {
+                                window.open(fileUrls[matchedKey], "_blank");
+                            } else {
+                                require(['core/notification'], function(Notification) { Notification.addNotification({message: 'File not found: ' + filename, type: 'error'}); });
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Settings Modal.
+        var modal = document.getElementById("settings-modal");
+        var openBtn = document.getElementById("open-settings");
+        var closeBtn = document.getElementById("close-settings");
+        var saveBtn = document.getElementById("save-settings");
+
+        var resultsContainer = document.getElementById("creator-results");
+        // Initial suggestions load removed to save API calls. Suggestions appear after chat.
+        messages.scrollTop = messages.scrollHeight;
+        
+        window.scanHistoryForArtifacts = function() {
+            messages.querySelectorAll(".message.ai").forEach(msg => {
+                detectAndRenderArtifacts(msg.innerText, "ai", true);
+            });
+            if (resultsContainer) resultsContainer.style.display = "none";
+        };
+
+        window.scanHistoryForArtifacts();
+        // Source counter and Select All logic.
+        var updateSourceCount = function() {
+            var checkedCount = document.querySelectorAll(".file-checkbox:checked").length;
+            var pill = document.getElementById("source-count");
+            if (pill) {
+                pill.innerText = checkedCount + (checkedCount === 1 ? " source" : " sources");
+                pill.style.display = checkedCount > 0 ? "inline-block" : "none";
+            }
+        };
+
+        var selectAll = document.getElementById("select-all-files");
+        if (selectAll) {
+            selectAll.onchange = function() {
+                var checkboxes = document.querySelectorAll(".file-checkbox");
+                checkboxes.forEach(function(cb) { cb.checked = selectAll.checked; });
+                updateSourceCount();
+            };
+        }
+
+        // Add event listeners to individual checkboxes.
+        document.querySelectorAll(".file-checkbox").forEach(function(cb) {
+            cb.onchange = updateSourceCount;
+        });
+
+        updateSourceCount();
+        return true;
+    };
+
+    var attempts = 0;
+    var timer = setInterval(function() {
+        if (initChat() || attempts > 20) clearInterval(timer);
+        attempts++;
+    }, 300);
+
+{{/js}}

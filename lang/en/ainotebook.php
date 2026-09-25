@@ -5,35 +5,36 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$string['modulename'] = 'DEMI Tutor';
-$string['modulename_help'] = 'DEMI Tutor allows students to study from uploaded materials and interact with a personalized AI.';
+$string['modulename'] = 'DEMI AI Academic Tutor';
+$string['modulename_help'] = 'DEMI AI Academic Tutor allows students to study from uploaded course materials and interact with a personalized AI companion.';
 $string['modulename_link'] = 'mod/ainotebook/view';
-$string['modulenameplural'] = 'DEMI Tutor';
-$string['pluginname'] = 'DEMI Tutor';
-$string['pluginadministration'] = 'DEMI Tutor administration';
+$string['modulenameplural'] = 'DEMI AI Academic Tutor';
+$string['pluginname'] = 'DEMI AI Academic Tutor';
+$string['pluginadministration'] = 'DEMI AI Academic Tutor administration';
 
-$string['ainotebook:addinstance'] = 'Add a new DEMI Tutor';
-$string['ainotebook:view'] = 'View DEMI Tutor';
+$string['ainotebook:addinstance'] = 'Add a new DEMI AI Academic Tutor';
+$string['ainotebook:view'] = 'View DEMI AI Academic Tutor';
 
-$string['chatwithai'] = 'Chat with AI';
-$string['asksomething'] = 'Ask something about the material...';
+$string['chatwithai'] = 'Chat with DEMI AI Academic Tutor';
+$string['asksomething'] = 'Ask DEMI AI Academic Tutor about concepts, slides, or exercises...';
 $string['copyright'] = 'Copyright by <a href="https://samastanuswantara.com" target="_blank">Tateta</a>';
 $string['material'] = 'Material';
-$string['settings_course_enable'] = 'Enable DEMI Tutor for this course';
-$string['settings_course_desc'] = 'Automatically add a DEMI Tutor activity to this course.';
+$string['settings_course_enable'] = 'Enable DEMI AI Academic Tutor for this course';
+$string['settings_course_desc'] = 'Automatically add a DEMI AI Academic Tutor activity to this course.';
 
 // Dashboard and Progress Strings
+$string['studentname'] = 'Student Name';
 $string['ainotebook:viewprogress'] = 'View student progress and chat logs';
 $string['studentprogress'] = 'Student Progress Dashboard';
 $string['overviewmetrics'] = 'Overview Metrics';
 $string['totalstudents'] = 'Active Students';
 $string['totalchats'] = 'Total Chats';
-$string['totalmaterials'] = 'Generated Learning Tools';
+$string['totalmaterials'] = 'Generated Learning Activities';
 $string['sendnotify'] = 'Send Notify';
 $string['task_weekly_teacher_alert'] = 'Weekly AI Teacher Alert';
 $string['email_weekly_alert_subject'] = 'Weekly Class Insight from DEMI Tutor: {$a}';
 $string['chatsent'] = 'Chats Sent';
-$string['materialsgenerated'] = 'Generated Learning Tools';
+$string['materialsgenerated'] = 'Generated Learning Activities';
 $string['lastactive'] = 'Last Active';
 $string['viewworkspace'] = 'View Workspace';
 $string['searchstudents'] = 'Search students...';
@@ -42,6 +43,7 @@ $string['backtodashboard'] = 'Back to Student List';
 $string['readonlymode'] = 'Read-Only Preview Mode';
 $string['viewingprogressfor'] = 'Viewing progress for:';
 $string['neveractive'] = 'Never';
+$string['process_materials_task'] = 'Process AI Notebook Materials (OCR & Embeddings)';
 
 // AI Evaluation Strings
 $string['aiscore'] = 'AI Score';
@@ -53,3 +55,7 @@ $string['activitysummary'] = 'Activity Summary';
 $string['recommendation'] = 'Recommendation';
 $string['evaluating'] = 'Evaluating...';
 $string['quizgrade'] = 'Quiz Score';
+
+$string['files_filemanager'] = 'Supported Materials';
+$string['files_filemanager_help'] = 'Supported file types: PDF (.pdf), Text (.txt), Word (.docx), and PowerPoint (.pptx).';
+$string['files_instruction'] = 'Supported file types: PDF, TXT, DOCX, and PPTX.';

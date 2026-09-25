@@ -7,9 +7,6 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$observers = [
-    [
-        'eventname' => '\core\event\course_created',
-        'callback'  => '\mod_ainotebook\event_observer::course_created',
-    ],
-];
+// Auto-add on course creation is handled via Moodle 4.4 hooks in db/hooks.php
+// (hook_callbacks::after_course_form_submission). No event observers required.
+$observers = [];

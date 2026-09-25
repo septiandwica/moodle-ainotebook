@@ -12,7 +12,7 @@ require_once(__DIR__ . '/lib.php');
 $cmid = required_param('cmid', PARAM_INT);
 $action = optional_param('action', 'chat', PARAM_TEXT);
 
-$cm = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
+$cm = \mod_ainotebook\ai_client::get_cm_safe($cmid);
 $course = $DB->get_record('course', array('id' => $cm->course), '*', MUST_EXIST);
 
 require_login($course, true, $cm);
@@ -51,11 +51,68 @@ if ($action === 'evaluate_student') {
     require_capability('mod/ainotebook:viewprogress', $context);
     
     $target_userid = required_param('userid', PARAM_INT);
-    $result = \mod_ainotebook\ai_client::evaluate_student($cmid, $target_userid);
+    try {
+        $result = \mod_ainotebook\ai_client::evaluate_student($cmid, $target_userid);
+        echo json_encode([
+            'success' => true,
+            'evaluation' => $result
+        ]);
+    } catch (\Exception $e) {
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+    exit;
+}
+
+if ($action === 'override_grade') {
+    $context = context_module::instance($cm->id);
+    require_capability('mod/ainotebook:viewprogress', $context);
     
+    $target_userid = required_param('userid', PARAM_INT);
+    $score = required_param('score', PARAM_INT);
+    
+    $ainotebook = $DB->get_record('ainotebook', ['id' => $cm->instance], '*', MUST_EXIST);
+    
+    $eval = $DB->get_record('ainotebook_evals', ['ainotebookid' => $ainotebook->id, 'userid' => $target_userid]);
+    if ($eval) {
+        $eval->score = $score;
+        $insight = json_decode($eval->insight_json, true) ?: [];
+        $insight['score'] = $score;
+        $eval->insight_json = json_encode($insight);
+        $eval->timemodified = time();
+        $DB->update_record('ainotebook_evals', $eval);
+    } else {
+        $eval = new \stdClass();
+        $eval->ainotebookid = $ainotebook->id;
+        $eval->userid = $target_userid;
+        $eval->score = $score;
+        $insight = [
+            'score' => $score,
+            'understanding' => 'Manually set by teacher.',
+            'activity_summary' => 'Manually evaluated.',
+            'recommendation' => 'N/A'
+        ];
+        $eval->insight_json = json_encode($insight);
+        $eval->timecreated = time();
+        $eval->timemodified = time();
+        $DB->insert_record('ainotebook_evals', $eval);
+    }
+    
+    // Push the score to the Moodle Gradebook
+    require_once(__DIR__ . '/lib.php');
+    $ainotebook->cmidnumber = $cm->idnumber;
+    
+    $grade = new \stdClass();
+    $grade->userid = $target_userid;
+    $grade->rawgrade = (float)$score;
+    ainotebook_grade_item_update($ainotebook, $grade);
+    
+    $eval_record = $DB->get_record('ainotebook_evals', ['ainotebookid' => $ainotebook->id, 'userid' => $target_userid]);
     echo json_encode([
         'success' => true,
-        'evaluation' => $result
+        'evaluation' => json_decode($eval_record->insight_json, true)
     ]);
     exit;
 }
@@ -80,20 +137,149 @@ if ($action === 'submit_quiz_grade') {
     exit;
 }
 
-// Fallback to chat action
+if ($action === 'fetch_sessions') {
+    $target_userid = optional_param('userid', $USER->id, PARAM_INT);
+    if ($target_userid != $USER->id) {
+        $context = context_module::instance($cm->id);
+        require_capability('mod/ainotebook:viewprogress', $context);
+    }
+    $sessions = \mod_ainotebook\ai_client::get_sessions($cmid, $target_userid);
+    echo json_encode(['success' => true, 'sessions' => $sessions]);
+    exit;
+}
+
+if ($action === 'fetch_session_messages') {
+    $session_id = required_param('session_id', PARAM_RAW);
+    $target_userid = optional_param('userid', $USER->id, PARAM_INT);
+    if ($target_userid != $USER->id) {
+        $context = context_module::instance($cm->id);
+        require_capability('mod/ainotebook:viewprogress', $context);
+    }
+    $messages = \mod_ainotebook\ai_client::get_session_messages($cmid, $target_userid, $session_id);
+    echo json_encode(['success' => true, 'messages' => $messages]);
+    exit;
+}
+
+// --- SSE STREAMING ACTION ---
+if ($action === 'chat_stream') {
+    @set_time_limit(300);
+    @ini_set('display_errors', '0');
+    
+    $message = required_param('message', PARAM_TEXT);
+    $session_id = optional_param('session_id', '', PARAM_RAW);
+    if (empty($session_id)) {
+        $session_id = 'sess_' . $USER->id . '_' . time() . '_' . substr(md5(uniqid()), 0, 6);
+    }
+    $selected_files = optional_param('selected_files', '[]', PARAM_RAW);
+    $file_ids = json_decode($selected_files, true) ?: [];
+    $config_raw = optional_param('config', '[]', PARAM_RAW);
+    $config = json_decode($config_raw, true) ?: [];
+    
+    // Check rate limits & trial limits
+    try {
+        $estimated_input_tokens = \mod_ainotebook\rate_limiter::estimate_tokens($message);
+        \mod_ainotebook\rate_limiter::enforce_limits($USER->id, $estimated_input_tokens, $course);
+    } catch (\Exception $e) {
+        header('Content-Type: text/event-stream');
+        header('Cache-Control: no-cache');
+        echo "data: " . json_encode(['chunk' => "⚠️ " . $e->getMessage()]) . "\n\n";
+        echo "data: " . json_encode(['done' => true]) . "\n\n";
+        flush();
+        exit;
+    }
+
+    // Disable Moodle's output buffering and set SSE headers
+    while (ob_get_level() > 0) {
+        @ob_end_flush();
+    }
+    header('Content-Type: text/event-stream');
+    header('Cache-Control: no-cache');
+    header('Connection: keep-alive');
+    header('X-Accel-Buffering: no'); // CRITICAL: Tells Nginx not to buffer the response
+    
+    // Send 2KB of padding to force initial flush in some proxies
+    echo str_repeat(' ', 2048) . "\n";
+    flush();
+    
+    try {
+        $result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config, true);
+        
+        $response_text = $result['response'] ?? "";
+        $sources_count = $result['sources_count'] ?? 0;
+        
+        if (!\mod_ainotebook\ai_client::was_streamed()) {
+            echo "data: " . json_encode(['chunk' => $response_text]) . "\n\n";
+            @ob_flush();
+            flush();
+        }
+        
+        // Send final metadata chunk with session_id
+        echo "data: " . json_encode(['sources_count' => $sources_count, 'session_id' => $session_id, 'done' => true]) . "\n\n";
+        @ob_flush();
+        flush();
+        
+        $silent = optional_param('silent', 0, PARAM_INT);
+        if (!$silent && !empty($response_text)) {
+            // Log token usage
+            $total_tokens = $estimated_input_tokens + \mod_ainotebook\rate_limiter::estimate_tokens($response_text);
+            \mod_ainotebook\rate_limiter::log_request($USER->id, $total_tokens);
+
+            \mod_ainotebook\ai_client::ensure_session_id_field();
+            $log = new stdClass();
+            $log->ainotebookid = $cm->instance;
+            $log->userid = $USER->id;
+            $log->session_id = $session_id;
+            $log->message = $message;
+            $log->response = $response_text;
+            $log->timecreated = time();
+            $DB->insert_record('ainotebook_chat', $log);
+        }
+    } catch (\Throwable $e) {
+        echo "data: " . json_encode(['chunk' => "⚠️ Error processing request: " . $e->getMessage()]) . "\n\n";
+        echo "data: " . json_encode(['done' => true]) . "\n\n";
+        @ob_flush();
+        flush();
+    }
+    exit;
+}
+
+// Fallback to synchronous chat action
 $message = required_param('message', PARAM_TEXT);
+$session_id = optional_param('session_id', '', PARAM_RAW);
+if (empty($session_id)) {
+    $session_id = 'sess_' . $USER->id . '_' . time() . '_' . substr(md5(uniqid()), 0, 6);
+}
 $selected_files = optional_param('selected_files', '[]', PARAM_RAW);
 $file_ids = json_decode($selected_files, true) ?: [];
 $config_raw = optional_param('config', '[]', PARAM_RAW);
 $config = json_decode($config_raw, true) ?: [];
 
-$response_text = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config);
+try {
+    $estimated_input_tokens = \mod_ainotebook\rate_limiter::estimate_tokens($message);
+    \mod_ainotebook\rate_limiter::enforce_limits($USER->id, $estimated_input_tokens);
+} catch (\Exception $e) {
+    echo json_encode([
+        'success' => false,
+        'response' => "⚠️ " . $e->getMessage()
+    ]);
+    exit;
+}
+
+$result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config);
+$response_text = $result['response'] ?? "Error retrieving response.";
+$sources_count = $result['sources_count'] ?? 0;
 
 $silent = optional_param('silent', 0, PARAM_INT);
 if (!$silent) {
+    // Log token usage
+    $total_tokens = $estimated_input_tokens + \mod_ainotebook\rate_limiter::estimate_tokens($response_text);
+    \mod_ainotebook\rate_limiter::log_request($USER->id, $total_tokens);
+
+    \mod_ainotebook\ai_client::ensure_session_id_field();
     $log = new stdClass();
     $log->ainotebookid = $cm->instance;
     $log->userid = $USER->id;
+    $log->session_id = $session_id;
     $log->message = $message;
     $log->response = $response_text;
     $log->timecreated = time();
@@ -102,5 +288,8 @@ if (!$silent) {
 
 echo json_encode([
     'success' => true,
-    'response' => $response_text
+    'response' => $response_text,
+    'sources_count' => $sources_count,
+    'session_id' => $session_id
 ]);
+

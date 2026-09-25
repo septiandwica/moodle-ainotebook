@@ -25,6 +25,10 @@ function ainotebook_add_instance($ainotebook, $mform) {
     if ($mform) {
         $context = context_module::instance($ainotebook->coursemodule);
         file_postupdate_standard_filemanager($ainotebook, 'files', array('subdirs' => 0, 'maxfiles' => 5), $context, 'mod_ainotebook', 'files', 0);
+        
+        $task = new \mod_ainotebook\task\process_materials_task();
+        $task->set_custom_data(['ainotebookid' => $ainotebook->id]);
+        \core\task\manager::queue_adhoc_task($task);
     }
 
     return $id;
@@ -46,6 +50,10 @@ function ainotebook_update_instance($ainotebook, $mform) {
 
     if ($mform) {
         file_postupdate_standard_filemanager($ainotebook, 'files', array('subdirs' => 0, 'maxfiles' => 5), $mform->get_context(), 'mod_ainotebook', 'files', 0);
+        
+        $task = new \mod_ainotebook\task\process_materials_task();
+        $task->set_custom_data(['ainotebookid' => $ainotebook->id]);
+        \core\task\manager::queue_adhoc_task($task);
     }
 
     return true;
@@ -57,14 +65,22 @@ function ainotebook_update_instance($ainotebook, $mform) {
  * @return bool
  */
 function ainotebook_delete_instance($id) {
-    global $DB;
+    global $CFG, $DB;
+    require_once($CFG->libdir . '/gradelib.php');
 
     if (!$ainotebook = $DB->get_record('ainotebook', array('id' => $id))) {
         return false;
     }
 
-    $DB->delete_records('ainotebook_chat', array('ainotebookid' => $ainotebook->id));
-    $DB->delete_records('ainotebook', array('id' => $ainotebook->id));
+    $DB->delete_records('ainotebook_chat',          array('ainotebookid' => $ainotebook->id));
+    $DB->delete_records('ainotebook_artifacts',     array('ainotebookid' => $ainotebook->id));
+    $DB->delete_records('ainotebook_evals',         array('ainotebookid' => $ainotebook->id));
+    $DB->delete_records('ainotebook_quiz_attempts', array('ainotebookid' => $ainotebook->id));
+    $DB->delete_records('ainotebook_embeddings',    array('ainotebookid' => $ainotebook->id));
+    $DB->delete_records('ainotebook',               array('id'           => $ainotebook->id));
+
+    grade_update('mod/ainotebook', $ainotebook->course, 'mod', 'ainotebook', $ainotebook->id, 0, null, array('deleted' => 1));
+    grade_update('mod/ainotebook', $ainotebook->course, 'mod', 'ainotebook', $ainotebook->id, 1, null, array('deleted' => 1));
 
     return true;
 }
@@ -280,7 +296,7 @@ function ainotebook_pluginfile($course, $cm, $context, $filearea, $args, $forced
  * @param settings_navigation $settingsnav
  * @param navigation_node $ainotebooknode
  */
-function ainotebook_extend_settings_navigation(settings_navigation $settingsnav, navigation_node $ainotebooknode = null) {
+function ainotebook_extend_settings_navigation(settings_navigation $settingsnav, ?navigation_node $ainotebooknode = null) {
     global $PAGE;
 
     if (!isset($PAGE->cm->id)) {

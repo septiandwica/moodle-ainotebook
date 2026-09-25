@@ -11,7 +11,7 @@ require_once(__DIR__ . '/lib.php');
 
 $cmid = required_param('cmid', PARAM_INT);
 
-$cm = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
+$cm = \mod_ainotebook\ai_client::get_cm_safe($cmid);
 $course = $DB->get_record('course', array('id' => $cm->course), '*', MUST_EXIST);
 
 require_login($course, true, $cm);

@@ -13,8 +13,8 @@ if ($ADMIN->fulltree) {
     $settings->add(new admin_setting_configtext(
         'mod_ainotebook/ai_name',
         'AI Name',
-        'The display name of your AI Assistant (e.g. PresMate).',
-        'PresMate',
+        'The display name of your AI Assistant (e.g. DEMI AI Academic Tutor).',
+        'DEMI AI Academic Tutor',
         PARAM_TEXT
     ));
 
@@ -27,102 +27,51 @@ if ($ADMIN->fulltree) {
         ['maxfiles' => 1, 'accepted_types' => ['.png', '.jpg', '.jpeg', '.svg']]
     ));
 
-    // ── Provider selector ─────────────────────────────────────────────────────
+    // ── Provider Config ───────────────────────────────────────────────────────
+    $settings->add(new admin_setting_heading(
+        'mod_ainotebook/engine_heading',
+        'DEMI Core AI Engine & Fallback Routing',
+        'Centralized AI routing and agent model selection handled via DEMI Core AI Engine with optional direct fallbacks.'
+    ));
+
     $settings->add(new admin_setting_configselect(
         'mod_ainotebook/ai_provider',
         'AI Provider',
-        'Select which AI provider to use.',
-        'groq',
+        'Select AI Provider. DEMI Core AI Engine automatically handles central model routing, student context, and agent selection.',
+        'demi_engine',
         [
-            'groq'   => 'Groq (Fastest)',
-            'openai' => 'OpenAI',
-            'gemini' => 'Google Gemini',
-            'moodle' => 'Moodle AI Subsystem (Default)',
+            'demi_engine' => 'DEMI Core AI Engine (Recommended - Central Endpoint Port 8001)',
+            'groq'        => 'Groq (Direct Fallback)',
+            'openai'      => 'OpenAI (Direct Fallback)',
+            'gemini'      => 'Google Gemini (Direct Fallback)',
+            'moodle'      => 'Moodle AI Subsystem',
         ]
     ));
 
-    // ── API Key ───────────────────────────────────────────────────────────────
+    // ── DEMI Engine Settings ──────────────────────────────────────────────────
+    $settings->add(new admin_setting_configtext(
+        'mod_ainotebook/demi_engine_url',
+        'DEMI AI Engine Endpoint URL',
+        'The base URL of the central DEMI AI Engine FastAPI service.',
+        'http://localhost:8001',
+        PARAM_URL
+    ));
+
+    $settings->add(new admin_setting_configpasswordunmask(
+        'mod_ainotebook/demi_engine_key',
+        'DEMI AI Engine Secret Key (X-Engine-API-Key)',
+        'Authentication key used to communicate with DEMI Core AI Engine.',
+        'demi_secret_engine_key_2026'
+    ));
+
     $settings->add(new admin_setting_configpasswordunmask(
         'mod_ainotebook/api_key',
-        'API Key',
-        'Your API Key for the selected provider (leave empty if using Moodle AI).',
+        'Direct Provider API Key',
+        'Direct API Key for fallback providers (Groq/OpenAI/Gemini) if DEMI Engine is unavailable.',
         ''
     ));
 
-    // ── Groq Models (updated May 2025) ────────────────────────────────────────
-    $settings->add(new admin_setting_configselect(
-        'mod_ainotebook/model_groq',
-        'Groq Model',
-        'Model used when Groq is selected.',
-        'llama-3.3-70b-versatile',
-        [
-            'llama-3.1-8b-instant'                      => 'Llama 3.1 8B Instant — 560 t/s',
-            'llama-3.3-70b-versatile'                    => 'Llama 3.3 70B Versatile — 280 t/s',
-            'openai/gpt-oss-120b'                        => 'GPT OSS 120B (via Groq) — 500 t/s',
-            'openai/gpt-oss-20b'                         => 'GPT OSS 20B (via Groq) — 1000 t/s',
-            'meta-llama/llama-4-scout-17b-16e-instruct'  => 'Llama 4 Scout 17B [Preview] — 750 t/s',
-            'qwen/qwen3-32b'                             => 'Qwen3 32B [Preview] — 400 t/s',
-            'custom'                                     => 'Other (type manually below)',
-        ]
-    ));
-
-    // ── OpenAI Models ─────────────────────────────────────────────────────────
-    $settings->add(new admin_setting_configselect(
-        'mod_ainotebook/model_openai',
-        'OpenAI Model',
-        'Model used when OpenAI is selected.',
-        'gpt-4o',
-        [
-            'gpt-4o'        => 'GPT-4o',
-            'gpt-4.1'       => 'GPT-4.1',
-            'gpt-4-turbo'   => 'GPT-4 Turbo',
-            'gpt-3.5-turbo' => 'GPT-3.5 Turbo',
-            'custom'        => 'Other (type manually below)',
-        ]
-    ));
-
-    // ── Gemini Models ─────────────────────────────────────────────────────────
-    $settings->add(new admin_setting_configselect(
-        'mod_ainotebook/model_gemini',
-        'Gemini Model',
-        'Model used when Google Gemini is selected.',
-        'gemini-1.5-flash',
-        [
-            'gemini-3.1-pro-preview'          => 'Gemini 3.1 Pro (Preview)',
-            'gemini-3.1-flash-lite'           => 'Gemini 3.1 Flash Lite',
-            'gemini-3.1-flash-lite-preview'   => 'Gemini 3.1 Flash Lite (Preview)',
-            'gemini-3.1-flash-live-preview'   => 'Gemini 3.1 Flash Live (Preview)',
-            'gemini-3.1-flash-image-preview'  => 'Gemini 3.1 Flash Image (Preview)',
-            'gemini-3.1-flash-tts-preview'    => 'Gemini 3.1 Flash TTS (Preview)',
-            'gemini-3-pro-image-preview'      => 'Gemini 3 Pro Image (Preview)',
-            'gemini-3-flash-preview'          => 'Gemini 3 Flash (Preview)',
-            'gemini-2.5-pro'                  => 'Gemini 2.5 Pro',
-            'gemini-2.5-flash'                => 'Gemini 2.5 Flash',
-            'gemini-2.5-flash-lite'           => 'Gemini 2.5 Flash Lite',
-            'gemini-2.5-flash-lite-preview-09-2025' => 'Gemini 2.5 Flash Lite (09-2025)',
-            'gemini-2.5-flash-native-audio-preview-12-2025' => 'Gemini 2.5 Flash Native Audio (12-2025)',
-            'gemini-2.5-flash-image'          => 'Gemini 2.5 Flash Image',
-            'gemini-2.5-flash-preview-tts'    => 'Gemini 2.5 Flash TTS (Preview)',
-            'gemini-2.5-pro-preview-tts'      => 'Gemini 2.5 Pro TTS (Preview)',
-            'gemini-2.5-computer-use-preview-10-2025' => 'Gemini 2.5 Computer Use (Preview)',
-            'gemini-2.0-flash'                => 'Gemini 2.0 Flash',
-            'gemini-2.0-flash-lite'           => 'Gemini 2.0 Flash Lite',
-            'gemini-1.5-pro'                  => 'Gemini 1.5 Pro',
-            'gemini-1.5-flash'                => 'Gemini 1.5 Flash',
-            'custom'                          => 'Other (type manually below)',
-        ]
-    ));
-
-    // ── Custom model ID (only shown when "Other" is selected) ─────────────────
-    $settings->add(new admin_setting_configtext(
-        'mod_ainotebook/model_custom',
-        'Custom Model ID',
-        'Enter a custom model ID if you selected "Other" above.',
-        '',
-        PARAM_TEXT
-    ));
-
-    // ── General ───────────────────────────────────────────────────────────────
+    // ── General Settings ──────────────────────────────────────────────────────
     $settings->add(new admin_setting_heading(
         'mod_ainotebook/general_heading',
         'General Settings',
@@ -136,102 +85,53 @@ if ($ADMIN->fulltree) {
         1
     ));
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // JS visibility logic.
-    //
-    // Strategy: inject a <style> block into <head> BEFORE the page paints so
-    // irrelevant rows are hidden from the very first frame (zero flicker).
-    // Once JS takes over, the style block is cleared and real display logic runs.
-    // ─────────────────────────────────────────────────────────────────────────
-    if (!empty($PAGE)) {
+    // ── Rate Limiting ─────────────────────────────────────────────────────────
+    $url = new moodle_url('/mod/ainotebook/usage_report.php');
+    $link = \html_writer::link($url, '📊 Open Global Usage Report Dashboard', ['class' => 'btn btn-primary', 'target' => '_blank']);
+    
+    $settings->add(new admin_setting_heading(
+        'mod_ainotebook/ratelimit_heading',
+        'Rate Limiting & Usage Tracking',
+        'Manage user API quotas and view consumption reports.<br><br>' . $link
+    ));
 
-        $saved_provider = get_config('mod_ainotebook', 'ai_provider') ?: 'groq';
-        $saved_model    = get_config('mod_ainotebook', 'model_' . $saved_provider) ?: '';
+    $settings->add(new admin_setting_configtext(
+        'mod_ainotebook/limit_rpm',
+        'Requests Per Minute (RPM)',
+        'Maximum number of chat requests a student can make in 1 minute. Set to 0 to disable.',
+        '10',
+        PARAM_INT
+    ));
 
-        // Build CSS that hides non-active rows before JS runs.
-        $pre_paint_css = '';
-        foreach (['groq', 'openai', 'gemini'] as $p) {
-            if ($p !== $saved_provider) {
-                $pre_paint_css .= ".form-group:has([name='s_mod_ainotebook/model_{$p}']){display:none!important}";
-            }
-        }
-        if ($saved_model !== 'custom') {
-            $pre_paint_css .= ".form-group:has([name='s_mod_ainotebook/model_custom']){display:none!important}";
-        }
-        if ($saved_provider === 'moodle') {
-            $pre_paint_css .= ".form-group:has([name='s_mod_ainotebook/api_key']){display:none!important}";
-        }
+    $settings->add(new admin_setting_configtext(
+        'mod_ainotebook/limit_rpd',
+        'Requests Per Day (RPD)',
+        'Maximum number of chat requests a student can make in 24 hours. Set to 0 to disable.',
+        '100',
+        PARAM_INT
+    ));
 
-        $pre_paint_css_json = json_encode($pre_paint_css);
+    $settings->add(new admin_setting_configtext(
+        'mod_ainotebook/limit_tpm',
+        'Tokens Per Minute (TPM)',
+        'Maximum estimated tokens (input + output) a student can consume in 1 minute. Set to 0 to disable.',
+        '4000',
+        PARAM_INT
+    ));
 
-        $PAGE->requires->js_init_code("
-(function () {
-    // ── Pre-paint: hide rows immediately so there is no flicker ──────────────
-    var style = document.createElement('style');
-    style.id  = 'ainb-prepaint';
-    style.textContent = {$pre_paint_css_json};
-    document.head.appendChild(style);
+    $settings->add(new admin_setting_configtext(
+        'mod_ainotebook/limit_trial_rpd',
+        'Trial / Candidate Student Daily Limit (RPD)',
+        'Maximum number of chat questions a trial or candidate student can ask per 24 hours (default: 10 questions/day).',
+        '10',
+        PARAM_INT
+    ));
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-    function getEl(name) {
-        return document.querySelector('[name=\"s_mod_ainotebook/' + name + '\"]');
-    }
-    function getRow(name) {
-        var el = getEl(name);
-        if (!el) return null;
-        return el.closest('.form-group') || el.closest('.row') || el.parentElement.parentElement;
-    }
-    function show(row, visible) {
-        if (row) row.style.display = visible ? '' : 'none';
-    }
-
-    // ── Main sync ─────────────────────────────────────────────────────────────
-    function syncUI() {
-        var providerEl = getEl('ai_provider');
-        if (!providerEl) return;
-
-        var provider = providerEl.value;
-
-        // Show only the model row that matches the current provider.
-        ['groq', 'openai', 'gemini'].forEach(function (p) {
-            show(getRow('model_' + p), p === provider);
-        });
-
-        // API key row: hide for Moodle (managed externally).
-        show(getRow('api_key'), provider !== 'moodle');
-
-        // Custom model field: show only when active provider's model = 'custom'.
-        var activeModelEl = getEl('model_' + provider);
-        show(getRow('model_custom'), !!(activeModelEl && activeModelEl.value === 'custom'));
-    }
-
-    // ── Init (wait for Moodle to render the form) ─────────────────────────────
-    function init() {
-        var providerEl = getEl('ai_provider');
-        if (!providerEl || providerEl.dataset.ainbInit) return false;
-        providerEl.dataset.ainbInit = '1';
-
-        // Remove pre-paint CSS and apply real logic.
-        var prepaint = document.getElementById('ainb-prepaint');
-        if (prepaint) prepaint.textContent = '';
-        syncUI();
-
-        providerEl.addEventListener('change', syncUI);
-
-        // Re-sync when any model dropdown changes (for the custom field).
-        document.querySelectorAll('[name^=\"s_mod_ainotebook/model_\"]').forEach(function (el) {
-            el.addEventListener('change', syncUI);
-        });
-
-        return true;
-    }
-
-    var attempts = 0;
-    var timer = setInterval(function () {
-        attempts++;
-        if (init() || attempts > 30) clearInterval(timer);
-    }, 100);
-})();
-        ");
-    }
+    $settings->add(new admin_setting_configtext(
+        'mod_ainotebook/trial_category_id',
+        'Trial Course Category ID',
+        'The Moodle Course Category ID designated for trial courses (default: Category 11).',
+        '11',
+        PARAM_INT
+    ));
 }

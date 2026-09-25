@@ -23,3 +23,11 @@ Thumbs.db
 # PHP
 composer.lock
 vendor/
+
+# Dev/debug utilities (do not deploy)
+temp.js
+fix_header.py
+find_id.php
+check_log.php
+purge.php
+test_rag.php

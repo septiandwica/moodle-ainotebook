@@ -8,13 +8,20 @@
 require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/lib.php');
 
-$id = required_param('id', PARAM_INT); // Course Module ID.
-
-$cm = get_coursemodule_from_id('ainotebook', $id, 0, false, MUST_EXIST);
+$id = optional_param('id', 0, PARAM_INT);
+$n  = optional_param('n', 0, PARAM_INT);
+$target_id = $id ?: $n;
+if (!$target_id) {
+    throw new \moodle_exception('invalidcoursemodule', 'error');
+}
+$cm = \mod_ainotebook\ai_client::get_cm_safe($target_id);
 $course = $DB->get_record('course', array('id' => $cm->course), '*', MUST_EXIST);
 $ainotebook = $DB->get_record('ainotebook', array('id' => $cm->instance), '*', MUST_EXIST);
 
 require_login($course, true, $cm);
+if (isguestuser() || !isloggedin()) {
+    print_error('noguest');
+}
 $context = context_module::instance($cm->id);
 
 // Ensure the user has permission to view the progress.
@@ -135,13 +142,32 @@ foreach ($students as $stu) {
         echo '<button class="btn-premium btn-small" style="background: #e2e8f0; color: #334155; border: 1px solid #cbd5e1;" onclick="window.notifyStudent('.$stu->id.', this)"><i class="fa fa-bell"></i> Send Notify</button>';
     } else if (isset($stu->eval_score)) {
         $insight_esc = htmlspecialchars($stu->eval_insight, ENT_QUOTES, 'UTF-8');
-        echo '<div class="eval-score-display">';
-        echo '<strong class="score-text">' . $stu->eval_score . '/100</strong> ';
-        echo '<button class="btn-premium btn-small" onclick="window.showInsightModal(`'.$insight_esc.'`)"><i class="fa fa-lightbulb-o"></i> '.get_string('viewinsight', 'mod_ainotebook').'</button>';
-        echo ' <button class="btn-premium btn-small" onclick="window.evaluateStudent('.$stu->id.', this)" title="Re-evaluate Student"><i class="fa fa-refresh"></i></button>';
+        echo '<div class="eval-score-display" id="eval-display-'.$stu->id.'">';
+        echo '<span class="score-val-container" style="display: inline-flex; align-items: center; gap: 5px;">';
+        echo '<strong class="score-text">' . $stu->eval_score . '</strong><span class="score-max" style="color: #64748b; font-size: 0.85rem;">/100</span>';
+        echo ' <button class="btn-icon-inline" onclick="window.startEditGrade('.$stu->id.', '.$stu->eval_score.')" title="Override Grade" style="background:none; border:none; color:#1e40af; cursor:pointer; padding: 2px 4px; font-size: 0.9rem;"><i class="fa fa-pencil"></i></button>';
+        echo '</span>';
+        echo '<span class="score-edit-container" style="display:none; align-items: center; gap: 4px;">';
+        echo '<input type="number" class="score-input" min="0" max="100" style="width: 55px; padding: 2px 4px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.85rem;" value="'.$stu->eval_score.'">';
+        echo ' <button class="btn-premium btn-small" onclick="window.saveGradeOverride('.$stu->id.', this)" style="padding: 2px 6px; font-size: 0.8rem; background: #00d084; border-color: #00d084; color: white;"><i class="fa fa-check"></i></button>';
+        echo ' <button class="btn-premium btn-small" onclick="window.cancelEditGrade('.$stu->id.')" style="padding: 2px 6px; font-size: 0.8rem; background: #ef4444; border-color: #ef4444; color: white;"><i class="fa fa-times"></i></button>';
+        echo '</span>';
+        echo '<br/>';
+        echo '<button class="btn-premium btn-small" onclick="window.showInsightModal(`'.$insight_esc.'`)" style="margin-top: 4px;"><i class="fa fa-lightbulb-o"></i> '.get_string('viewinsight', 'mod_ainotebook').'</button>';
+        echo ' <button class="btn-premium btn-small" onclick="window.evaluateStudent('.$stu->id.', this)" title="Re-evaluate Student" style="margin-top: 4px;"><i class="fa fa-refresh"></i></button>';
         echo '</div>';
     } else {
+        echo '<div class="eval-score-display" id="eval-display-'.$stu->id.'">';
+        echo '<span class="score-val-container" style="display: inline-flex; align-items: center; gap: 5px;">';
         echo '<button class="btn-premium btn-small eval-btn" id="eval-btn-'.$stu->id.'" onclick="window.evaluateStudent('.$stu->id.', this)"><i class="fa fa-magic"></i> '.get_string('evaluatestudent', 'mod_ainotebook').'</button>';
+        echo ' <button class="btn-icon-inline" onclick="window.startEditGrade('.$stu->id.', 0)" title="Set Grade Manually" style="background:none; border:none; color:#1e40af; cursor:pointer; padding: 2px 4px; font-size: 0.9rem;"><i class="fa fa-pencil"></i></button>';
+        echo '</span>';
+        echo '<span class="score-edit-container" style="display:none; align-items: center; gap: 4px;">';
+        echo '<input type="number" class="score-input" min="0" max="100" style="width: 55px; padding: 2px 4px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.85rem;" value="0">';
+        echo ' <button class="btn-premium btn-small" onclick="window.saveGradeOverride('.$stu->id.', this)" style="padding: 2px 6px; font-size: 0.8rem; background: #00d084; border-color: #00d084; color: white;"><i class="fa fa-check"></i></button>';
+        echo ' <button class="btn-premium btn-small" onclick="window.cancelEditGrade('.$stu->id.')" style="padding: 2px 6px; font-size: 0.8rem; background: #ef4444; border-color: #ef4444; color: white;"><i class="fa fa-times"></i></button>';
+        echo '</span>';
+        echo '</div>';
     }
     echo '</td>';
     
@@ -227,6 +253,33 @@ echo '<script>
         });
     };
     
+    window.updateEvalDisplay = function(userId, evaluation) {
+        var el = document.getElementById("eval-display-" + userId);
+        if (!el) return;
+        
+        var score = evaluation.score;
+        var insightStr = JSON.stringify(evaluation);
+        var escapedInsight = insightStr.replace(/`/g, "\\`").replace(/"/g, "&quot;");
+        
+        var html = "";
+        html += "<span class=\'score-val-container\' style=\'display: inline-flex; align-items: center; gap: 5px;\'>";
+        html += "<strong class=\'score-text\'>" + score + "</strong><span class=\'score-max\' style=\'color: #64748b; font-size: 0.85rem;\'>/100</span>";
+        html += " <button class=\'btn-icon-inline\' onclick=\'window.startEditGrade(" + userId + ", " + score + ")\' title=\'Override Grade\' style=\'background:none; border:none; color:#1e40af; cursor:pointer; padding: 2px 4px; font-size: 0.9rem;\'><i class=\'fa fa-pencil\'></i></button>";
+        html += "</span>";
+        
+        html += "<span class=\'score-edit-container\' style=\'display:none; align-items: center; gap: 4px;\'>";
+        html += "<input type=\'number\' class=\'score-input\' min=\'0\' max=\'100\' style=\'width: 55px; padding: 2px 4px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 0.85rem;\' value=\'" + score + "\'>";
+        html += " <button class=\'btn-premium btn-small\' onclick=\'window.saveGradeOverride(" + userId + ", this)\' style=\'padding: 2px 6px; font-size: 0.8rem; background: #00d084; border-color: #00d084; color: white;\'><i class=\'fa fa-check\'></i></button>";
+        html += " <button class=\'btn-premium btn-small\' onclick=\'window.cancelEditGrade(" + userId + ")\' style=\'padding: 2px 6px; font-size: 0.8rem; background: #ef4444; border-color: #ef4444; color: white;\'><i class=\'fa fa-times\'></i></button>";
+        html += "</span>";
+        
+        html += "<br/>";
+        html += "<button class=\'btn-premium btn-small\' onclick=\'window.showInsightModal(`" + escapedInsight + "`)\' style=\'margin-top: 4px;\'><i class=\'fa fa-lightbulb-o\'></i> " + "'.get_string('viewinsight', 'mod_ainotebook').'" + "</button>";
+        html += " <button class=\'btn-premium btn-small\' onclick=\'window.evaluateStudent(" + userId + ", this)\' title=\'Re-evaluate Student\' style=\'margin-top: 4px;\'><i class=\'fa fa-refresh\'></i></button>";
+        
+        el.innerHTML = html;
+    };
+
     window.evaluateStudent = function(userId, btnElement) {
         var originalHtml = btnElement.innerHTML;
         btnElement.disabled = true;
@@ -243,9 +296,68 @@ echo '<script>
             body: fd
         }).then(r => r.json()).then(res => {
             if(res.success && res.evaluation) {
-                location.reload(); 
+                window.updateEvalDisplay(userId, res.evaluation);
             } else {
-                alert("Evaluation failed.");
+                alert("Evaluation failed: " + (res.error || "Unknown error"));
+                btnElement.disabled = false;
+                btnElement.innerHTML = originalHtml;
+            }
+        }).catch(e => {
+            alert("Network error.");
+            btnElement.disabled = false;
+            btnElement.innerHTML = originalHtml;
+        });
+    };
+
+    window.startEditGrade = function(userId, currentScore) {
+        var el = document.getElementById("eval-display-" + userId);
+        if (el) {
+            el.querySelector(".score-val-container").style.display = "none";
+            el.querySelector(".score-edit-container").style.display = "inline-flex";
+            var input = el.querySelector(".score-input");
+            input.value = currentScore;
+            input.focus();
+        }
+    };
+    
+    window.cancelEditGrade = function(userId) {
+        var el = document.getElementById("eval-display-" + userId);
+        if (el) {
+            el.querySelector(".score-val-container").style.display = "inline-flex";
+            el.querySelector(".score-edit-container").style.display = "none";
+        }
+    };
+    
+    window.saveGradeOverride = function(userId, btnElement) {
+        var el = document.getElementById("eval-display-" + userId);
+        if (!el) return;
+        
+        var input = el.querySelector(".score-input");
+        var newScore = parseInt(input.value);
+        if (isNaN(newScore) || newScore < 0 || newScore > 100) {
+            alert("Please enter a valid score between 0 and 100.");
+            return;
+        }
+        
+        var originalHtml = btnElement.innerHTML;
+        btnElement.disabled = true;
+        btnElement.innerHTML = "<i class=\'fa fa-spinner fa-spin\'></i>";
+        
+        var fd = new FormData();
+        fd.append("cmid", '.$cm->id.');
+        fd.append("action", "override_grade");
+        fd.append("userid", userId);
+        fd.append("score", newScore);
+        fd.append("sesskey", "'.sesskey().'");
+        
+        fetch("chat_ajax.php", {
+            method: "POST",
+            body: fd
+        }).then(r => r.json()).then(res => {
+            if(res.success && res.evaluation) {
+                window.updateEvalDisplay(userId, res.evaluation);
+            } else {
+                alert("Failed to override grade.");
                 btnElement.disabled = false;
                 btnElement.innerHTML = originalHtml;
             }

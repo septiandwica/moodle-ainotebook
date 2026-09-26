@@ -681,13 +681,24 @@
 
         var utterance = new SpeechSynthesisUtterance(cleanText);
         var voices = window.speechSynthesis.getVoices();
-        var idVoice = voices.find(function(v) { return v.lang && (v.lang.startsWith('id') || v.lang.startsWith('in')); });
-        var enVoice = voices.find(function(v) { return v.lang && v.lang.startsWith('en'); });
-        if (idVoice) {
-            utterance.voice = idVoice;
-            utterance.lang = 'id-ID';
-        } else if (enVoice) {
-            utterance.voice = enVoice;
+        var preferredEnVoiceNames = ['Google US English', 'Samantha', 'Daniel', 'Alex', 'Karen', 'Victoria', 'Microsoft Zira', 'Natural', 'English'];
+        var chosenVoice = voices.find(function(v) { 
+            return preferredEnVoiceNames.some(function(p) { return v.name && v.name.indexOf(p) !== -1; }) && v.lang && v.lang.startsWith('en'); 
+        });
+        if (!chosenVoice) {
+            chosenVoice = voices.find(function(v) { return v.lang && (v.lang === 'en-US' || v.lang === 'en-GB'); });
+        }
+        if (!chosenVoice) {
+            chosenVoice = voices.find(function(v) { return v.lang && v.lang.startsWith('en'); });
+        }
+        if (!chosenVoice) {
+            chosenVoice = voices.find(function(v) { return v.lang && (v.lang.startsWith('id') || v.lang.startsWith('in')); });
+        }
+
+        if (chosenVoice) {
+            utterance.voice = chosenVoice;
+            utterance.lang = chosenVoice.lang;
+        } else {
             utterance.lang = 'en-US';
         }
 

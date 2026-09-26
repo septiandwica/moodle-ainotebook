@@ -858,11 +858,11 @@
 
 /* Input Bar */
 .input-wrapper-container { padding: 12px 24px 24px 24px; background: #f8fafc; }
-.input-wrapper { background: #ffffff; border: 1px solid #cbd5e1; padding: 6px 6px 6px 18px; border-radius: 14px; display: flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.input-wrapper { background: #ffffff; border: 1px solid #cbd5e1; padding: 6px 8px 6px 18px; border-radius: 14px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
 .input-wrapper:focus-within { border-color: #07366c; box-shadow: 0 0 0 3px rgba(7, 54, 108, 0.1); }
 .input-wrapper input { flex: 1; border: none; background: transparent; padding: 10px 0; color: var(--pres-text); outline: none; font-size: 0.95rem; }
-.source-pill { background: #f1f5f9; color: #07366c; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; margin-right: 12px; white-space: nowrap; border: 1px solid #e2e8f0; }
-#send-btn { width: 42px; height: 42px; background: #ed171c; color: #fff; border: none; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: background 0.2s; }
+.source-pill { background: #f1f5f9; color: #07366c; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 800; margin-right: 4px; white-space: nowrap; border: 1px solid #e2e8f0; }
+#send-btn { width: 42px; height: 42px; background: #ed171c; color: #fff; border: none; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; transition: background 0.2s; flex-shrink: 0; }
 #send-btn:hover { background: #d60d16; }
 
 /* Creator Hub Workspace */
@@ -2562,6 +2562,7 @@
     cursor: pointer;
     transition: all 0.2s ease;
     flex-shrink: 0;
+    margin-right: 8px;
 }
 
 .btn-mic:hover {

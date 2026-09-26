@@ -1221,38 +1221,44 @@
             .then(function(r) { return r.json(); })
             .then(function(d) {
                 if (d.success && d.messages && messages) {
-                    var html = '<div class="message ai welcome-msg">' +
-                        '<div class="ai-avatar-icon">DEMI</div>' +
+                    messages.innerHTML = '';
+                    var welcomeDiv = document.createElement("div");
+                    welcomeDiv.className = "message ai welcome-msg";
+                    welcomeDiv.innerHTML = '<div class="ai-avatar-icon">DEMI</div>' +
                         '<div class="message-bubble-body">' +
                             '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span></div>' +
                             '<div class="message-text">Session loaded. Continue your discussion below!</div>' +
-                        '</div>' +
-                    '</div>';
+                        '</div>';
+                    messages.appendChild(welcomeDiv);
 
                     d.messages.forEach(function(m) {
                         var parsedUser = m.user_message.replace(/\n/g, '<br>');
-                        var parsedAi = (typeof marked !== 'undefined') ? marked.parse(m.ai_response) : m.ai_response.replace(/\n/g, '<br>');
 
-                        html += '<div class="message user">' +
-                            '<div class="message-bubble-body">' +
-                                '<div class="message-meta-header"><span class="meta-author">' + studentName + '</span><span class="meta-time">' + m.time + '</span></div>' +
-                                '<div class="message-text">' + parsedUser + '</div>' +
-                            '</div>' +
+                        var userDiv = document.createElement("div");
+                        userDiv.className = "message user";
+                        userDiv.innerHTML = '<div class="message-bubble-body">' +
+                            '<div class="message-meta-header"><span class="meta-author">' + studentName + '</span><span class="meta-time">' + m.time + '</span></div>' +
+                            '<div class="message-text">' + parsedUser + '</div>' +
                         '</div>';
+                        messages.appendChild(userDiv);
 
-                        html += '<div class="message ai">' +
-                            '<div class="ai-avatar-icon">DEMI</div>' +
+                        var aiDiv = document.createElement("div");
+                        aiDiv.className = "message ai";
+                        aiDiv.innerHTML = '<div class="ai-avatar-icon">DEMI</div>' +
                             '<div class="message-bubble-body">' +
                                 '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span><div class="meta-actions"><button type="button" class="btn-read-aloud" onclick="window.speakAiMessage(this)" title="Read aloud with AI voice"><i class="fa fa-volume-up"></i> Read Aloud</button><span class="meta-time">' + m.time + '</span></div></div>' +
-                                '<div class="message-text"><div class="markdown-body">' + parsedAi + '</div></div>' +
-                            '</div>' +
-                        '</div>';
+                                '<div class="message-text"><div class="markdown-body"></div></div>' +
+                            '</div>';
+                        messages.appendChild(aiDiv);
+
+                        if (typeof formatAndRenderAiBubble === "function") {
+                            formatAndRenderAiBubble(aiDiv, m.ai_response, true);
+                        } else {
+                            var mb = aiDiv.querySelector(".markdown-body");
+                            if (mb) mb.innerHTML = (typeof marked !== 'undefined') ? marked.parse(m.ai_response) : m.ai_response.replace(/\n/g, '<br>');
+                        }
                     });
 
-                    messages.innerHTML = html;
-                    if (typeof window.scanHistoryForArtifacts === "function") {
-                        window.scanHistoryForArtifacts();
-                    }
                     messages.scrollTop = messages.scrollHeight;
                 }
             })
@@ -1504,7 +1510,7 @@
                 }
             }
 
-            // 2. Check for QUIZ (Support both json-quiz and plain json tags).
+            // 2. Check for QUIZ (Support both json-quiz, plain json tags, and raw JSON).
             if (!found) {
                 var quizMatch = text.match(/```(?:json-quiz|json)\s*([\s\S]*?)```/);
                 if (quizMatch) {
@@ -1517,10 +1523,30 @@
                             artifact = { type: "quiz", data: quizData, title: "Quiz - " + new Date().toLocaleTimeString() };
                             cleanText = text.replace(quizMatch[0], "").trim();
                             found = true;
-                            console.log("Detected Quiz artifact.");
+                            console.log("Detected Quiz artifact via codeblock.");
                         }
                     } catch (e) {
                         console.error("Quiz JSON parse error:", e);
+                    }
+                }
+            }
+
+            // Also check for raw JSON without codeblock (e.g. { "questions": [...] })
+            if (!found) {
+                var rawQuizMatch = text.match(/\{\s*"questions"\s*:\s*\[[\s\S]*?\]\s*\}/i);
+                if (rawQuizMatch) {
+                    try {
+                        var parsed = JSON.parse(rawQuizMatch[0].trim());
+                        var quizData = parsed.quiz || (parsed.questions ? parsed : null);
+                        if (quizData && quizData.questions) {
+                            artType = "quiz";
+                            artifact = { type: "quiz", data: quizData, title: "Quiz - " + new Date().toLocaleTimeString() };
+                            cleanText = text.replace(rawQuizMatch[0], "").trim();
+                            found = true;
+                            console.log("Detected Quiz artifact via raw JSON.");
+                        }
+                    } catch (e) {
+                        console.error("Raw Quiz JSON parse error:", e);
                     }
                 }
             }
@@ -1651,6 +1677,61 @@
             }
         };
 
+        var formatAndRenderAiBubble = function(aiMsgDiv, rawText, isHistorical) {
+            if (!aiMsgDiv || !rawText) return;
+            var contentDiv = aiMsgDiv.querySelector(".markdown-body") || aiMsgDiv.querySelector(".message-text");
+            if (!contentDiv) return;
+
+            var artifactBox = document.createElement("div");
+            artifactBox.className = "inline-artifact-container";
+            artifactBox.style.marginTop = "12px";
+
+            var result = detectAndRenderArtifacts(rawText, "ai", !isHistorical, artifactBox);
+            var displayMsg = result.cleanText;
+
+            // Robust Suggestion Extraction (Support <suggestions>, raw pipes, or trailing question lines)
+            var extractedSuggestions = [];
+            var sugMatch = displayMsg.match(/<suggestions>([\s\S]*?)<\/suggestions>/i);
+            if (sugMatch) {
+                var suggestionsStr = sugMatch[1];
+                displayMsg = displayMsg.replace(sugMatch[0], "").trim();
+                extractedSuggestions = suggestionsStr.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 5; });
+            } else {
+                var pipeRegex = /(?:^|\n|\r|\.\s+)([^\n\r\|]{6,}\?[ \t]*\|[ \t]*[^\n\r\|]{6,}(?:\|[ \t]*[^\n\r\|]{6,})?)/i;
+                var pipeMatch = pipeRegex.exec(displayMsg);
+                if (!pipeMatch) {
+                    pipeRegex = /(?:^|\n|\r)\s*([^\n\r\|]{6,}\|[^\n\r\|]{6,}(?:\|[^\n\r\|]{6,})?)\s*(?=\n|\r|$)/i;
+                    pipeMatch = pipeRegex.exec(displayMsg);
+                }
+                if (pipeMatch) {
+                    var rawPipeStr = pipeMatch[1];
+                    displayMsg = displayMsg.replace(pipeMatch[1], "").trim();
+                    extractedSuggestions = rawPipeStr.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 5; });
+                }
+            }
+
+            if (extractedSuggestions.length === 0) {
+                var trailingQuestionsRegex = /(?:^|\n)((?:[^\n\r]{8,}\?\s*(?:\n|\r|$)){2,4})$/;
+                var tqMatch = trailingQuestionsRegex.exec(displayMsg);
+                if (tqMatch) {
+                    var rawTq = tqMatch[1].trim();
+                    displayMsg = displayMsg.substring(0, displayMsg.lastIndexOf(tqMatch[1])).trim();
+                    extractedSuggestions = rawTq.split(/\n+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 5; });
+                }
+            }
+
+            displayMsg = displayMsg.replace(/(?:^|\n|\r)\s*Smart Context:\s*Answer is generated using \d+ relevant material sources\.?\s*/gi, "\n\n").trim();
+
+            contentDiv.innerHTML = (typeof window.marked !== 'undefined') ? window.marked.parse(displayMsg) : displayMsg.replace(/\n/g, '<br>');
+            if (result.found) {
+                contentDiv.appendChild(artifactBox);
+            }
+
+            if (extractedSuggestions.length > 0 && typeof renderSuggestions === "function") {
+                renderSuggestions(extractedSuggestions, aiMsgDiv);
+            }
+        };
+
         var getOrCreateTargetContainer = function() {
             if (resultsContent) return resultsContent;
             var aiMsgs = document.querySelectorAll(".message.ai .markdown-body, .message.ai .message-text");
@@ -1670,26 +1751,41 @@
             var container = target.querySelector("#" + containerId) || target;
             
             var currentIdx = 0;
-            var score = 0;
             var total = data.questions.length;
-            var isAnswered = false;
-            var selectedOption = null;
+            var userAnswers = {};
+            var hintsRevealed = {};
 
-            var showQuestion = function(idx) {
-                isAnswered = false;
-                selectedOption = null;
-                container.innerHTML = "";
-
-                var q = data.questions[idx];
-                var correctAnswer = q.answer;
+            var getCorrectAnsIndex = function(qObj) {
+                var correctAnswer = qObj.answer;
                 if (typeof correctAnswer === "string") {
                     var upper = correctAnswer.trim().toUpperCase();
                     if (upper.length === 1 && upper >= "A" && upper <= "E") {
-                        correctAnswer = upper.charCodeAt(0) - 65;
-                    } else {
-                        correctAnswer = parseInt(upper) || 0;
+                        return upper.charCodeAt(0) - 65;
                     }
+                    return parseInt(upper) || 0;
                 }
+                return typeof correctAnswer === "number" ? correctAnswer : 0;
+            };
+
+            var calcScore = function() {
+                var s = 0;
+                data.questions.forEach(function(qObj, qIdx) {
+                    if (userAnswers[qIdx] !== undefined && userAnswers[qIdx] === getCorrectAnsIndex(qObj)) {
+                        s++;
+                    }
+                });
+                return s;
+            };
+
+            var showQuestion = function(idx) {
+                currentIdx = idx;
+                container.innerHTML = "";
+
+                var q = data.questions[idx];
+                var correctAnswer = getCorrectAnsIndex(q);
+                var isAnswered = userAnswers[idx] !== undefined;
+                var selectedOption = userAnswers[idx];
+                var currentScore = calcScore();
 
                 var qText = q.text || q.question || "No question text provided.";
                 var alpha = ["A", "B", "C", "D", "E"];
@@ -1700,67 +1796,94 @@
 
                 var headerHTML = '<div class="demi-quiz-header">' +
                     '<span class="demi-quiz-step">Question ' + (idx + 1) + ' of ' + total + '</span>' +
-                    '<span class="demi-quiz-score">Current Score: ' + score + '/' + total + '</span>' +
+                    '<span class="demi-quiz-score">Score: ' + currentScore + '/' + total + '</span>' +
                 '</div>';
+
+                var pillsHTML = '<div class="demi-quiz-pills-row">';
+                data.questions.forEach(function(qItem, pIdx) {
+                    var pAns = userAnswers[pIdx];
+                    var pClass = "demi-quiz-pill";
+                    if (pIdx === idx) pClass += " active";
+                    if (pAns !== undefined) {
+                        pClass += (pAns === getCorrectAnsIndex(qItem)) ? " answered-correct" : " answered-incorrect";
+                    }
+                    pillsHTML += '<button type="button" class="' + pClass + '" data-jump="' + pIdx + '" title="Jump to question ' + (pIdx + 1) + '">' + (pIdx + 1) + '</button>';
+                });
+                pillsHTML += '</div>';
 
                 var qTextHTML = '<h4 class="demi-quiz-question">' + qText + '</h4>';
 
                 var optionsHTML = '<div class="demi-quiz-options">';
                 opts.forEach(function(opt, oi) {
-                    optionsHTML += '<button type="button" class="demi-quiz-opt-btn" data-idx="' + oi + '">' +
+                    var cleanOpt = opt.replace(/^[A-Ea-e0-9][\)\.\:\-]\s*/, '').trim();
+                    var btnClass = "demi-quiz-opt-btn";
+                    if (isAnswered) {
+                        if (oi === correctAnswer) {
+                            btnClass += " correct";
+                        } else if (oi === selectedOption) {
+                            btnClass += " incorrect";
+                        } else {
+                            btnClass += " dimmed";
+                        }
+                    }
+
+                    optionsHTML += '<button type="button" class="' + btnClass + '" data-idx="' + oi + '" ' + (isAnswered ? 'disabled' : '') + '>' +
                         '<span class="demi-quiz-opt-badge">' + (alpha[oi] || oi) + '</span>' +
-                        '<span class="demi-quiz-opt-text">' + opt + '</span>' +
+                        '<span class="demi-quiz-opt-text">' + cleanOpt + '</span>' +
+                        (isAnswered && oi === correctAnswer ? '<span style="color:#10b981; font-weight:bold; margin-left:auto;">✓</span>' : '') +
+                        (isAnswered && oi === selectedOption && oi !== correctAnswer ? '<span style="color:#ef4444; font-weight:bold; margin-left:auto;">✗</span>' : '') +
                     '</button>';
                 });
                 optionsHTML += '</div>';
 
+                var hintShown = hintsRevealed[idx] === true;
                 var footerHTML = '<div class="demi-quiz-footer">' +
                     '<div class="demi-quiz-hint-wrap">' +
-                        (q.hint ? '<button type="button" class="demi-quiz-hint-btn">💡 Need a Hint?</button><div class="demi-quiz-hint-box" style="display:none;"><strong>Hint:</strong> ' + q.hint + '</div>' : '') +
+                        (q.hint ? '<button type="button" class="demi-quiz-hint-btn" style="' + (hintShown ? 'display:none;' : '') + '">💡 Need a Hint?</button><div class="demi-quiz-hint-box" style="' + (hintShown ? 'display:block;' : 'display:none;') + '"><strong>Hint:</strong> ' + q.hint + '</div>' : '') +
                     '</div>' +
-                    '<button type="button" class="demi-quiz-next-btn" style="display:none;">' + (idx === total - 1 ? 'Finish Quiz' : 'Next Question →') + '</button>' +
+                    '<div class="demi-quiz-nav-group">' +
+                        (idx > 0 ? '<button type="button" class="demi-quiz-prev-btn">← Back</button>' : '') +
+                        '<button type="button" class="demi-quiz-next-btn">' + (idx === total - 1 ? 'Finish Quiz' : 'Next Question →') + '</button>' +
+                    '</div>' +
                 '</div>';
 
-                card.innerHTML = headerHTML + qTextHTML + optionsHTML + footerHTML;
+                card.innerHTML = headerHTML + pillsHTML + qTextHTML + optionsHTML + footerHTML;
                 container.appendChild(card);
+
+                // Handle jump pills
+                card.querySelectorAll(".demi-quiz-pill").forEach(function(pill) {
+                    pill.onclick = function() {
+                        var jumpIdx = parseInt(this.getAttribute("data-jump"));
+                        showQuestion(jumpIdx);
+                    };
+                });
 
                 var optBtns = card.querySelectorAll(".demi-quiz-opt-btn");
                 var nextBtn = card.querySelector(".demi-quiz-next-btn");
+                var prevBtn = card.querySelector(".demi-quiz-prev-btn");
                 var hintBtn = card.querySelector(".demi-quiz-hint-btn");
                 var hintBox = card.querySelector(".demi-quiz-hint-box");
 
                 if (hintBtn && hintBox) {
                     hintBtn.onclick = function() {
+                        hintsRevealed[idx] = true;
                         hintBox.style.display = "block";
                         hintBtn.style.display = "none";
                     };
                 }
 
+                if (prevBtn) {
+                    prevBtn.onclick = function() {
+                        showQuestion(idx - 1);
+                    };
+                }
+
                 optBtns.forEach(function(btn) {
                     btn.onclick = function() {
-                        if (isAnswered) return;
-                        isAnswered = true;
+                        if (userAnswers[idx] !== undefined) return;
                         var chosenIdx = parseInt(this.getAttribute("data-idx"));
-                        selectedOption = chosenIdx;
-
-                        if (chosenIdx === correctAnswer) {
-                            score++;
-                        }
-
-                        optBtns.forEach(function(b, oi) {
-                            b.disabled = true;
-                            if (oi === correctAnswer) {
-                                b.classList.add("correct");
-                            } else if (oi === chosenIdx) {
-                                b.classList.add("incorrect");
-                            } else {
-                                b.classList.add("dimmed");
-                            }
-                        });
-
-                        if (nextBtn) {
-                            nextBtn.style.display = "inline-flex";
-                        }
+                        userAnswers[idx] = chosenIdx;
+                        showQuestion(idx);
                     };
                 });
 
@@ -1776,7 +1899,8 @@
             };
 
             var showCompletionCard = function() {
-                var pct = Math.round((score / total) * 100);
+                var finalScore = calcScore();
+                var pct = Math.round((finalScore / total) * 100);
                 container.innerHTML = '<div class="demi-quiz-completed-card">' +
                     '<div class="demi-quiz-completed-header">' +
                         '<div class="demi-quiz-completed-title">' +
@@ -1786,17 +1910,26 @@
                         '<span class="demi-quiz-completed-badge">' + pct + '% Score</span>' +
                     '</div>' +
                     '<p class="demi-quiz-completed-desc">' +
-                        'You answered <strong>' + score + '</strong> out of <strong>' + total + '</strong> questions correctly.' +
+                        'You answered <strong>' + finalScore + '</strong> out of <strong>' + total + '</strong> questions correctly.' +
                     '</p>' +
-                    '<div class="demi-quiz-completed-actions">' +
+                    '<div class="demi-quiz-completed-actions" style="display:flex; gap:8px;">' +
+                        '<button type="button" class="demi-quiz-prev-btn demi-review-btn"><i class="fa fa-eye"></i> Review Questions</button>' +
                         '<button type="button" class="demi-quiz-tryagain-btn"><i class="fa fa-refresh"></i> Try Again</button>' +
                     '</div>' +
                 '</div>';
 
+                var reviewBtn = container.querySelector(".demi-review-btn");
+                if (reviewBtn) {
+                    reviewBtn.onclick = function() {
+                        showQuestion(0);
+                    };
+                }
+
                 var tryAgainBtn = container.querySelector(".demi-quiz-tryagain-btn");
                 if (tryAgainBtn) {
                     tryAgainBtn.onclick = function() {
-                        score = 0;
+                        userAnswers = {};
+                        hintsRevealed = {};
                         showQuestion(0);
                     };
                 }
@@ -1805,7 +1938,7 @@
                     var formData = new FormData();
                     formData.append("cmid", cmid);
                     formData.append("action", "submit_quiz_grade");
-                    formData.append("score", score);
+                    formData.append("score", finalScore);
                     formData.append("maxscore", total);
                     formData.append("sesskey", sesskey);
                     fetch(wwwroot + "/mod/ainotebook/chat_ajax.php?t=" + Date.now(), {
@@ -1815,6 +1948,7 @@
                         if(res.success) {
                             var div = document.createElement("div");
                             div.className = "gradebook-sync-msg";
+                            div.style.marginTop = "10px";
                             div.innerHTML = "<i class='fa fa-check-circle'></i> Score synchronized with Gradebook!";
                             var actionsDiv = container.querySelector(".demi-quiz-completed-actions");
                             if (actionsDiv) actionsDiv.appendChild(div);
@@ -2654,8 +2788,13 @@
         messages.scrollTop = messages.scrollHeight;
         
         window.scanHistoryForArtifacts = function() {
-            messages.querySelectorAll(".message.ai").forEach(msg => {
-                detectAndRenderArtifacts(msg.innerText, "ai", true);
+            var msgs = document.querySelectorAll("#chat-messages .message.ai:not(.welcome-msg)");
+            msgs.forEach(function(msg) {
+                var mb = msg.querySelector(".markdown-body") || msg.querySelector(".message-text");
+                if (mb && !msg.querySelector(".inline-artifact-container") && !msg.querySelector(".demi-quiz-card") && !msg.querySelector(".demi-flashcard-card-box")) {
+                    var rawContent = mb.innerText || mb.textContent;
+                    formatAndRenderAiBubble(msg, rawContent, true);
+                }
             });
             if (resultsContainer) resultsContainer.style.display = "none";
         };

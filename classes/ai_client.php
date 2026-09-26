@@ -359,6 +359,8 @@ class ai_client {
                     $unified_list[] = (object)[
                         'message'     => $item['prompt'] ?? '',
                         'response'    => $item['response'] ?? '',
+                        'client_app'  => $item['client_app'] ?? '',
+                        'session_id'  => $item['session_id'] ?? '',
                         'timecreated' => !empty($item['created_at']) ? strtotime($item['created_at']) : time(),
                     ];
                 }
@@ -449,21 +451,29 @@ class ai_client {
         try {
             $unified = self::get_unified_history($cmid, $userid);
             $portal_msgs = array_filter($unified, function($item) {
-                // If it exists in unified history from demi_engine
-                return !empty($item->message) || !empty($item->response);
+                $app = strtolower($item->client_app ?? '');
+                return str_contains($app, 'portal') || str_contains($app, 'pjj');
             });
 
-            if (!empty($portal_msgs) && empty($sessions)) {
-                $latest = reset($portal_msgs);
-                $firstPrompt = $latest->message ?? 'DEMI Tutor Activity';
-                $title = strlen($firstPrompt) > 40 ? substr($firstPrompt, 0, 37) . '...' : $firstPrompt;
+            if (!empty($portal_msgs)) {
+                $portal_msgs = array_values($portal_msgs);
+                $latest = end($portal_msgs);
+                $firstPrompt = $latest->message ?? 'PJJ Portal Activity';
+                $clean_p = trim(strip_tags($firstPrompt));
+                $title = strlen($clean_p) > 40 ? substr($clean_p, 0, 37) . '...' : $clean_p;
+
+                $diff = time() - $latest->timecreated;
+                if ($diff < 60) $rel_time = 'Just now';
+                elseif ($diff < 3600) $rel_time = floor($diff / 60) . ' mins ago';
+                elseif ($diff < 86400) $rel_time = floor($diff / 3600) . ' hours ago';
+                else $rel_time = floor($diff / 86400) . ' days ago';
 
                 $sessions[] = [
                     'session_id'      => 'pjj_portal_sync',
                     'course_fullname' => s($course->fullname),
-                    'title'           => '🌐 PJJ Portal: ' . s($title),
+                    'title'           => '🌐 ' . s($title),
                     'time'            => !empty($latest->timecreated) ? date('h:i A', $latest->timecreated) : date('h:i A'),
-                    'rel_time'        => 'Synced from Portal',
+                    'rel_time'        => $rel_time,
                     'message_count'   => count($portal_msgs),
                     'updated_at_ts'   => !empty($latest->timecreated) ? $latest->timecreated : time()
                 ];
@@ -483,10 +493,15 @@ class ai_client {
         self::ensure_session_id_field();
         $cm = self::get_cm_safe($cmid);
 
-        if ($session_id === 'pjj_portal_sync' || str_starts_with($session_id, 'pjj_portal_')) {
+        if ($session_id === 'pjj_portal_sync' || str_starts_with($session_id, 'pjj_portal_') || str_starts_with($session_id, 'portal_')) {
             $unified = self::get_unified_history($cmid, $userid);
+            $portal_msgs = array_filter($unified, function($item) {
+                $app = strtolower($item->client_app ?? '');
+                return str_contains($app, 'portal') || str_contains($app, 'pjj');
+            });
+
             $messages = [];
-            foreach ($unified as $idx => $r) {
+            foreach (array_values($portal_msgs) as $idx => $r) {
                 $clean_response = preg_replace('/<script[\s\S]*?<\/script>/i', '', $r->response ?? '');
                 $messages[] = [
                     'id'           => 900000 + $idx,

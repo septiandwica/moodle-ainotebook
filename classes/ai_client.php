@@ -102,19 +102,6 @@ class ai_client {
         $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
         $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
 
-        global $CFG;
-        require_once($CFG->libdir . '/filelib.php');
-        $curl = new \curl();
-        $curl->setopt([
-            'CURLOPT_TIMEOUT'        => 180,
-            'CURLOPT_CONNECTTIMEOUT' => 15,
-            'CURLOPT_HTTPHEADER'     => [
-                'X-Engine-API-Key: ' . $engine_key,
-                'Content-Type: application/json',
-                'Accept: application/json',
-            ],
-        ]);
-
         $formatted_history = [];
         if ($history) {
             foreach (array_reverse($history) as $h) {
@@ -133,73 +120,84 @@ class ai_client {
             'stream'        => (bool) $stream,
         ]);
 
+        $endpoint = rtrim($engine_url, '/') . '/api/v1/chat/tutor';
+        $full_text = "";
+        $buffer = "";
+
+        $ch = curl_init($endpoint);
+        $headers = [
+            'X-Engine-API-Key: ' . $engine_key,
+            'Content-Type: application/json',
+            'Accept: application/json, text/event-stream',
+        ];
+
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 180);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+
         if ($stream) {
-            $endpoint = rtrim($engine_url, '/') . '/api/v1/chat/tutor';
-            $buffer = "";
-            $full_text = "";
-            
-            $curl->setopt([
-                'CURLOPT_WRITEFUNCTION' => function($ch, $data) use (&$full_text, &$buffer) {
-                    $buffer .= $data;
-                    while (($pos = strpos($buffer, "\n")) !== false) {
-                        $line = substr($buffer, 0, $pos);
-                        $buffer = substr($buffer, $pos + 1);
-                        $line = trim($line);
-                        if (strpos($line, 'data: ') === 0) {
-                            $json_str = trim(substr($line, 6));
-                            if ($json_str === '[DONE]') continue;
-                            $json = json_decode($json_str, true);
-                            if ($json && isset($json['chunk']) && $json['chunk'] !== '') {
-                                $chunk = $json['chunk'];
-                                $full_text .= $chunk;
-                                self::$streamed = true;
-                                echo "data: " . json_encode(['chunk' => $chunk]) . "\n\n";
-                                @ob_flush();
-                                flush();
-                            }
+            curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch_handle, $data) use (&$full_text, &$buffer) {
+                $buffer .= $data;
+                while (($pos = strpos($buffer, "\n")) !== false) {
+                    $line = substr($buffer, 0, $pos);
+                    $buffer = substr($buffer, $pos + 1);
+                    $line = trim($line);
+                    if (strpos($line, 'data: ') === 0) {
+                        $json_str = trim(substr($line, 6));
+                        if ($json_str === '[DONE]' || $json_str === '') continue;
+                        $json = json_decode($json_str, true);
+                        if ($json && isset($json['chunk']) && $json['chunk'] !== '') {
+                            $chunk = $json['chunk'];
+                            $full_text .= $chunk;
+                            self::$streamed = true;
+                            echo "data: " . json_encode(['chunk' => $chunk]) . "\n\n";
+                            @ob_flush();
+                            flush();
                         }
                     }
-                    return strlen($data);
                 }
-            ]);
-
-            $raw_response = $curl->post($endpoint, $payload);
-            if (!$curl->errno && !empty($full_text)) {
-                if (strpos($full_text, '```mermaid') !== false) {
-                    $full_text = preg_replace_callback(
-                        '/```mermaid(.*?)```/s',
-                        fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
-                        $full_text
-                    );
-                }
-                return ['response' => self::sanitize_ai_output($full_text), 'sources_count' => $sources_count];
-            }
+                return strlen($data);
+            });
+            curl_exec($ch);
         } else {
-            $endpoint = rtrim($engine_url, '/') . '/api/v1/chat/tutor';
-            $raw_response = $curl->post($endpoint, $payload);
-
-            if (!$curl->errno) {
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $raw_response = curl_exec($ch);
+            if ($raw_response !== false) {
                 $res_data = json_decode($raw_response, true);
                 if (isset($res_data['data']['response'])) {
-                    $ai_text = $res_data['data']['response'];
-                    if (strpos($ai_text, '```mermaid') !== false) {
-                        $ai_text = preg_replace_callback(
-                            '/```mermaid(.*?)```/s',
-                            fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
-                            $ai_text
-                        );
-                    }
-                    return ['response' => self::sanitize_ai_output($ai_text), 'sources_count' => $sources_count];
+                    $full_text = $res_data['data']['response'];
+                } elseif (isset($res_data['response'])) {
+                    $full_text = $res_data['response'];
                 }
             }
         }
 
-        if ($curl->errno) {
-            debugging("mod_ainotebook: DEMI Engine request failed. Error: " . $curl->error, DEBUG_DEVELOPER);
-            return ['response' => "⚠️ DEMI Core AI Engine is currently unreachable at {$engine_url}. Please ensure the DEMI AI service is running.", 'sources_count' => 0];
+        $curl_errno = curl_errno($ch);
+        $curl_error = curl_error($ch);
+        $http_code  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if (!$curl_errno && !empty($full_text)) {
+            if (strpos($full_text, '```mermaid') !== false) {
+                $full_text = preg_replace_callback(
+                    '/```mermaid(.*?)```/s',
+                    fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
+                    $full_text
+                );
+            }
+            return ['response' => self::sanitize_ai_output($full_text), 'sources_count' => $sources_count];
         }
 
-        return ['response' => "⚠️ Received unexpected response from DEMI Core AI Engine.", 'sources_count' => 0];
+        if ($curl_errno) {
+            debugging("mod_ainotebook: DEMI Engine native cURL failed: {$curl_error} (HTTP {$http_code})", DEBUG_DEVELOPER);
+            return ['response' => "⚠️ DEMI Core AI Engine is currently unreachable at {$engine_url} (Error: {$curl_error}). Please ensure the DEMI AI service is running.", 'sources_count' => 0];
+        }
+
+        return ['response' => "⚠️ Received unexpected response from DEMI Core AI Engine (HTTP {$http_code}).", 'sources_count' => 0];
     }
 
     /**

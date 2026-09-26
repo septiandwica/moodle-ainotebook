@@ -1578,39 +1578,215 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   AI Suggested Questions & Pills Styling
+   AI Response Typography & Markdown Body Styling
+   ───────────────────────────────────────────────────────────────────────── */
+.message.ai .markdown-body {
+    font-size: 0.93rem;
+    line-height: 1.7;
+    color: #1e293b;
+    word-break: break-word;
+}
+
+.message.ai .markdown-body h1,
+.message.ai .markdown-body h2,
+.message.ai .markdown-body h3,
+.message.ai .markdown-body h4 {
+    color: #07366c;
+    font-weight: 700;
+    margin-top: 1.25rem;
+    margin-bottom: 0.6rem;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+}
+
+.message.ai .markdown-body h1 { font-size: 1.35rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; }
+.message.ai .markdown-body h2 { font-size: 1.18rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
+.message.ai .markdown-body h3 { font-size: 1.05rem; }
+.message.ai .markdown-body h4 { font-size: 0.95rem; }
+
+.message.ai .markdown-body p {
+    margin-top: 0;
+    margin-bottom: 0.85rem;
+}
+
+.message.ai .markdown-body p:last-child {
+    margin-bottom: 0;
+}
+
+.message.ai .markdown-body ul,
+.message.ai .markdown-body ol {
+    margin-top: 0.35rem;
+    margin-bottom: 0.85rem;
+    padding-left: 1.5rem;
+}
+
+.message.ai .markdown-body li {
+    margin-bottom: 0.4rem;
+    line-height: 1.6;
+}
+
+.message.ai .markdown-body li > p {
+    margin-bottom: 0.3rem;
+}
+
+.message.ai .markdown-body strong {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.message.ai .markdown-body blockquote {
+    margin: 1rem 0;
+    padding: 10px 16px;
+    background: #f8fafc;
+    border-left: 4px solid #2563eb;
+    border-radius: 0 8px 8px 0;
+    color: #334155;
+    font-style: italic;
+}
+
+.message.ai .markdown-body code {
+    background: #f1f5f9;
+    color: #dc2626;
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-size: 0.86em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.message.ai .markdown-body pre {
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 14px;
+    border-radius: 10px;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.message.ai .markdown-body pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    font-size: inherit;
+}
+
+.message.ai .markdown-body table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.86rem;
+}
+
+.message.ai .markdown-body th,
+.message.ai .markdown-body td {
+    border: 1px solid #e2e8f0;
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.message.ai .markdown-body th {
+    background: #f8fafc;
+    font-weight: 700;
+    color: #07366c;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   AI Suggested Questions & Follow-Up Topics Styling
    ───────────────────────────────────────────────────────────────────────── */
 .suggestion-container, .suggestions-container {
     display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
+    flex-direction: column;
+    gap: 8px;
     margin-top: 14px;
     margin-bottom: 16px;
-    padding-left: 0;
+    padding: 12px 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    animation: fadeInSug 0.3s ease-in-out;
 }
-.suggestion-btn, .suggestion-pill {
-    background: #ffffff;
-    color: #102b52;
-    border: 1px solid #cbd5e1;
-    border-radius: 20px;
-    padding: 8px 16px;
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    display: inline-flex;
+
+@keyframes fadeInSug {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.suggestion-header {
+    display: flex;
     align-items: center;
     gap: 6px;
-    text-align: left;
-    line-height: 1.4;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin-bottom: 4px;
 }
+
+.suggestion-header i {
+    color: #d97706;
+}
+
+.suggestion-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.suggestion-btn, .suggestion-pill {
+    background: #ffffff;
+    color: #1e293b;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 9px 14px;
+    font-size: 0.84rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    text-align: left;
+    line-height: 1.45;
+    width: 100%;
+}
+
+.suggestion-btn .sug-icon {
+    color: #3b82f6;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.suggestion-btn .sug-text {
+    flex: 1;
+    color: #1e293b;
+}
+
+.suggestion-btn .sug-arrow {
+    color: #94a3b8;
+    font-size: 1rem;
+    transition: transform 0.2s ease, color 0.2s ease;
+    flex-shrink: 0;
+}
+
 .suggestion-btn:hover, .suggestion-pill:hover {
-    background: #102b52;
-    color: #ffffff;
-    border-color: #102b52;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-color: #93c5fd;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(16, 43, 82, 0.18);
+    box-shadow: 0 3px 10px rgba(37, 99, 235, 0.1);
+}
+
+.suggestion-btn:hover .sug-text {
+    color: #1d4ed8;
+}
+
+.suggestion-btn:hover .sug-arrow {
+    color: #2563eb;
+    transform: translateX(3px);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -1817,6 +1993,209 @@
 }
 .demi-quiz-tryagain-btn:hover {
     background: #b45309;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   DEMI Interactive 3D Study Flashcards (Matching AiTutor.tsx 100%)
+   ───────────────────────────────────────────────────────────────────────── */
+.interactive-flashcard-wrapper {
+    margin: 12px 0;
+}
+
+.demi-flashcard-card-box {
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(233, 213, 255, 0.8);
+    background: linear-gradient(135deg, rgba(250, 245, 255, 0.7) 0%, rgba(238, 242, 255, 0.4) 50%, #ffffff 100%);
+    box-shadow: 0 2px 8px rgba(147, 51, 234, 0.05);
+}
+
+.demi-flashcard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f3e8ff;
+}
+
+.demi-flashcard-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.demi-flashcard-icon {
+    font-size: 1.25rem;
+}
+
+.demi-flashcard-title {
+    font-size: 0.76rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #581c87;
+    margin: 0;
+}
+
+.demi-flashcard-counter {
+    font-size: 0.7rem;
+    color: #9333ea;
+    font-weight: 600;
+}
+
+.demi-flashcard-status-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #7e22ce;
+    border: 1px solid #d8b4fe;
+    background: rgba(243, 232, 255, 0.8);
+    padding: 3px 10px;
+    border-radius: 9999px;
+    transition: all 0.2s ease;
+}
+
+.demi-flashcard-status-badge.revealed {
+    color: #4338ca;
+    border-color: #a5b4fc;
+    background: rgba(224, 231, 255, 0.9);
+}
+
+.demi-flashcard-flip-area {
+    cursor: pointer;
+    min-height: 160px;
+    padding: 22px;
+    border-radius: 14px;
+    border: 2px solid #d8b4fe;
+    background: #ffffff;
+    color: #0f172a;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    user-select: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.demi-flashcard-flip-area:hover {
+    border-color: #a855f7;
+    box-shadow: 0 4px 14px rgba(168, 85, 247, 0.15);
+    transform: translateY(-1px);
+}
+
+.demi-flashcard-flip-area.is-flipped {
+    border-color: #818cf8;
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #0f172a 100%);
+    color: #ffffff;
+    box-shadow: 0 8px 20px rgba(49, 46, 129, 0.3);
+}
+
+.demi-flashcard-tag {
+    font-size: 0.66rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    background: #f3e8ff;
+    color: #7e22ce;
+    margin-bottom: 12px;
+    display: inline-block;
+}
+
+.demi-flashcard-flip-area.is-flipped .demi-flashcard-tag {
+    background: rgba(99, 102, 241, 0.25);
+    color: #c7d2fe;
+    border: 1px solid rgba(129, 140, 248, 0.3);
+}
+
+.demi-flashcard-body-text {
+    font-size: 0.94rem;
+    font-weight: 600;
+    line-height: 1.6;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.demi-flashcard-flip-area.is-flipped .demi-flashcard-body-text {
+    color: #f8fafc;
+}
+
+.demi-flashcard-hint {
+    font-size: 0.68rem;
+    margin-top: 16px;
+    font-weight: 500;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.demi-flashcard-flip-area.is-flipped .demi-flashcard-hint {
+    color: #a5b4fc;
+}
+
+.demi-flashcard-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid #f3e8ff;
+}
+
+.demi-flashcard-nav-btn {
+    background: #ffffff;
+    border: 1px solid #e9d5ff;
+    color: #581c87;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.demi-flashcard-nav-btn:hover:not(:disabled) {
+    background: #f3e8ff;
+    border-color: #d8b4fe;
+    color: #3b0764;
+}
+
+.demi-flashcard-nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.demi-flashcard-dots {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.demi-flashcard-dot {
+    height: 8px;
+    border-radius: 9999px;
+    border: none;
+    background: #e9d5ff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 8px;
+    padding: 0;
+}
+
+.demi-flashcard-dot.active {
+    background: #9333ea;
+    width: 20px;
+}
+
+.demi-flashcard-dot:hover:not(.active) {
+    background: #d8b4fe;
 }
 
 /* ==========================================================================

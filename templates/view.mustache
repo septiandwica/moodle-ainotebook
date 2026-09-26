@@ -1151,26 +1151,96 @@
             var cleanText = text;
             var artType = null;
 
-            // 1. Check for QUIZ (Support both json-quiz and plain json tags).
-            var quizMatch = text.match(/```(?:json-quiz|json)\s*([\s\S]*?)```/);
-            if (quizMatch) {
+            // 1. Check for FLASHCARDS (Support json-flashcards or json with flashcards / front-back)
+            var fcMatch = text.match(/```(?:json-flashcards|json)\s*([\s\S]*?)```/i);
+            if (fcMatch) {
                 try {
-                    var raw = quizMatch[1].trim();
+                    var raw = fcMatch[1].trim();
                     var parsed = JSON.parse(raw);
-                    var quizData = parsed.quiz || (parsed.questions ? parsed : null);
-                    if (quizData && quizData.questions) {
-                        artType = "quiz";
-                        artifact = { type: "quiz", data: quizData, title: "Quiz - " + new Date().toLocaleTimeString() };
-                        cleanText = text.replace(quizMatch[0], "").trim();
+                    var fcItems = Array.isArray(parsed) ? parsed : (parsed.flashcards || null);
+                    if (fcItems && Array.isArray(fcItems) && fcItems.length > 0 && (fcItems[0].front || fcItems[0].question || fcItems[0].term)) {
+                        artType = "flashcards";
+                        artifact = { type: "flashcards", data: fcItems, title: "Flashcards - " + new Date().toLocaleTimeString() };
+                        cleanText = text.replace(fcMatch[0], "").trim();
                         found = true;
-                        console.log("Detected Quiz artifact.");
+                        console.log("Detected Flashcards artifact via codeblock.");
                     }
-                } catch (e) {
-                    console.error("Quiz JSON parse error:", e);
+                } catch(e) {}
+            }
+
+            // Also check for raw JSON without codeblock (e.g. { "flashcards": [...] })
+            if (!found) {
+                var rawJsonMatch = text.match(/\{\s*"flashcards"\s*:\s*\[[\s\S]*?\]\s*\}/i);
+                if (rawJsonMatch) {
+                    try {
+                        var parsed = JSON.parse(rawJsonMatch[0].trim());
+                        if (parsed && Array.isArray(parsed.flashcards) && parsed.flashcards.length > 0) {
+                            artType = "flashcards";
+                            artifact = { type: "flashcards", data: parsed.flashcards, title: "Flashcards - " + new Date().toLocaleTimeString() };
+                            cleanText = text.replace(rawJsonMatch[0], "").trim();
+                            found = true;
+                            console.log("Detected Flashcards artifact via raw JSON.");
+                        }
+                    } catch(e) {}
                 }
             }
 
-            // 2. Check for MINDMAP (Mermaid).
+            // Also check for Markdown/Text structured Flashcards (Front: ... Back: ...)
+            if (!found) {
+                var textFcRegex = /(?:^|\n)(?:(?:\*\*|#+)?\s*(?:Flashcard\s*1\s*[-:]?\s*)?(?:Front|Question|Term|Q)(?:\*\*|#+)?\s*[:\-–][\s\S]+)/i;
+                var textFcMatch = text.match(textFcRegex);
+                if (textFcMatch) {
+                    var lines = text.split('\n');
+                    var items = [];
+                    var curF = '', curB = '', collectingB = false;
+                    for (var i = 0; i < lines.length; i++) {
+                        var l = lines[i].trim();
+                        if (!l) continue;
+                        var fm = l.match(/^(?:(?:\*\*|#+)?\s*(?:Flashcard\s*\d+\s*[-:]?\s*)?(?:Front|Question|Term|Q)(?:\*\*|#+)?\s*[:\-–]\s*)(.+)/i);
+                        var bm = l.match(/^(?:(?:\*\*|#+)?\s*(?:Back|Answer|Definition|Explanation|A)(?:\*\*|#+)?\s*[:\-–]\s*)(.+)/i);
+                        if (fm) {
+                            if (curF && curB) { items.push({ front: curF, back: curB }); curB = ''; }
+                            curF = fm[1].replace(/^\*\*|\*\*$/g, '').trim();
+                            collectingB = false;
+                        } else if (bm) {
+                            curB = bm[1].replace(/^\*\*|\*\*$/g, '').trim();
+                            collectingB = true;
+                        } else if (collectingB && !l.match(/^(?:Flashcard|\*\*Flashcard|Front:|Back:)/i) && !l.includes('|')) {
+                            curB += '\n' + l;
+                        }
+                    }
+                    if (curF && curB) items.push({ front: curF, back: curB });
+                    if (items.length >= 2) {
+                        artType = "flashcards";
+                        artifact = { type: "flashcards", data: items, title: "Flashcards - " + new Date().toLocaleTimeString() };
+                        cleanText = text.substring(0, text.indexOf(textFcMatch[0])).trim();
+                        found = true;
+                    }
+                }
+            }
+
+            // 2. Check for QUIZ (Support both json-quiz and plain json tags).
+            if (!found) {
+                var quizMatch = text.match(/```(?:json-quiz|json)\s*([\s\S]*?)```/);
+                if (quizMatch) {
+                    try {
+                        var raw = quizMatch[1].trim();
+                        var parsed = JSON.parse(raw);
+                        var quizData = parsed.quiz || (parsed.questions ? parsed : null);
+                        if (quizData && quizData.questions) {
+                            artType = "quiz";
+                            artifact = { type: "quiz", data: quizData, title: "Quiz - " + new Date().toLocaleTimeString() };
+                            cleanText = text.replace(quizMatch[0], "").trim();
+                            found = true;
+                            console.log("Detected Quiz artifact.");
+                        }
+                    } catch (e) {
+                        console.error("Quiz JSON parse error:", e);
+                    }
+                }
+            }
+
+            // 3. Check for MINDMAP (Mermaid).
             if (!found) {
                 var mermaidMatch = text.match(/```mermaid\s*([\s\S]*?)```/i);
                 if (!mermaidMatch) {
@@ -1188,7 +1258,7 @@
                 }
             }
 
-            // 3. Check for SUMMARY.
+            // 4. Check for SUMMARY.
             if (!found) {
                 var summaryMatch = text.match(/\[(?:SUMMARY|REPORT)_START\]([\s\S]*?)\[(?:SUMMARY|REPORT)_END\]/);
                 if (summaryMatch) {
@@ -1291,6 +1361,7 @@
             } else {
                 setPrintLandscape(false);
                 if (art.type === "quiz") renderQuiz(art.data, customTarget);
+                if (art.type === "flashcards") renderFlashcards(art.data, customTarget);
                 if (art.type === "summary") renderSummary(art.data, customTarget);
             }
         };
@@ -1468,6 +1539,159 @@
             };
 
             showQuestion(0);
+        };
+
+        var renderFlashcards = function(data, customTarget = null) {
+            if (resultsContainer && !customTarget) resultsContainer.style.display = "block";
+            var target = customTarget || getOrCreateTargetContainer();
+            if (!target) return;
+
+            var items = [];
+            if (Array.isArray(data)) {
+                items = data;
+            } else if (data && Array.isArray(data.flashcards)) {
+                items = data.flashcards;
+            } else if (typeof data === "string") {
+                try {
+                    var parsed = JSON.parse(data);
+                    if (Array.isArray(parsed)) items = parsed;
+                    else if (parsed && Array.isArray(parsed.flashcards)) items = parsed.flashcards;
+                } catch(e) {
+                    var lines = data.split('\n');
+                    var curF = '', curB = '', collectingB = false;
+                    for (var i = 0; i < lines.length; i++) {
+                        var l = lines[i].trim();
+                        if (!l) continue;
+                        var fm = l.match(/^(?:(?:\*\*|#+)?\s*(?:Flashcard\s*\d+\s*[-:]?\s*)?(?:Front|Question|Term|Q)(?:\*\*|#+)?\s*[:\-–]\s*)(.+)/i);
+                        var bm = l.match(/^(?:(?:\*\*|#+)?\s*(?:Back|Answer|Definition|Explanation|A)(?:\*\*|#+)?\s*[:\-–]\s*)(.+)/i);
+                        if (fm) {
+                            if (curF && curB) { items.push({ front: curF, back: curB }); curB = ''; }
+                            curF = fm[1].replace(/^\*\*|\*\*$/g, '').trim();
+                            collectingB = false;
+                        } else if (bm) {
+                            curB = bm[1].replace(/^\*\*|\*\*$/g, '').trim();
+                            collectingB = true;
+                        } else if (collectingB && !l.match(/^(?:Flashcard|\*\*Flashcard|Front:|Back:)/i) && !l.includes('|')) {
+                            curB += '\n' + l;
+                        }
+                    }
+                    if (curF && curB) items.push({ front: curF, back: curB });
+                }
+            }
+
+            if (!items || items.length === 0) return;
+
+            var containerId = "flashcard-container-" + Math.random().toString(36).substring(2, 9);
+            target.innerHTML = "<div id='" + containerId + "' class='interactive-flashcard-wrapper'></div>";
+            var container = target.querySelector("#" + containerId) || target;
+
+            var currentIdx = 0;
+            var isFlipped = false;
+            var total = items.length;
+
+            var showCard = function(idx) {
+                currentIdx = idx;
+                isFlipped = false;
+                container.innerHTML = "";
+
+                var cardData = items[idx];
+                var frontText = cardData.front || cardData.question || cardData.term || "Question";
+                var backText = cardData.back || cardData.answer || cardData.definition || cardData.explanation || "Answer";
+
+                var cardWrap = document.createElement("div");
+                cardWrap.className = "demi-flashcard-card-box";
+
+                // Header
+                var headerHTML = '<div class="demi-flashcard-header">' +
+                    '<div class="demi-flashcard-title-wrap">' +
+                        '<span class="demi-flashcard-icon">🗂️</span>' +
+                        '<div>' +
+                            '<h4 class="demi-flashcard-title">Interactive 3D Study Flashcards</h4>' +
+                            '<span class="demi-flashcard-counter">Card ' + (idx + 1) + ' of ' + total + '</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<span class="demi-flashcard-status-badge">' + (isFlipped ? '💡 Answer Revealed' : '❓ Click to Reveal') + '</span>' +
+                '</div>';
+
+                // 3D Card Area
+                var cardAreaHTML = '<div class="demi-flashcard-flip-area' + (isFlipped ? ' is-flipped' : '') + '" tabindex="0" role="button">' +
+                    '<div class="demi-flashcard-tag">' + (isFlipped ? '💡 Back / Definition' : '❓ Front / Term') + '</div>' +
+                    '<div class="demi-flashcard-body-text">' + (isFlipped ? backText : frontText) + '</div>' +
+                    '<div class="demi-flashcard-hint">' + (isFlipped ? '🔄 Click or tap anywhere to return to question' : '🔄 Click or tap anywhere to flip card') + '</div>' +
+                '</div>';
+
+                // Footer with dots and buttons
+                var dotsHTML = '<div class="demi-flashcard-dots">';
+                for (var d = 0; d < total; d++) {
+                    dotsHTML += '<button type="button" class="demi-flashcard-dot' + (d === idx ? ' active' : '') + '" data-idx="' + d + '" title="Card ' + (d + 1) + '"></button>';
+                }
+                dotsHTML += '</div>';
+
+                var footerHTML = '<div class="demi-flashcard-footer">' +
+                    '<button type="button" class="demi-flashcard-nav-btn btn-prev"' + (idx === 0 ? ' disabled' : '') + '><i class="fa fa-chevron-left"></i> Previous</button>' +
+                    dotsHTML +
+                    '<button type="button" class="demi-flashcard-nav-btn btn-next"' + (idx === total - 1 ? ' disabled' : '') + '>Next <i class="fa fa-chevron-right"></i></button>' +
+                '</div>';
+
+                cardWrap.innerHTML = headerHTML + cardAreaHTML + footerHTML;
+                container.appendChild(cardWrap);
+
+                var flipArea = cardWrap.querySelector(".demi-flashcard-flip-area");
+                var badge = cardWrap.querySelector(".demi-flashcard-status-badge");
+                var tag = cardWrap.querySelector(".demi-flashcard-tag");
+                var bodyText = cardWrap.querySelector(".demi-flashcard-body-text");
+                var hint = cardWrap.querySelector(".demi-flashcard-hint");
+
+                var toggleFlip = function() {
+                    isFlipped = !isFlipped;
+                    if (isFlipped) {
+                        flipArea.classList.add("is-flipped");
+                        badge.innerHTML = "💡 Answer Revealed";
+                        badge.classList.add("revealed");
+                        tag.innerHTML = "💡 Back / Definition";
+                        bodyText.innerText = backText;
+                        hint.innerHTML = "🔄 Click or tap anywhere to return to question";
+                    } else {
+                        flipArea.classList.remove("is-flipped");
+                        badge.innerHTML = "❓ Click to Reveal";
+                        badge.classList.remove("revealed");
+                        tag.innerHTML = "❓ Front / Term";
+                        bodyText.innerText = frontText;
+                        hint.innerHTML = "🔄 Click or tap anywhere to flip card";
+                    }
+                };
+
+                flipArea.onclick = toggleFlip;
+                flipArea.onkeydown = function(e) {
+                    if (e.key === " " || e.key === "Enter") {
+                        e.preventDefault();
+                        toggleFlip();
+                    }
+                };
+
+                var prevBtn = cardWrap.querySelector(".btn-prev");
+                if (prevBtn) {
+                    prevBtn.onclick = function() {
+                        if (idx > 0) showCard(idx - 1);
+                    };
+                }
+
+                var nextBtn = cardWrap.querySelector(".btn-next");
+                if (nextBtn) {
+                    nextBtn.onclick = function() {
+                        if (idx < total - 1) showCard(idx + 1);
+                    };
+                }
+
+                cardWrap.querySelectorAll(".demi-flashcard-dot").forEach(function(dot) {
+                    dot.onclick = function() {
+                        var targetIdx = parseInt(this.getAttribute("data-idx"));
+                        showCard(targetIdx);
+                    };
+                });
+            };
+
+            showCard(0);
         };
 
         var prepareFormalHeader = function(title) {
@@ -1776,7 +2000,11 @@
                     function updateStreamUI() {
                         if (!contentDiv || isFinalized) return;
                         var cleanTyping = fullText
-                            .replace(/```(?:json-quiz|json)[\s\S]*?(?:```|$)/gi, '\n\n*(⚡ Generating Interactive Quiz...)*')
+                            .replace(/```(?:json-flashcards)[\s\S]*?(?:```|$)/gi, '\n\n*(🗂️ Generating Interactive Flashcards...)*')
+                            .replace(/```(?:json-quiz)[\s\S]*?(?:```|$)/gi, '\n\n*(⚡ Generating Interactive Quiz...)*')
+                            .replace(/```json[\s\S]*?(?:flashcards|front)[\s\S]*?(?:```|$)/gi, '\n\n*(🗂️ Generating Interactive Flashcards...)*')
+                            .replace(/```json[\s\S]*?(?:questions|quiz)[\s\S]*?(?:```|$)/gi, '\n\n*(⚡ Generating Interactive Quiz...)*')
+                            .replace(/\{\s*"flashcards"\s*:\s*\[[\s\S]*?(?:\}\s*$|$)/gi, '\n\n*(🗂️ Generating Interactive Flashcards...)*')
                             .replace(/```mermaid[\s\S]*?(?:```|$)/gi, '\n\n*(⚡ Generating Mindmap...)*')
                             .replace(/\[(?:SUMMARY|REPORT)_START\][\s\S]*?(?:\[(?:SUMMARY|REPORT)_END\]|$)/gi, '\n\n*(⚡ Generating Summary...)*')
                             .replace(/<suggestions>[\s\S]*?(?:<\/suggestions>|$)/gi, '')
@@ -1819,22 +2047,40 @@
                             var result = detectAndRenderArtifacts(fullText, "ai", true, artifactBox);
                             var displayMsg = result.cleanText;
                             
-                            // Robust Suggestion Extraction (Support <suggestions> AND raw pipe-separated strings)
+                            // Robust Suggestion Extraction (Support <suggestions>, raw pipes, or trailing question lines)
                             var extractedSuggestions = [];
                             var sugMatch = displayMsg.match(/<suggestions>([\s\S]*?)<\/suggestions>/i);
                             if (sugMatch) {
                                 var suggestionsStr = sugMatch[1];
                                 displayMsg = displayMsg.replace(sugMatch[0], "").trim();
-                                extractedSuggestions = suggestionsStr.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+                                extractedSuggestions = suggestionsStr.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 5; });
                             } else {
-                                var pipeRegex = /(?:^|\n|\r)\s*([^\n\r\|]{2,}\|[^\n\r\|]{2,}(?:\|[^\n\r\|]{2,})?)\s*(?=\n|\r|$)/g;
+                                var pipeRegex = /(?:^|\n|\r|\.\s+)([^\n\r\|]{6,}\?[ \t]*\|[ \t]*[^\n\r\|]{6,}(?:\|[ \t]*[^\n\r\|]{6,})?)/i;
                                 var pipeMatch = pipeRegex.exec(displayMsg);
+                                if (!pipeMatch) {
+                                    pipeRegex = /(?:^|\n|\r)\s*([^\n\r\|]{6,}\|[^\n\r\|]{6,}(?:\|[^\n\r\|]{6,})?)\s*(?=\n|\r|$)/i;
+                                    pipeMatch = pipeRegex.exec(displayMsg);
+                                }
                                 if (pipeMatch) {
                                     var rawPipeStr = pipeMatch[1];
-                                    displayMsg = displayMsg.replace(pipeMatch[0], "").trim();
-                                    extractedSuggestions = rawPipeStr.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+                                    displayMsg = displayMsg.replace(pipeMatch[1], "").trim();
+                                    extractedSuggestions = rawPipeStr.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 5; });
                                 }
                             }
+
+                            // If still empty, check for trailing multiline questions
+                            if (extractedSuggestions.length === 0) {
+                                var trailingQuestionsRegex = /(?:^|\n)((?:[^\n\r]{8,}\?\s*(?:\n|\r|$)){2,4})$/;
+                                var tqMatch = trailingQuestionsRegex.exec(displayMsg);
+                                if (tqMatch) {
+                                    var rawTq = tqMatch[1].trim();
+                                    displayMsg = displayMsg.substring(0, displayMsg.lastIndexOf(tqMatch[1])).trim();
+                                    extractedSuggestions = rawTq.split(/\n+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 5; });
+                                }
+                            }
+
+                            // Clean duplicate plain smart context text from displayMsg if present
+                            displayMsg = displayMsg.replace(/(?:^|\n|\r)\s*Smart Context:\s*Answer is generated using \d+ relevant material sources\.?\s*/gi, "\n\n").trim();
                             
                             if (sourcesCount > 0) {
                                 displayMsg += "\n\n<div class=\"context-source-badge\"><i class=\"fa fa-check-circle\"></i> Smart Context: Answer is generated using " + sourcesCount + " relevant material sources.</div>";
@@ -2001,15 +2247,17 @@
 
             var container = document.createElement("div");
             container.className = "suggestion-container";
-            
+            container.innerHTML = '<div class="suggestion-header"><i class="fa fa-lightbulb-o mr-1"></i><span>Suggested Follow-up & In-Depth Topics</span></div><div class="suggestion-list"></div>';
+            var list = container.querySelector(".suggestion-list");
+
             suggestionsArray.forEach(function(s) {
                 var btn = document.createElement("button");
                 btn.className = "suggestion-btn";
-                btn.innerText = s;
+                btn.innerHTML = '<span class="sug-icon"><i class="fa fa-commenting-o"></i></span><span class="sug-text">' + s + '</span><span class="sug-arrow"><i class="fa fa-angle-right"></i></span>';
                 btn.onclick = function() { sendSuggested(s); };
-                container.appendChild(btn);
+                list.appendChild(btn);
             });
-            
+
             if (parentMsgNode && parentMsgNode.parentNode) {
                 parentMsgNode.parentNode.insertBefore(container, parentMsgNode.nextSibling);
             } else {

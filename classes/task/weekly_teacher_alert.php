@@ -68,23 +68,16 @@ class weekly_teacher_alert extends \core\task\scheduled_task {
             $system_prompt .= "4. Highlight the specific topics they struggled with and suggest reviewing them in class.\n";
             $system_prompt .= "5. Do NOT use markdown code blocks.\n";
             
-            $provider = get_config('mod_ainotebook', 'ai_provider');
-            if ($provider === 'moodle') {
-                $aimanager = \core\di::get(\core_ai\manager::class);
-                $action = new \core_ai\aiactions\generate_text(
-                    contextid: $context->id,
-                    userid: (int)get_admin()->id,
-                    prompttext: $system_prompt . "\n\nStudent Queries:\n" . $chat_text
-                );
-                $response_obj = $aimanager->process_action($action);
-                if ($response_obj->get_success()) {
-                    $ai_report = $response_obj->get_response_data()['generatedcontent'];
-                } else {
-                    $ai_report = "";
-                }
-            } else {
-                $ai_report = \mod_ainotebook\ai_client::custom_provider_request($provider, $system_prompt, "Student Queries:\n" . $chat_text);
-            }
+            $ai_report = \mod_ainotebook\ai_client::demi_engine_request(
+                $system_prompt,
+                "Student Queries:\n" . $chat_text,
+                [],
+                false,
+                (int)get_admin()->id,
+                $course->id,
+                $notebook->id,
+                $notebook->name
+            );
 
             // Cleanup AI response
             $ai_report = trim(preg_replace('/^```\w*\s*/', '', $ai_report));

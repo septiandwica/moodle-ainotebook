@@ -1773,3 +1773,306 @@ body { background-color: var(--pres-bg); color: var(--pres-text); font-family: s
     background: #b45309;
 }
 
+/* ==========================================================================
+   Comprehensive Responsive System for DEMI AI Academic Notebook
+   ========================================================================== */
+
+.btn-sidebar-toggle-mobile {
+    display: none;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #1e293b;
+    padding: 7px 12px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+.btn-sidebar-toggle-mobile:hover {
+    background: #e2e8f0;
+    border-color: #94a3b8;
+}
+
+/* Tablets and below (<= 992px) */
+@media (max-width: 992px) {
+    #ainotebook-wrapper {
+        padding: 12px;
+    }
+
+    .demi-top-control-bar {
+        padding: 12px 16px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .demi-brand-group {
+        width: 100%;
+    }
+
+    .demi-header-controls {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 8px;
+    }
+
+    .btn-sidebar-toggle-mobile {
+        display: inline-flex;
+    }
+
+    .demi-course-pill {
+        flex: 1 1 auto;
+        min-width: 180px;
+        max-width: calc(100% - 130px);
+        overflow: hidden;
+    }
+    .demi-course-pill .pill-value {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: inline-block;
+        max-width: 160px;
+    }
+
+    /* Main Workspace Layout */
+    .main-dashboard-card {
+        flex-direction: column;
+        height: auto;
+        min-height: 600px;
+    }
+
+    .ainotebook-sidebar {
+        width: 100%;
+        min-width: 100%;
+        max-height: 0;
+        overflow: hidden;
+        border-right: none;
+        border-bottom: 1px solid var(--pres-border);
+        transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: none;
+    }
+
+    .ainotebook-sidebar.mobile-open {
+        display: flex;
+        max-height: 420px;
+        overflow-y: auto;
+    }
+
+    .ainotebook-chat {
+        width: 100%;
+        flex: 1;
+        min-height: 520px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chat-messages {
+        max-height: 460px;
+    }
+
+    .creator-workspace {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .creator-history-panel {
+        width: 100% !important;
+        max-height: 200px;
+    }
+
+    .creator-preview-panel {
+        width: 100%;
+    }
+
+    .preview-scroll-area {
+        height: 450px;
+        padding: 16px;
+    }
+}
+
+/* Mobile Devices (<= 768px) */
+@media (max-width: 768px) {
+    #ainotebook-wrapper {
+        padding: 8px;
+    }
+
+    .demi-top-control-bar {
+        border-radius: 12px;
+        padding: 10px 14px;
+        margin-bottom: 12px;
+    }
+
+    .demi-avatar-badge {
+        width: 36px;
+        height: 36px;
+        font-size: 0.75rem;
+    }
+
+    .demi-title-row h2 {
+        font-size: 0.95rem;
+    }
+
+    .demi-subtitle {
+        font-size: 0.72rem;
+        display: none;
+    }
+
+    .demi-header-controls {
+        gap: 6px;
+    }
+
+    .demi-course-pill {
+        font-size: 0.75rem;
+        padding: 4px 8px;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .demi-status-pill {
+        font-size: 0.72rem;
+        padding: 4px 8px;
+    }
+
+    .btn-new-session-red {
+        padding: 6px 10px;
+        font-size: 0.75rem;
+    }
+
+    .main-dashboard-card {
+        border-radius: 12px;
+    }
+
+    .chat-header {
+        padding: 10px 14px;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .chat-info h2 {
+        font-size: 0.95rem;
+    }
+
+    .academic-mode-tag {
+        font-size: 0.7rem;
+        padding: 3px 8px;
+    }
+
+    .chat-messages {
+        padding: 12px;
+        gap: 12px;
+    }
+
+    .message-bubble-body {
+        max-width: 94%;
+        padding: 10px 14px;
+    }
+
+    .message.user .message-bubble-body {
+        max-width: 90%;
+    }
+
+    .floating-study-tools-bar {
+        padding: 6px 10px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+        gap: 6px;
+    }
+    .floating-study-tools-bar .tools-label {
+        font-size: 0.7rem;
+        flex-shrink: 0;
+    }
+    .floating-study-tools-bar .tool-btn {
+        padding: 4px 10px;
+        font-size: 0.72rem;
+        flex-shrink: 0;
+    }
+
+    .input-wrapper-container {
+        padding: 8px 10px;
+    }
+
+    .input-wrapper {
+        padding: 4px 6px;
+    }
+
+    .input-wrapper input {
+        font-size: 0.85rem;
+        padding: 8px 10px;
+    }
+
+    .source-pill {
+        display: none !important;
+    }
+
+    .study-tools-inline-box {
+        padding: 10px;
+    }
+
+    .tools-chips-group {
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .study-tool-chip {
+        width: 100%;
+        text-align: left;
+        justify-content: flex-start;
+    }
+
+    /* Modal responsiveness */
+    .ain-modal-content {
+        width: 94% !important;
+        max-width: 94% !important;
+        margin: 16px auto;
+        padding: 16px;
+        border-radius: 12px;
+    }
+
+    .mermaid {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* Extra small screens (<= 480px) */
+@media (max-width: 480px) {
+    .demi-brand-group {
+        gap: 10px;
+    }
+
+    .demi-title-row {
+        gap: 6px;
+    }
+
+    .demi-title-row h2 {
+        font-size: 0.88rem;
+    }
+
+    .btn-new-session-red .btn-text {
+        display: none;
+    }
+    .btn-new-session-red {
+        padding: 6px 10px;
+    }
+
+    .btn-sidebar-toggle-mobile span {
+        font-size: 0.72rem;
+    }
+
+    .chat-messages {
+        padding: 8px;
+    }
+
+    .message-text {
+        font-size: 0.82rem;
+    }
+}
+
+

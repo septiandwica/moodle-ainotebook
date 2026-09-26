@@ -194,144 +194,108 @@ class ai_client {
             }
         }
 
-        // ── Route to provider ─────────────────────────────────────────────────
-        $provider = get_config('mod_ainotebook', 'ai_provider') ?: 'demi_engine';
+        // ── Pure DEMI Core AI Engine Integration (Port 8001) ─────────────────
+        $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
+        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
 
-        // 1. Mandatory DEMI Core AI Engine Integration (FastAPI Port 8001)
-        // 1. Mandatory DEMI Core AI Engine Integration (FastAPI Port 8001)
-        if ($provider === 'demi_engine') {
-            $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
-            $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
+        global $CFG;
+        require_once($CFG->libdir . '/filelib.php');
+        $curl = new \curl();
+        $curl->setopt([
+            'CURLOPT_TIMEOUT'        => 180,
+            'CURLOPT_CONNECTTIMEOUT' => 15,
+            'CURLOPT_HTTPHEADER'     => [
+                'X-Engine-API-Key: ' . $engine_key,
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ],
+        ]);
 
-            global $CFG;
-            require_once($CFG->libdir . '/filelib.php');
-            $curl = new \curl();
-            $curl->setopt([
-                'CURLOPT_TIMEOUT'        => 180,
-                'CURLOPT_CONNECTTIMEOUT' => 15,
-                'CURLOPT_HTTPHEADER'     => [
-                    'X-Engine-API-Key: ' . $engine_key,
-                    'Content-Type: application/json',
-                    'Accept: application/json',
-                ],
-            ]);
-
-            $payload = json_encode([
-                'user_id'       => (int) $userid,
-                'course_id'     => (int) $course->id,
-                'activity_id'   => (int) $cm->instance,
-                'activity_name' => (string) $ainotebook->name,
-                'user_message'  => (string) $user_message,
-            ]);
-
-            if ($stream) {
-                $endpoint = rtrim($engine_url, '/') . '/api/v1/chat/stream';
-                $buffer = "";
-                $full_text = "";
-                
-                $curl->setopt([
-                    'CURLOPT_WRITEFUNCTION' => function($ch, $data) use (&$full_text, &$buffer) {
-                        $buffer .= $data;
-                        while (($pos = strpos($buffer, "\n")) !== false) {
-                            $line = substr($buffer, 0, $pos);
-                            $buffer = substr($buffer, $pos + 1);
-                            $line = trim($line);
-                            if (strpos($line, 'data: ') === 0) {
-                                $json_str = trim(substr($line, 6));
-                                $json = json_decode($json_str, true);
-                                if ($json && isset($json['chunk']) && $json['chunk'] !== '') {
-                                    $chunk = $json['chunk'];
-                                    $full_text .= $chunk;
-                                    self::$streamed = true;
-                                    echo "data: " . json_encode(['chunk' => $chunk]) . "\n\n";
-                                    @ob_flush();
-                                    flush();
-                                }
-                            }
-                        }
-                        return strlen($data);
-                    }
-                ]);
-
-                $raw_response = $curl->post($endpoint, $payload);
-                if (!$curl->errno && !empty($full_text)) {
-                    if (strpos($full_text, '```mermaid') !== false) {
-                        $full_text = preg_replace_callback(
-                            '/```mermaid(.*?)```/s',
-                            fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
-                            $full_text
-                        );
-                    }
-                    return ['response' => $full_text, 'sources_count' => $sources_count];
-                }
-            } else {
-                $endpoint = rtrim($engine_url, '/') . '/api/v1/chat/tutor';
-                $raw_response = $curl->post($endpoint, $payload);
-
-                if (!$curl->errno) {
-                    $res_data = json_decode($raw_response, true);
-                    if (isset($res_data['data']['response'])) {
-                        $ai_text = $res_data['data']['response'];
-                        if (strpos($ai_text, '```mermaid') !== false) {
-                            $ai_text = preg_replace_callback(
-                                '/```mermaid(.*?)```/s',
-                                fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
-                                $ai_text
-                            );
-                        }
-                        return ['response' => $ai_text, 'sources_count' => $sources_count];
-                    }
-                }
-            }
-
-            // Automatic Fallback: If demi-engine is unhosted or unreachable, fall back to direct provider (gemini/groq/openai)
-            $apikey = get_config('mod_ainotebook', 'api_key');
-            if (!empty($apikey)) {
-                $fallback_provider = get_config('mod_ainotebook', 'ai_provider_fallback') ?: 'gemini';
-                return ['response' => self::custom_provider_request($fallback_provider, $system_prompt, $user_message, $history ? array_reverse($history) : [], $binaries, $stream), 'sources_count' => $sources_count];
-            }
-
-            debugging("mod_ainotebook: demi-engine request failed. Error: " . $curl->error, DEBUG_DEVELOPER);
-            return ['response' => "⚠️ DEMI Engine service is temporarily unavailable. Please set an API Key in Site Administration > Activity Modules > AI Notebook.", 'sources_count' => 0];
-        }
-
-        if ($provider !== 'moodle') {
-            return ['response' => self::custom_provider_request($provider, $system_prompt, $user_message, $history ? array_reverse($history) : [], $binaries, $stream), 'sources_count' => $sources_count];
-        }
-
-        // Moodle AI subsystem: flatten everything into a single prompt string
-        // because the core generate_text action only accepts a single prompttext.
-        $history_str = "";
+        $formatted_history = [];
         if ($history) {
             foreach (array_reverse($history) as $h) {
-                $history_str .= "Student: " . $h->message . "\nAI: " . $h->response . "\n";
+                $formatted_history[] = ['role' => 'user', 'content' => $h->message];
+                $formatted_history[] = ['role' => 'assistant', 'content' => $h->response];
             }
         }
-        $final_prompt = $system_prompt . "\n\nConversation History:\n" . $history_str . "\nStudent Input: " . $user_message;
 
-        $aimanager = \core\di::get(manager::class);
-        $action    = new generate_text(
-            contextid: \context_module::instance($cm->id)->id,
-            userid:    $userid,
-            prompttext: $final_prompt
-        );
+        $payload = json_encode([
+            'user_id'       => (int) $userid,
+            'course_id'     => (int) $course->id,
+            'activity_id'   => (int) $cm->instance,
+            'activity_name' => (string) $ainotebook->name,
+            'user_message'  => (string) $user_message,
+            'chat_history'  => $formatted_history,
+            'stream'        => (bool) $stream,
+        ]);
 
-        $response = $aimanager->process_action($action);
-        if ($response->get_success()) {
-            $data = $response->get_response_data();
-            $generated = $data['generatedcontent'];
-            // Sanitize Mermaid syntax if response contains a mindmap.
-            if (strpos($generated, '```mermaid') !== false) {
-                $generated = preg_replace_callback(
-                    '/```mermaid(.*?)```/s',
-                    fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
-                    $generated
-                );
+        if ($stream) {
+            $endpoint = rtrim($engine_url, '/') . '/api/v1/chat/tutor';
+            $buffer = "";
+            $full_text = "";
+            
+            $curl->setopt([
+                'CURLOPT_WRITEFUNCTION' => function($ch, $data) use (&$full_text, &$buffer) {
+                    $buffer .= $data;
+                    while (($pos = strpos($buffer, "\n")) !== false) {
+                        $line = substr($buffer, 0, $pos);
+                        $buffer = substr($buffer, $pos + 1);
+                        $line = trim($line);
+                        if (strpos($line, 'data: ') === 0) {
+                            $json_str = trim(substr($line, 6));
+                            if ($json_str === '[DONE]') continue;
+                            $json = json_decode($json_str, true);
+                            if ($json && isset($json['chunk']) && $json['chunk'] !== '') {
+                                $chunk = $json['chunk'];
+                                $full_text .= $chunk;
+                                self::$streamed = true;
+                                echo "data: " . json_encode(['chunk' => $chunk]) . "\n\n";
+                                @ob_flush();
+                                flush();
+                            }
+                        }
+                    }
+                    return strlen($data);
+                }
+            ]);
+
+            $raw_response = $curl->post($endpoint, $payload);
+            if (!$curl->errno && !empty($full_text)) {
+                if (strpos($full_text, '```mermaid') !== false) {
+                    $full_text = preg_replace_callback(
+                        '/```mermaid(.*?)```/s',
+                        fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
+                        $full_text
+                    );
+                }
+                return ['response' => self::sanitize_ai_output($full_text), 'sources_count' => $sources_count];
             }
-            return ['response' => $generated, 'sources_count' => $sources_count];
+        } else {
+            $endpoint = rtrim($engine_url, '/') . '/api/v1/chat/tutor';
+            $raw_response = $curl->post($endpoint, $payload);
+
+            if (!$curl->errno) {
+                $res_data = json_decode($raw_response, true);
+                if (isset($res_data['data']['response'])) {
+                    $ai_text = $res_data['data']['response'];
+                    if (strpos($ai_text, '```mermaid') !== false) {
+                        $ai_text = preg_replace_callback(
+                            '/```mermaid(.*?)```/s',
+                            fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
+                            $ai_text
+                        );
+                    }
+                    return ['response' => self::sanitize_ai_output($ai_text), 'sources_count' => $sources_count];
+                }
+            }
         }
 
-        return ['response' => "Sorry, I encountered an error: " . $response->get_errormessage(), 'sources_count' => 0];
+        if ($curl->errno) {
+            debugging("mod_ainotebook: DEMI Engine request failed. Error: " . $curl->error, DEBUG_DEVELOPER);
+            return ['response' => "⚠️ DEMI Core AI Engine is currently unreachable at {$engine_url}. Please ensure the DEMI AI service is running.", 'sources_count' => 0];
+        }
+
+        return ['response' => "⚠️ Received unexpected response from DEMI Core AI Engine.", 'sources_count' => 0];
     }
 
     /**
@@ -495,8 +459,138 @@ class ai_client {
     // Now accepts a structured messages array for proper multi-turn history.
     // ─────────────────────────────────────────────────────────────────────────
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Pure DEMI Core AI Engine Request
+    // ─────────────────────────────────────────────────────────────────────────
+
     /**
-     * @param  array $history  Ordered (oldest-first) records from ainotebook_chat.
+     * Send direct prompt/chat request to central DEMI Core AI Engine (FastAPI Port 8001).
+     */
+    public static function demi_engine_request(
+        string $system_prompt,
+        string $user_message,
+        array  $history = [],
+        bool   $stream = false,
+        int    $user_id = 0,
+        int    $course_id = 0,
+        int    $activity_id = 0,
+        string $activity_name = ''
+    ): string {
+        $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
+        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
+
+        global $CFG;
+        require_once($CFG->libdir . '/filelib.php');
+        $curl = new \curl();
+        $curl->setopt([
+            'CURLOPT_TIMEOUT'        => 180,
+            'CURLOPT_CONNECTTIMEOUT' => 15,
+            'CURLOPT_HTTPHEADER'     => [
+                'X-Engine-API-Key: ' . $engine_key,
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ],
+        ]);
+
+        $formatted_history = [];
+        foreach ($history as $h) {
+            if (is_object($h)) {
+                $formatted_history[] = ['role' => 'user', 'content' => $h->message ?? ''];
+                $formatted_history[] = ['role' => 'assistant', 'content' => $h->response ?? ''];
+            } elseif (is_array($h)) {
+                $formatted_history[] = [
+                    'role' => $h['role'] ?? 'user',
+                    'content' => $h['content'] ?? ($h['parts'][0]['text'] ?? '')
+                ];
+            }
+        }
+
+        $full_message = $user_message;
+        if (!empty($system_prompt)) {
+            $full_message = "[System Instruction: {$system_prompt}]\n\n" . $user_message;
+        }
+
+        $payload = json_encode([
+            'user_id'       => (int) ($user_id ?: 1001),
+            'course_id'     => (int) $course_id,
+            'activity_id'   => (int) $activity_id,
+            'activity_name' => (string) ($activity_name ?: 'DEMI Academic Tutor'),
+            'user_message'  => (string) $full_message,
+            'chat_history'  => $formatted_history,
+            'stream'        => (bool) $stream,
+        ]);
+
+        if ($stream) {
+            $endpoint = rtrim($engine_url, '/') . '/api/v1/chat/tutor';
+            $buffer = "";
+            $full_text = "";
+            
+            $curl->setopt([
+                'CURLOPT_WRITEFUNCTION' => function($ch, $data) use (&$full_text, &$buffer) {
+                    $buffer .= $data;
+                    while (($pos = strpos($buffer, "\n")) !== false) {
+                        $line = substr($buffer, 0, $pos);
+                        $buffer = substr($buffer, $pos + 1);
+                        $line = trim($line);
+                        if (strpos($line, 'data: ') === 0) {
+                            $json_str = trim(substr($line, 6));
+                            if ($json_str === '[DONE]') continue;
+                            $json = json_decode($json_str, true);
+                            if ($json && isset($json['chunk']) && $json['chunk'] !== '') {
+                                $chunk = $json['chunk'];
+                                $full_text .= $chunk;
+                                self::$streamed = true;
+                                echo "data: " . json_encode(['chunk' => $chunk]) . "\n\n";
+                                @ob_flush();
+                                flush();
+                            }
+                        }
+                    }
+                    return strlen($data);
+                }
+            ]);
+
+            $raw_response = $curl->post($endpoint, $payload);
+            if (!$curl->errno && !empty($full_text)) {
+                if (strpos($full_text, '```mermaid') !== false) {
+                    $full_text = preg_replace_callback(
+                        '/```mermaid(.*?)```/s',
+                        fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
+                        $full_text
+                    );
+                }
+                return self::sanitize_ai_output($full_text);
+            }
+        } else {
+            $endpoint = rtrim($engine_url, '/') . '/api/v1/chat/tutor';
+            $raw_response = $curl->post($endpoint, $payload);
+
+            if (!$curl->errno) {
+                $res_data = json_decode($raw_response, true);
+                if (isset($res_data['data']['response'])) {
+                    $ai_text = $res_data['data']['response'];
+                    if (strpos($ai_text, '```mermaid') !== false) {
+                        $ai_text = preg_replace_callback(
+                            '/```mermaid(.*?)```/s',
+                            fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
+                            $ai_text
+                        );
+                    }
+                    return self::sanitize_ai_output($ai_text);
+                }
+            }
+        }
+
+        if ($curl->errno) {
+            debugging("mod_ainotebook: DEMI Engine request failed: " . $curl->error, DEBUG_DEVELOPER);
+            return "⚠️ DEMI Core AI Engine is currently unreachable at {$engine_url}. Please ensure the DEMI AI service is running.";
+        }
+
+        return "⚠️ Received unexpected response from DEMI Core AI Engine.";
+    }
+
+    /**
+     * Backward-compatible alias for custom_provider_request routing to pure DEMI Engine.
      */
     public static function custom_provider_request(
         string $provider,
@@ -506,294 +600,7 @@ class ai_client {
         array  $binaries = [],
         bool   $stream = false
     ): string {
-        $apikey = get_config('mod_ainotebook', 'api_key');
-        $model  = get_config('mod_ainotebook', 'model_' . $provider);
-
-        $fallbacks = [
-            'groq'   => 'llama-3.3-70b-versatile',
-            'openai' => 'gpt-4o',
-            'gemini' => 'gemini-1.5-flash',
-        ];
-
-        if (empty($model)) {
-            $model = $fallbacks[$provider] ?? 'llama-3.3-70b-versatile';
-        } elseif ($model === 'custom') {
-            $model = get_config('mod_ainotebook', 'model_custom') ?: ($fallbacks[$provider] ?? 'llama-3.3-70b-versatile');
-        }
-
-        if (empty($apikey)) {
-            return "Error: API Key is missing. Please set it in Site Administration > Plugins > Activity Modules > AI Notebook.";
-        }
-
-        global $CFG;
-        require_once($CFG->libdir . '/filelib.php');
-        $curl = new \curl();
-        $curl->setopt([
-            'CURLOPT_TIMEOUT'        => 60,
-            'CURLOPT_CONNECTTIMEOUT' => 10,
-            // Phase 6: Connection Optimization (Keep-Alive)
-            'CURLOPT_TCP_KEEPALIVE'  => 1,
-            'CURLOPT_TCP_FASTOPEN'   => 1,
-            'CURLOPT_FORBID_REUSE'   => false,
-        ]);
-
-        // ── Gemini ────────────────────────────────────────────────────────────
-        if ($provider === 'gemini') {
-            if ($stream) {
-                $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:streamGenerateContent?alt=sse&key={$apikey}";
-            } else {
-                $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apikey}";
-            }
-
-            // Build Gemini contents array from history + current message.
-            $contents = [];
-            foreach ($history as $h) {
-                $contents[] = ['role' => 'user',  'parts' => [['text' => $h->message]]];
-                $contents[] = ['role' => 'model', 'parts' => [['text' => $h->response]]];
-            }
-            // Build user parts: Binaries FIRST, then the text message.
-            $user_parts = [];
-            if (!empty($binaries)) {
-                foreach ($binaries as $bin) {
-                    $user_parts[] = [
-                        'inline_data' => [
-                            'mime_type' => $bin['mimetype'],
-                            'data'      => $bin['data']
-                        ]
-                    ];
-                }
-            }
-            $user_parts[] = ['text' => $user_message];
-            $contents[] = ['role' => 'user', 'parts' => $user_parts];
-
-            $data = [
-                // [IMPROVED] Use Gemini's dedicated system_instruction field.
-                'system_instruction' => ['parts' => [['text' => $system_prompt]]],
-                'contents'           => $contents,
-            ];
-
-            $curl->setopt(['CURLOPT_HTTPHEADER' => ['Content-Type: application/json']]);
-            
-            $raw_body = "";
-            $full_stream_text = "";
-            if ($stream) {
-                $buffer = "";
-                $curl->setopt(['CURLOPT_WRITEFUNCTION' => function($ch, $data) use (&$full_stream_text, &$buffer, &$raw_body) {
-                    $raw_body .= $data;
-                    $buffer .= $data;
-                    while (($pos = strpos($buffer, "\n")) !== false) {
-                        $line = substr($buffer, 0, $pos);
-                        $buffer = substr($buffer, $pos + 1);
-                        $line = trim($line);
-                        if (strpos($line, 'data: ') === 0) {
-                            $json_str = trim(substr($line, 6));
-                            if ($json_str === '[DONE]') continue;
-                            $json = json_decode($json_str);
-                            if ($json && isset($json->candidates[0]->content->parts[0]->text)) {
-                                $text = $json->candidates[0]->content->parts[0]->text;
-                                $full_stream_text .= $text;
-                                self::$streamed = true;
-                                echo "data: " . json_encode(['chunk' => $text]) . "\n\n";
-                                @ob_flush();
-                                flush();
-                            }
-                        }
-                    }
-                    return strlen($data);
-                }]);
-            }
-
-            $raw_response = $curl->post($endpoint, json_encode($data));
-
-            // [FIX] Check transport error first.
-            if ($curl->errno) {
-                debugging("ainotebook curl error (gemini): " . $curl->error, DEBUG_DEVELOPER);
-                return "I am having trouble connecting to the AI service. Please check your internet connection.";
-            }
-
-            if ($stream) {
-                if (!self::$streamed) {
-                    $result = json_decode($raw_body);
-                    if ($result && isset($result->error)) {
-                        $error_msg = $result->error->message ?? 'Unknown error';
-                        debugging("ainotebook Gemini API Error (Stream): " . $error_msg, DEBUG_DEVELOPER);
-                        if (stripos($error_msg, 'quota') !== false || stripos($error_msg, 'rate limit') !== false || stripos($error_msg, '429') !== false) {
-                            return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
-                        }
-                        return "The AI service is currently unavailable. Please try again later or notify your instructor/admin.";
-                    }
-                    return "No response received from the AI.";
-                }
-                return $full_stream_text;
-            }
-
-            $result = json_decode($raw_response);
-
-            if ($result === null) {
-                debugging("ainotebook: null JSON from gemini. Raw: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);
-                return "The AI service returned an invalid response. Please try again.";
-            }
-
-            if (isset($result->error)) {
-                $error_msg = $result->error->message ?? 'Unknown error';
-                debugging("ainotebook Gemini API Error: " . $error_msg, DEBUG_DEVELOPER);
-                
-                if (stripos($error_msg, 'quota') !== false || stripos($error_msg, 'rate limit') !== false || stripos($error_msg, '429') !== false) {
-                    return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
-                }
-                return "The AI service is currently unavailable. Please try again later or notify your instructor/admin.";
-            }
-
-            if (isset($result->candidates[0]->content->parts[0]->text)) {
-                $text = $result->candidates[0]->content->parts[0]->text;
-                if (strpos($text, '```mermaid') !== false) {
-                    $text = preg_replace_callback(
-                        '/```mermaid(.*?)```/s',
-                        fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
-                        $text
-                    );
-                }
-                return $text;
-            }
-
-            debugging("ainotebook: unexpected response shape from gemini: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);
-            return "I encountered an unexpected response. Please try again.";
-        }
-
-        // ── OpenAI-compatible (OpenAI / Groq) ─────────────────────────────────
-        else {
-            $endpoint = ($provider === 'groq')
-                ? 'https://api.groq.com/openai/v1/chat/completions'
-                : 'https://api.openai.com/v1/chat/completions';
-
-            // [FIX] Build proper messages[] array for multi-turn history.
-            $messages = [['role' => 'system', 'content' => $system_prompt]];
-            foreach ($history as $h) {
-                $messages[] = ['role' => 'user',      'content' => $h->message];
-                $messages[] = ['role' => 'assistant', 'content' => $h->response];
-            }
-            $messages[] = ['role' => 'user', 'content' => $user_message];
-
-            $payload_arr = [
-                'model'       => $model,
-                'messages'    => $messages,
-                'temperature' => 0.7,
-            ];
-            if ($stream) {
-                $payload_arr['stream'] = true;
-            }
-            $payload = json_encode($payload_arr);
-
-            // [FIX] Set headers and use CURLOPT_POSTFIELDS directly to ensure
-            // Content-Type: application/json is honoured by Moodle's curl wrapper.
-            $curl->setopt([
-                'CURLOPT_HTTPHEADER' => [
-                    'Authorization: Bearer ' . $apikey,
-                    'Content-Type: application/json',
-                    'Accept: application/json',
-                ],
-                'CURLOPT_POSTFIELDS' => $payload,
-            ]);
-
-            $raw_body = "";
-            $full_stream_text = "";
-            if ($stream) {
-                $buffer = "";
-                $curl->setopt(['CURLOPT_WRITEFUNCTION' => function($ch, $data) use (&$full_stream_text, &$buffer, &$raw_body) {
-                    $raw_body .= $data;
-                    $buffer .= $data;
-                    while (($pos = strpos($buffer, "\n")) !== false) {
-                        $line = substr($buffer, 0, $pos);
-                        $buffer = substr($buffer, $pos + 1);
-                        $line = trim($line);
-                        if (strpos($line, 'data: ') === 0) {
-                            $json_str = trim(substr($line, 6));
-                            if ($json_str === '[DONE]') continue;
-                            $json = json_decode($json_str);
-                            if ($json && isset($json->choices[0]->delta->content)) {
-                                $text = $json->choices[0]->delta->content;
-                                $full_stream_text .= $text;
-                                self::$streamed = true;
-                                echo "data: " . json_encode(['chunk' => $text]) . "\n\n";
-                                @ob_flush();
-                                flush();
-                            }
-                        }
-                    }
-                    return strlen($data);
-                }]);
-            }
-
-            $raw_response = $curl->post($endpoint, $payload);
-
-            // [FIX] Check curl transport error first.
-            if ($curl->errno) {
-                debugging("ainotebook curl error ({$provider}): " . $curl->error, DEBUG_DEVELOPER);
-                return "I am having trouble connecting to the AI service. Please check your internet connection.";
-            }
-
-            if ($stream) {
-                if (!self::$streamed) {
-                    $result = json_decode($raw_body);
-                    if ($result && isset($result->error)) {
-                        $err = $result->error->message ?? "Unknown Error";
-                        $err_type = $result->error->type ?? "";
-                        debugging("ainotebook API error ({$provider}) (Stream): {$err}", DEBUG_DEVELOPER);
-                        if (stripos($err_type, 'rate_limit') !== false || stripos($err, 'rate limit') !== false || stripos($err, 'quota') !== false) {
-                            return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
-                        }
-                        return "DEMI AI service is currently unavailable. Please try again later or notify your instructor/admin.";
-                    }
-                    return "No response received from DEMI AI.";
-                }
-                // For stream, the full text is collected by the write callback.
-                if (strpos($full_stream_text, '```mermaid') !== false) {
-                    $full_stream_text = preg_replace_callback(
-                        '/```mermaid(.*?)```/s',
-                        fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
-                        $full_stream_text
-                    );
-                }
-                return self::sanitize_ai_output($full_stream_text);
-            }
-
-            $result = json_decode($raw_response);
-
-            // [FIX] Log the raw response in dev mode so we can always see what came back.
-            if ($result === null) {
-                debugging("ainotebook: null JSON from {$provider}. Raw: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);
-                return "I encountered an unexpected response. Please try again.";
-            }
-
-            if (isset($result->choices[0]->message->content)) {
-                $text = $result->choices[0]->message->content;
-                if (strpos($text, '```mermaid') !== false) {
-                    $text = preg_replace_callback(
-                        '/```mermaid(.*?)```/s',
-                        fn($m) => '```mermaid' . self::sanitize_mermaid($m[1]) . '```',
-                        $text
-                    );
-                }
-                return self::sanitize_ai_output($text);
-            }
-
-            if (isset($result->error)) {
-                $err     = $result->error->message ?? "Unknown Provider Error";
-                $err_type = $result->error->type ?? "";
-                // [FIX] Log actual error so admins can diagnose.
-                debugging("ainotebook API error ({$provider}) [{$err_type}]: {$err}", DEBUG_DEVELOPER);
-
-                // Only show rate-limit message for actual rate limit errors.
-                if (stripos($err_type, 'rate_limit') !== false || stripos($err, 'rate limit') !== false || stripos($err, 'quota') !== false) {
-                    return "DEMI Tutor is currently assisting many students. Please wait a few moments and try your question again.";
-                }
-                // Show actual error in console, but generic clean message in UI.
-                return "DEMI AI service is currently unavailable. Please try again later or notify your instructor/admin.";
-            }
-
-            debugging("ainotebook: unexpected response shape from {$provider}: " . substr($raw_response, 0, 500), DEBUG_DEVELOPER);
-            return "I encountered an unexpected response. Please try again.";
-        }
+        return self::demi_engine_request($system_prompt, $user_message, $history, $stream);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -851,31 +658,16 @@ class ai_client {
         }
         $user_prompt .= "Study Materials:\n" . substr($material, 0, 2000);
 
-        $provider = get_config('mod_ainotebook', 'ai_provider');
-
-        // [FIXED] Handle Moodle provider correctly (was always calling custom_provider_request).
-        if ($provider === 'moodle') {
-            // Moodle AI subsystem: flatten into single prompt.
-            $flat_prompt = $system_prompt . "\n\n" . $user_prompt;
-            $aimanager   = \core\di::get(manager::class);
-            $cm_context  = \context_module::instance($cmid);
-
-            $action   = new generate_text(
-                contextid:  $cm_context->id,
-                userid:     $userid,
-                prompttext: $flat_prompt
-            );
-            $response_obj = $aimanager->process_action($action);
-
-            if ($response_obj->get_success()) {
-                $data     = $response_obj->get_response_data();
-                $response = $data['generatedcontent'];
-            } else {
-                $response = "";
-            }
-        } else {
-            $response = self::custom_provider_request($provider, $system_prompt, $user_prompt);
-        }
+        $response = self::demi_engine_request(
+            $system_prompt,
+            $user_prompt,
+            [],
+            false,
+            $userid,
+            $cm->course,
+            $cm->instance,
+            $cm->name
+        );
 
         if (empty($response) || stripos($response, 'AI Error') !== false || stripos($response, 'The AI service') !== false || stripos($response, 'I encountered') !== false || stripos($response, 'I am having') !== false || stripos($response, 'DEMI Tutor is currently assisting') !== false) {
             $suggestions = []; // Force empty to trigger fallback
@@ -1000,27 +792,16 @@ class ai_client {
         $system_prompt .= "  \"recommendation\": \"<1 sentence actionable advice for the teacher>\"\n";
         $system_prompt .= "}\n";
         
-        $provider = get_config('mod_ainotebook', 'ai_provider');
-        
-        if ($provider === 'moodle') {
-            $flat_prompt = $system_prompt . "\n\n" . $user_prompt;
-            $aimanager   = \core\di::get(\core_ai\manager::class);
-            $cm_context  = \context_module::instance($cmid);
-            $action   = new \core_ai\aiactions\generate_text(
-                contextid:  $cm_context->id,
-                userid:     $target_userid,
-                prompttext: $flat_prompt
-            );
-            $response_obj = $aimanager->process_action($action);
-            if ($response_obj->get_success()) {
-                $data     = $response_obj->get_response_data();
-                $response = $data['generatedcontent'];
-            } else {
-                $response = "";
-            }
-        } else {
-            $response = self::custom_provider_request($provider, $system_prompt, $user_prompt);
-        }
+        $response = self::demi_engine_request(
+            $system_prompt,
+            $user_prompt,
+            [],
+            false,
+            $target_userid,
+            $cm->course,
+            $cm->instance,
+            'Academic Evaluator'
+        );
         
         $json_text = trim($response);
         $first_brace = strpos($json_text, '{');

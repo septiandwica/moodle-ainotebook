@@ -34,6 +34,9 @@
             </div>
         </div>
         <div class="demi-header-controls">
+            <button id="btn-toggle-sidebar" class="btn-sidebar-toggle-mobile" onclick="window.toggleMobileSidebar()" title="Toggle Sidebar (History / Syllabus)">
+                <i class="fa fa-bars"></i> <span>Syllabus & History</span>
+            </button>
             <div class="demi-course-pill">
                 <span class="pill-label">Course:</span>
                 <span class="pill-value">{{course_fullname}}</span>
@@ -43,7 +46,7 @@
                 <span>DEMI AI</span>
             </div>
             <button id="btn-new-session" class="btn-new-session-red" onclick="window.startNewSession()" title="Start New Session">
-                <i class="fa fa-plus"></i> New Session
+                <i class="fa fa-plus"></i> <span class="btn-text">New Session</span>
             </button>
             <button id="open-settings" class="btn-icon" title="Configure Chat"><i class="fa fa-cog"></i></button>
         </div>
@@ -447,6 +450,13 @@
         var target = document.getElementById(tabId);
         if (target) target.classList.add('active');
         if (btnEl) btnEl.classList.add('active');
+    };
+
+    window.toggleMobileSidebar = function() {
+        var sidebar = document.getElementById('ainotebook-sidebar-nav');
+        if (sidebar) {
+            sidebar.classList.toggle('mobile-open');
+        }
     };
 
     window.filterTopicFocus = function(topicName, cardEl) {

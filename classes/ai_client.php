@@ -68,7 +68,7 @@ class ai_client {
     /**
      * Main entry point for generating AI response.
      */
-    public static function get_response(int $cmid, int $userid, string $user_message, array $selected_file_ids = [], array $config = [], bool $stream = false, string $focus_topic = ''): array {
+    public static function get_response(int $cmid, int $userid, string $user_message, array $selected_file_ids = [], array $config = [], bool $stream = false, string $focus_topic = '', string $session_id = ''): array {
         self::$streamed = false;
         global $DB, $USER;
 
@@ -227,6 +227,7 @@ class ai_client {
             'live_syllabus'    => $live_syllabus,
             'material_context' => $material_context,
             'chat_history'     => $formatted_history,
+            'session_id'       => (string) $session_id,
             'stream'           => (bool) $stream,
         ]);
 

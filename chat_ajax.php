@@ -206,7 +206,7 @@ if ($action === 'chat_stream') {
     flush();
     
     try {
-        $result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config, true, $focus_topic);
+        $result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config, true, $focus_topic, $session_id);
         
         $response_text = $result['response'] ?? "";
         $sources_count = $result['sources_count'] ?? 0;
@@ -296,7 +296,7 @@ try {
     exit;
 }
 
-$result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config, false, $focus_topic);
+$result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config, false, $focus_topic, $session_id);
 $response_text = $result['response'] ?? "Error retrieving response.";
 $sources_count = $result['sources_count'] ?? 0;
 

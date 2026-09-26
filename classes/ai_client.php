@@ -47,7 +47,7 @@ class ai_client {
         if (empty($text)) return $text;
 
         // If error message contains API key leak, unauthorized or provider platform URL, sanitize completely
-        if (stripos($text, 'Incorrect API key') !== false || stripos($text, 'platform.openai.com') !== false || stripos($text, 'api-keys') !== false || stripos($text, 'invalid_api_key') !== false || stripos($text, 'unauthorized') !== false) {
+        if (stripos($text, 'Incorrect API key') !== false || stripos($text, 'platform.openai.com') !== false || stripos($text, 'api-keys') !== false || stripos($text, 'invalid_api_key') !== false || stripos($text, 'unauthorized') !== false || stripos($text, 'trycloudflare.com') !== false || stripos($text, 'Could not resolve host') !== false) {
             return "DEMI AI service is currently unavailable. Please try again later or notify your instructor/admin.";
         }
 
@@ -197,11 +197,12 @@ class ai_client {
         }
 
         if ($curl_errno) {
-            debugging("mod_ainotebook: DEMI Engine native cURL failed: {$curl_error} (HTTP {$http_code})", DEBUG_DEVELOPER);
-            return ['response' => "⚠️ DEMI Core AI Engine is currently unreachable at {$engine_url} (Error: {$curl_error}). Please ensure the DEMI AI service is running.", 'sources_count' => 0];
+            debugging("mod_ainotebook: DEMI Engine native cURL failed: {$curl_error} (HTTP {$http_code}) URL: {$engine_url}", DEBUG_DEVELOPER);
+            return ['response' => "⚠️ DEMI Core AI Engine is currently unreachable. Please try again later or contact your administrator.", 'sources_count' => 0];
         }
 
-        return ['response' => "⚠️ Received unexpected response from DEMI Core AI Engine (HTTP {$http_code}).", 'sources_count' => 0];
+        debugging("mod_ainotebook: DEMI Engine unexpected response: HTTP {$http_code}", DEBUG_DEVELOPER);
+        return ['response' => "⚠️ Received unexpected response from DEMI Core AI Engine. Please try again in a moment.", 'sources_count' => 0];
     }
 
     /**
@@ -492,11 +493,12 @@ class ai_client {
         }
 
         if ($curl->errno) {
-            debugging("mod_ainotebook: DEMI Engine request failed: " . $curl->error, DEBUG_DEVELOPER);
-            return "⚠️ DEMI Core AI Engine is currently unreachable at {$engine_url}. Please ensure the DEMI AI service is running.";
+            debugging("mod_ainotebook: DEMI Engine request failed: " . $curl->error . " URL: " . $engine_url, DEBUG_DEVELOPER);
+            return "⚠️ DEMI Core AI Engine is currently unreachable. Please try again later or contact your administrator.";
         }
 
-        return "⚠️ Received unexpected response from DEMI Core AI Engine.";
+        debugging("mod_ainotebook: DEMI Engine unexpected response: " . print_r($curl->response, true), DEBUG_DEVELOPER);
+        return "⚠️ Received unexpected response from DEMI Core AI Engine. Please try again in a moment.";
     }
 
     /**

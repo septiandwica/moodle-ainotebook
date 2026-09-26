@@ -1346,4 +1346,40 @@ class ai_client {
         }
         return "";
     }
+
+    /**
+     * Synchronize a video URL or Bunny Stream link directly to DEMI Engine RAG
+     */
+    public static function sync_video_material(int $course_id, string $topic, string $video_url, string $filename = ''): bool {
+        $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
+        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
+
+        global $CFG;
+        require_once($CFG->libdir . '/filelib.php');
+        $curl = new \curl();
+        $curl->setopt([
+            'CURLOPT_TIMEOUT'    => 30,
+            'CURLOPT_HTTPHEADER' => [
+                'X-Engine-API-Key: ' . $engine_key,
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ],
+        ]);
+
+        $payload = json_encode([
+            'course_id' => $course_id,
+            'files' => [
+                [
+                    'url' => $video_url,
+                    'topic' => $topic,
+                    'filename' => $filename ?: 'Video_Lecture_' . substr(md5($video_url), 0, 8) . '.vtt',
+                ]
+            ]
+        ]);
+
+        $endpoint = rtrim($engine_url, '/') . '/api/v1/rag/sync-moodle-files';
+        $raw_response = $curl->post($endpoint, $payload);
+        $res = json_decode($raw_response, true);
+        return isset($res['status']) && in_array($res['status'], ['success', 'partial_success']);
+    }
 }

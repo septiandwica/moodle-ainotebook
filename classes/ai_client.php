@@ -1473,4 +1473,43 @@ class ai_client {
         $res = json_decode($raw_response, true);
         return isset($res['status']) && in_array($res['status'], ['success', 'partial_success']);
     }
+
+    /**
+     * Transcribe student voice audio using DEMI Engine Whisper
+     */
+    public static function transcribe_audio_file(string $tmp_filepath, string $filename = 'voice.webm'): array {
+        $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
+        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
+
+        $endpoint = rtrim($engine_url, '/') . '/api/v1/chat/transcribe-audio';
+
+        $ch = curl_init();
+        $cfile = new \CURLFile($tmp_filepath, 'audio/webm', $filename);
+        $data = ['file' => $cfile];
+
+        curl_setopt($ch, CURLOPT_URL, $endpoint);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'X-Engine-API-Key: ' . $engine_key,
+        ]);
+
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+
+        if ($err) {
+            return ['status' => 'error', 'message' => $err];
+        }
+
+        $res = json_decode($response, true);
+        if ($res && isset($res['text'])) {
+            return $res;
+        }
+
+        return ['status' => 'error', 'message' => $response ?: 'Unknown transcription error'];
+    }
 }

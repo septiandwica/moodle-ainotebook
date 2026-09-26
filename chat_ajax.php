@@ -247,6 +247,32 @@ if ($action === 'chat_stream') {
     exit;
 }
 
+if ($action === 'transcribe_audio') {
+    if (empty($_FILES['audio']['tmp_name'])) {
+        echo json_encode(['success' => false, 'message' => 'No audio file uploaded.']);
+        exit;
+    }
+
+    $tmp_file = $_FILES['audio']['tmp_name'];
+    $orig_name = $_FILES['audio']['name'] ?? 'voice.webm';
+
+    $result = \mod_ainotebook\ai_client::transcribe_audio_file($tmp_file, $orig_name);
+
+    if (isset($result['text'])) {
+        echo json_encode([
+            'success' => true,
+            'text'    => $result['text'],
+            'provider'=> $result['provider'] ?? 'whisper'
+        ]);
+    } else {
+        echo json_encode([
+            'success' => false,
+            'message' => $result['message'] ?? 'Voice transcription error'
+        ]);
+    }
+    exit;
+}
+
 // Fallback to synchronous chat action
 $message = required_param('message', PARAM_TEXT);
 $session_id = optional_param('session_id', '', PARAM_RAW);

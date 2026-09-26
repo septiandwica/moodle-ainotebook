@@ -237,6 +237,7 @@ class ai_client {
         $ch = curl_init($endpoint);
         $headers = [
             'X-Engine-API-Key: ' . $engine_key,
+            'X-Client-App: moodle_ainotebook',
             'Content-Type: application/json',
             'Accept: application/json, text/event-stream',
         ];
@@ -443,6 +444,34 @@ class ai_client {
                 'updated_at_ts'   => $r->last_timecreated
             ];
         }
+
+        // Pull cross-platform history from DEMI Engine (PJJ Portal chats)
+        try {
+            $unified = self::get_unified_history($cmid, $userid);
+            $portal_msgs = array_filter($unified, function($item) {
+                // If it exists in unified history from demi_engine
+                return !empty($item->message) || !empty($item->response);
+            });
+
+            if (!empty($portal_msgs) && empty($sessions)) {
+                $latest = reset($portal_msgs);
+                $firstPrompt = $latest->message ?? 'DEMI Tutor Activity';
+                $title = strlen($firstPrompt) > 40 ? substr($firstPrompt, 0, 37) . '...' : $firstPrompt;
+
+                $sessions[] = [
+                    'session_id'      => 'pjj_portal_sync',
+                    'course_fullname' => s($course->fullname),
+                    'title'           => '🌐 PJJ Portal: ' . s($title),
+                    'time'            => !empty($latest->timecreated) ? date('h:i A', $latest->timecreated) : date('h:i A'),
+                    'rel_time'        => 'Synced from Portal',
+                    'message_count'   => count($portal_msgs),
+                    'updated_at_ts'   => !empty($latest->timecreated) ? $latest->timecreated : time()
+                ];
+            }
+        } catch (\Throwable $t) {
+            // Graceful fallback
+        }
+
         return $sessions;
     }
 
@@ -453,6 +482,22 @@ class ai_client {
         global $DB;
         self::ensure_session_id_field();
         $cm = self::get_cm_safe($cmid);
+
+        if ($session_id === 'pjj_portal_sync' || str_starts_with($session_id, 'pjj_portal_')) {
+            $unified = self::get_unified_history($cmid, $userid);
+            $messages = [];
+            foreach ($unified as $idx => $r) {
+                $clean_response = preg_replace('/<script[\s\S]*?<\/script>/i', '', $r->response ?? '');
+                $messages[] = [
+                    'id'           => 900000 + $idx,
+                    'user_message' => $r->message ?? '',
+                    'ai_response'  => $clean_response,
+                    'time'         => !empty($r->timecreated) ? date('h:i A', $r->timecreated) : date('h:i A'),
+                    'timecreated'  => $r->timecreated ?? time()
+                ];
+            }
+            return $messages;
+        }
 
         $records = $DB->get_records('ainotebook_chat', [
             'ainotebookid' => $cm->instance,

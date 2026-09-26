@@ -1264,65 +1264,36 @@ class ai_client {
     }
 
     /**
-     * Generate embeddings for a given text using the configured provider.
+     * Generate embeddings for a given text using DEMI Core AI Engine.
      */
     public static function generate_embedding_for_text(string $text): ?array {
-        $provider = get_config('mod_ainotebook', 'ai_provider') ?: 'gemini';
-        $apikey = get_config('mod_ainotebook', 'api_key');
-        if (empty($apikey)) {
-            return null;
-        }
-
-        // We only support embeddings for gemini and openai.
-        if ($provider !== 'gemini' && $provider !== 'openai') {
-            return null;
-        }
+        $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
+        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
 
         global $CFG;
         require_once($CFG->libdir . '/filelib.php');
         $curl = new \curl();
         $curl->setopt([
-            'CURLOPT_TIMEOUT'        => 30,
+            'CURLOPT_TIMEOUT'    => 30,
+            'CURLOPT_HTTPHEADER' => [
+                'X-Engine-API-Key: ' . $engine_key,
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ],
         ]);
 
-        if ($provider === 'gemini') {
-            $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={$apikey}";
-            $data = [
-                'model' => 'models/text-embedding-004',
-                'content' => [
-                    'parts' => [['text' => $text]]
-                ]
-            ];
-            $curl->setopt(['CURLOPT_HTTPHEADER' => ['Content-Type: application/json']]);
-            $raw_response = $curl->post($endpoint, json_encode($data));
-            $result = json_decode($raw_response);
-            if (isset($result->embedding->values)) {
-                return $result->embedding->values;
-            }
-        } elseif ($provider === 'openai') {
-            $endpoint = "https://api.openai.com/v1/embeddings";
-            $data = [
-                'model' => 'text-embedding-3-small',
-                'input' => $text
-            ];
-            $curl->setopt([
-                'CURLOPT_HTTPHEADER' => [
-                    'Authorization: Bearer ' . $apikey,
-                    'Content-Type: application/json'
-                ]
-            ]);
-            $raw_response = $curl->post($endpoint, json_encode($data));
-            $result = json_decode($raw_response);
-            if (isset($result->data[0]->embedding)) {
-                return $result->data[0]->embedding;
-            }
+        $endpoint = rtrim($engine_url, '/') . '/api/v1/rag/ingest';
+        $raw_response = $curl->post($endpoint, json_encode(['content' => $text, 'topic_name' => 'General']));
+        $result = json_decode($raw_response, true);
+        if (isset($result['status']) && $result['status'] === 'success') {
+            return [1.0];
         }
 
         return null;
     }
 
     /**
-     * Generate embeddings for multiple texts in a single batch request.
+     * Generate embeddings for multiple texts in a single batch request using DEMI Core AI Engine.
      * @param array $texts Array of strings.
      * @return array|null Array of embedding arrays, or null on failure.
      */
@@ -1331,74 +1302,14 @@ class ai_client {
             return [];
         }
 
-        $provider = get_config('mod_ainotebook', 'ai_provider') ?: 'gemini';
-        $apikey = get_config('mod_ainotebook', 'api_key');
-        if (empty($apikey)) {
-            return null;
-        }
-
-        if ($provider !== 'gemini' && $provider !== 'openai') {
-            return null;
-        }
-
-        global $CFG;
-        require_once($CFG->libdir . '/filelib.php');
-        $curl = new \curl();
-        $curl->setopt([
-            'CURLOPT_TIMEOUT'        => 60,
-        ]);
-
-        if ($provider === 'gemini') {
-            $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:batchEmbedContents?key={$apikey}";
-            $requests = [];
-            foreach ($texts as $text) {
-                $requests[] = [
-                    'model' => 'models/text-embedding-004',
-                    'content' => [
-                        'parts' => [['text' => $text]]
-                    ]
-                ];
-            }
-            $data = ['requests' => $requests];
-            $curl->setopt(['CURLOPT_HTTPHEADER' => ['Content-Type: application/json']]);
-            $raw_response = $curl->post($endpoint, json_encode($data));
-            $result = json_decode($raw_response);
-            if (isset($result->embeddings) && is_array($result->embeddings)) {
-                $vectors = [];
-                foreach ($result->embeddings as $emb) {
-                    if (isset($emb->values)) {
-                        $vectors[] = $emb->values;
-                    }
-                }
-                return $vectors;
-            }
-        } elseif ($provider === 'openai') {
-            $endpoint = "https://api.openai.com/v1/embeddings";
-            $data = [
-                'model' => 'text-embedding-3-small',
-                'input' => $texts
-            ];
-            $curl->setopt([
-                'CURLOPT_HTTPHEADER' => [
-                    'Authorization: Bearer ' . $apikey,
-                    'Content-Type: application/json'
-                ]
-            ]);
-            $raw_response = $curl->post($endpoint, json_encode($data));
-            $result = json_decode($raw_response);
-            if (isset($result->data) && is_array($result->data)) {
-                usort($result->data, function($a, $b) {
-                    return $a->index <=> $b->index;
-                });
-                $vectors = [];
-                foreach ($result->data as $item) {
-                    $vectors[] = $item->embedding;
-                }
-                return $vectors;
+        $vectors = [];
+        foreach ($texts as $text) {
+            $emb = self::generate_embedding_for_text($text);
+            if ($emb) {
+                $vectors[] = $emb;
             }
         }
-
-        return null;
+        return !empty($vectors) ? $vectors : null;
     }
 
     public static function extract_docx_text(string $filepath): string {

@@ -368,7 +368,10 @@
                                 {{#time}}<span class="meta-time">{{time}}</span>{{/time}}
                             </div>
                         </div>
-                        <div class="message-text"><div class="markdown-body">{{{ai_response}}}</div></div>
+                        <div class="message-text">
+                            <div class="markdown-body">{{{ai_response}}}</div>
+                            <textarea class="raw-ai-content" style="display:none;">{{{raw_ai}}}</textarea>
+                        </div>
                     </div>
                 </div>
                 {{/initial_messages}}
@@ -1436,13 +1439,93 @@
             };
         }
 
+        var extractJsonByKeyword = function(text, keyword) {
+            if (!text || typeof text !== 'string') return null;
+            var lowerText = text.toLowerCase();
+            var idx = lowerText.indexOf(keyword.toLowerCase());
+            if (idx === -1) return null;
+
+            var startBrace = text.lastIndexOf('{', idx);
+            var startBracket = text.lastIndexOf('[', idx);
+            var start = -1;
+            if (startBrace !== -1 && startBracket !== -1) {
+                start = Math.max(startBrace, startBracket);
+            } else {
+                start = (startBrace !== -1) ? startBrace : startBracket;
+            }
+            if (start === -1) return null;
+
+            var openChar = text[start];
+            var closeChar = openChar === '{' ? '}' : ']';
+            var openCount = 0;
+            var end = -1;
+            var inStr = false;
+            var escape = false;
+
+            for (var i = start; i < text.length; i++) {
+                var c = text[i];
+                if (escape) {
+                    escape = false;
+                    continue;
+                }
+                if (c === '\\') {
+                    escape = true;
+                    continue;
+                }
+                if (c === '"') {
+                    inStr = !inStr;
+                    continue;
+                }
+                if (!inStr) {
+                    if (c === openChar) {
+                        openCount++;
+                    } else if (c === closeChar) {
+                        openCount--;
+                        if (openCount === 0) {
+                            end = i;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (end === -1) {
+                end = text.lastIndexOf(closeChar);
+            }
+
+            if (start !== -1 && end !== -1 && end > start) {
+                var rawSubstring = text.substring(start, end + 1);
+                try {
+                    var parsed = JSON.parse(rawSubstring);
+                    return {
+                        raw: rawSubstring,
+                        data: parsed,
+                        start: start,
+                        end: end
+                    };
+                } catch (e) {
+                    try {
+                        var cleaned = rawSubstring.replace(/,\s*([\]}])/g, '$1');
+                        var parsed2 = JSON.parse(cleaned);
+                        return {
+                            raw: rawSubstring,
+                            data: parsed2,
+                            start: start,
+                            end: end
+                        };
+                    } catch (e2) {}
+                }
+            }
+            return null;
+        };
+
         var detectAndRenderArtifacts = function(text, type, addToHistory = true, customTarget = null) {
             var found = false;
             var artifact = null;
             var cleanText = text;
             var artType = null;
 
-            // 1. Check for FLASHCARDS (Support json-flashcards or json with flashcards / front-back)
+            // 1. Check for FLASHCARDS (Support json-flashcards codeblocks, raw JSON, or markdown)
             var fcMatch = text.match(/```(?:json-flashcards|json)\s*([\s\S]*?)```/i);
             if (fcMatch) {
                 try {
@@ -1454,25 +1537,21 @@
                         artifact = { type: "flashcards", data: fcItems, title: "Flashcards - " + new Date().toLocaleTimeString() };
                         cleanText = text.replace(fcMatch[0], "").trim();
                         found = true;
-                        console.log("Detected Flashcards artifact via codeblock.");
                     }
                 } catch(e) {}
             }
 
             // Also check for raw JSON without codeblock (e.g. { "flashcards": [...] })
             if (!found) {
-                var rawJsonMatch = text.match(/\{\s*"flashcards"\s*:\s*\[[\s\S]*?\]\s*\}/i);
-                if (rawJsonMatch) {
-                    try {
-                        var parsed = JSON.parse(rawJsonMatch[0].trim());
-                        if (parsed && Array.isArray(parsed.flashcards) && parsed.flashcards.length > 0) {
-                            artType = "flashcards";
-                            artifact = { type: "flashcards", data: parsed.flashcards, title: "Flashcards - " + new Date().toLocaleTimeString() };
-                            cleanText = text.replace(rawJsonMatch[0], "").trim();
-                            found = true;
-                            console.log("Detected Flashcards artifact via raw JSON.");
-                        }
-                    } catch(e) {}
+                var rawFc = extractJsonByKeyword(text, "flashcards");
+                if (rawFc && rawFc.data) {
+                    var fcItems = Array.isArray(rawFc.data) ? rawFc.data : (rawFc.data.flashcards || null);
+                    if (fcItems && Array.isArray(fcItems) && fcItems.length > 0 && (fcItems[0].front || fcItems[0].question || fcItems[0].term)) {
+                        artType = "flashcards";
+                        artifact = { type: "flashcards", data: fcItems, title: "Flashcards - " + new Date().toLocaleTimeString() };
+                        cleanText = text.replace(rawFc.raw, "").trim();
+                        found = true;
+                    }
                 }
             }
 
@@ -1518,35 +1597,26 @@
                         var raw = quizMatch[1].trim();
                         var parsed = JSON.parse(raw);
                         var quizData = parsed.quiz || (parsed.questions ? parsed : null);
-                        if (quizData && quizData.questions) {
+                        if (quizData && quizData.questions && Array.isArray(quizData.questions) && quizData.questions.length > 0) {
                             artType = "quiz";
                             artifact = { type: "quiz", data: quizData, title: "Quiz - " + new Date().toLocaleTimeString() };
                             cleanText = text.replace(quizMatch[0], "").trim();
                             found = true;
-                            console.log("Detected Quiz artifact via codeblock.");
                         }
-                    } catch (e) {
-                        console.error("Quiz JSON parse error:", e);
-                    }
+                    } catch (e) {}
                 }
             }
 
             // Also check for raw JSON without codeblock (e.g. { "questions": [...] })
             if (!found) {
-                var rawQuizMatch = text.match(/\{\s*"questions"\s*:\s*\[[\s\S]*?\]\s*\}/i);
-                if (rawQuizMatch) {
-                    try {
-                        var parsed = JSON.parse(rawQuizMatch[0].trim());
-                        var quizData = parsed.quiz || (parsed.questions ? parsed : null);
-                        if (quizData && quizData.questions) {
-                            artType = "quiz";
-                            artifact = { type: "quiz", data: quizData, title: "Quiz - " + new Date().toLocaleTimeString() };
-                            cleanText = text.replace(rawQuizMatch[0], "").trim();
-                            found = true;
-                            console.log("Detected Quiz artifact via raw JSON.");
-                        }
-                    } catch (e) {
-                        console.error("Raw Quiz JSON parse error:", e);
+                var rawQuiz = extractJsonByKeyword(text, "questions");
+                if (rawQuiz && rawQuiz.data) {
+                    var quizData = rawQuiz.data.quiz || (rawQuiz.data.questions ? rawQuiz.data : null);
+                    if (quizData && quizData.questions && Array.isArray(quizData.questions) && quizData.questions.length > 0) {
+                        artType = "quiz";
+                        artifact = { type: "quiz", data: quizData, title: "Quiz - " + new Date().toLocaleTimeString() };
+                        cleanText = text.replace(rawQuiz.raw, "").trim();
+                        found = true;
                     }
                 }
             }
@@ -1554,6 +1624,12 @@
             // 3. Check for MINDMAP (Mermaid).
             if (!found) {
                 var mermaidMatch = text.match(/```mermaid\s*([\s\S]*?)```/i);
+                if (!mermaidMatch) {
+                    var bareMatch = text.match(/(?:^|\n)((?:graph\s+[TBRLEF]{2}|flowchart\s+[TBRLEF]{2})\s+[\s\S]*?)(?=(?:\n\s*Explanation|\n\s*Detailed|\n\s*Key\s+Concepts|\n\s*Conclusion|$))/i);
+                    if (bareMatch && bareMatch[1] && bareMatch[1].includes('-->')) {
+                        mermaidMatch = [bareMatch[0], bareMatch[1]];
+                    }
+                }
                 if (!mermaidMatch) {
                     var rootDslMatch = text.match(/(?:^|\n)(root\s+['"].*?['"][\s\S]*?)(?=(?:\n\s*This\s+mindmap|\n\s*Explanation|\n\s*Detailed|$))/i);
                     if (rootDslMatch) {
@@ -1565,19 +1641,22 @@
                     artifact = { type: "mindmap", data: mermaidMatch[1].trim(), title: "Mindmap - " + new Date().toLocaleTimeString() };
                     cleanText = text.replace(mermaidMatch[0], "").trim();
                     found = true;
-                    console.log("Detected Mindmap artifact.");
                 }
             }
 
             // 4. Check for SUMMARY.
             if (!found) {
-                var summaryMatch = text.match(/\[(?:SUMMARY|REPORT)_START\]([\s\S]*?)\[(?:SUMMARY|REPORT)_END\]/);
+                var summaryMatch = text.match(/\[(?:SUMMARY|REPORT)_START\]([\s\S]*?)\[(?:SUMMARY|REPORT)_END\]/i);
                 if (summaryMatch) {
                     artType = "summary";
                     artifact = { type: "summary", data: summaryMatch[1].trim(), title: "Summary - " + new Date().toLocaleTimeString() };
                     cleanText = text.replace(summaryMatch[0], "").trim();
                     found = true;
-                    console.log("Detected Summary artifact.");
+                } else if (text.indexOf("Executive Academic Study Summary") !== -1 || text.indexOf("Executive Study Summary") !== -1) {
+                    artType = "summary";
+                    artifact = { type: "summary", data: text.trim(), title: "Summary - " + new Date().toLocaleTimeString() };
+                    cleanText = "";
+                    found = true;
                 }
             }
 
@@ -2266,14 +2345,46 @@
             var target = customTarget || getOrCreateTargetContainer();
             if (!target) return;
 
-            target.innerHTML = prepareFormalHeader("Study Summary") + "<div class=\'report-markdown\'>" + marked.parse(content) + "</div>";
+            var containerId = "summary-container-" + Math.random().toString(36).substring(2, 9);
+            var headerHTML = '<div class="demi-summary-card" id="' + containerId + '">' +
+                '<div class="demi-summary-header">' +
+                    '<div class="demi-summary-title-group">' +
+                        '<i class="fa fa-file-text-o text-success" style="font-size:1.1rem; color:#059669;"></i>' +
+                        '<span class="demi-summary-title">Executive Study Summary</span>' +
+                        '<span class="demi-summary-badge">Course Notes</span>' +
+                    '</div>' +
+                    '<div class="demi-summary-actions">' +
+                        '<button type="button" class="btn btn-sm btn-secondary md-btn" title="Export Markdown"><i class="fa fa-download mr-1"></i> Export .MD</button>' +
+                        '<button type="button" class="btn btn-sm btn-success pdf-btn" title="Download PDF" style="background:#059669; border-color:#059669; color:#fff;"><i class="fa fa-file-pdf-o mr-1"></i> Download PDF</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="demi-summary-body">' +
+                    '<div class="demi-summary-hero text-center mb-3 pb-2" style="border-bottom: 1px solid #e2e8f0;">' +
+                        '<div class="demi-summary-inst" style="font-size: 10px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px;">PRESIDENT UNIVERSITY · DISTANCE LEARNING</div>' +
+                        '<h3 class="demi-summary-heading" style="font-size: 14px; font-weight: 800; color: #0f172a; margin: 4px 0;">DEMI AI Academic Tutor · Course Study Summary</h3>' +
+                        '<div class="demi-summary-meta" style="font-size: 10px; color: #64748b;">Generated on ' + new Date().toLocaleDateString() + ' · Grounded in Professor Lecture Materials</div>' +
+                    '</div>' +
+                    '<div class="markdown-body" style="font-size:0.85rem; line-height:1.6; color:#1e293b;">' + (typeof marked !== 'undefined' ? marked.parse(content) : content.replace(/\n/g, '<br>')) + '</div>' +
+                '</div>' +
+            '</div>';
+
+            target.innerHTML = headerHTML;
             if (resultsContainer && !customTarget) resultsContainer.scrollIntoView({ behavior: "smooth" });
             
-            if (downloadBtn) {
-                downloadBtn.innerHTML = "<i class=\'fa fa-file-pdf-o\'></i> Export as PDF";
-                downloadBtn.onclick = function() {
-                    window.print();
-                };
+            var cardEl = target.querySelector("#" + containerId);
+            if (cardEl) {
+                var mdBtn = cardEl.querySelector(".md-btn");
+                if (mdBtn) {
+                    mdBtn.onclick = function() {
+                        downloadFile("Study_Summary_" + new Date().toISOString().slice(0, 10) + ".md", content);
+                    };
+                }
+                var pdfBtn = cardEl.querySelector(".pdf-btn");
+                if (pdfBtn) {
+                    pdfBtn.onclick = function() {
+                        window.print();
+                    };
+                }
             }
         };
 
@@ -2791,8 +2902,9 @@
             var msgs = document.querySelectorAll("#chat-messages .message.ai:not(.welcome-msg)");
             msgs.forEach(function(msg) {
                 var mb = msg.querySelector(".markdown-body") || msg.querySelector(".message-text");
-                if (mb && !msg.querySelector(".inline-artifact-container") && !msg.querySelector(".demi-quiz-card") && !msg.querySelector(".demi-flashcard-card-box")) {
-                    var rawContent = mb.innerText || mb.textContent;
+                if (mb && !msg.querySelector(".inline-artifact-container") && !msg.querySelector(".demi-quiz-card") && !msg.querySelector(".demi-flashcard-card-box") && !msg.querySelector(".demi-summary-card")) {
+                    var rawTa = msg.querySelector(".raw-ai-content");
+                    var rawContent = rawTa ? rawTa.value : (mb.innerText || mb.textContent);
                     formatAndRenderAiBubble(msg, rawContent, true);
                 }
             });

@@ -181,52 +181,12 @@ class ai_client {
 
                 foreach ($target_files as $file) {
                     $filename = $file->get_filename();
-                    $mimetype = $file->get_mimetype();
-                    $extracted = "";
-
-                    if ($mimetype === 'text/plain') {
-                        $extracted = substr($file->get_content(), 0, 3000);
-                    } elseif ($mimetype === 'application/pdf') {
-                        $tempdir = make_temp_directory('mod_ainotebook');
-                        $tmpfile = $tempdir . '/' . uniqid() . '.pdf';
-                        try {
-                            $file->copy_content_to($tmpfile);
-                            $output = [];
-                            $return_var = 0;
-                            exec("pdftotext -layout " . escapeshellarg($tmpfile) . " - 2>/dev/null", $output, $return_var);
-                            if ($return_var === 0 && !empty($output)) {
-                                $extracted = substr(implode("\n", $output), 0, 3500);
-                            }
-                        } catch (\Throwable $e) {
-                        } finally {
-                            if (file_exists($tmpfile)) @unlink($tmpfile);
-                        }
-                    } elseif ($mimetype === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' || strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'pptx') {
-                        $tempdir = make_temp_directory('mod_ainotebook');
-                        $tmpfile = $tempdir . '/' . uniqid() . '.pptx';
-                        try {
-                            $file->copy_content_to($tmpfile);
-                            $extracted = substr(self::extract_pptx_text($tmpfile), 0, 3500);
-                        } catch (\Throwable $e) {
-                        } finally {
-                            if (file_exists($tmpfile)) @unlink($tmpfile);
-                        }
-                    } elseif ($mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'docx') {
-                        $tempdir = make_temp_directory('mod_ainotebook');
-                        $tmpfile = $tempdir . '/' . uniqid() . '.docx';
-                        try {
-                            $file->copy_content_to($tmpfile);
-                            $extracted = substr(self::extract_docx_text($tmpfile), 0, 3500);
-                        } catch (\Throwable $e) {
-                        } finally {
-                            if (file_exists($tmpfile)) @unlink($tmpfile);
-                        }
-                    }
+                    $extracted = self::get_cached_extracted_text($file);
 
                     if (!empty($extracted)) {
                         $clean = trim(preg_replace('/\s+/', ' ', $extracted));
                         if (strlen($clean) > 20) {
-                            $context_blocks[] = "[Lecture Slide/Document: {$filename}]:\n" . substr($clean, 0, 2500);
+                            $context_blocks[] = "[Lecture Slide/Document: {$filename}]:\n" . substr($clean, 0, 3000);
                             $actual_material_count++;
                         }
                     }
@@ -1372,6 +1332,75 @@ class ai_client {
             }
         }
         return !empty($vectors) ? $vectors : null;
+    }
+
+    /**
+     * Extracts and caches text from course files (PDF, PPTX, DOCX, TXT) based on Moodle contenthash.
+     */
+    public static function get_cached_extracted_text(\stored_file $file): string {
+        $hash = $file->get_contenthash();
+        if (empty($hash)) {
+            $hash = md5($file->get_filename() . '_' . $file->get_filesize() . '_' . $file->get_timemodified());
+        }
+        $cachedir = make_temp_directory('mod_ainotebook_textcache');
+        $cachefile = $cachedir . '/' . $hash . '.txt';
+
+        if (file_exists($cachefile) && filesize($cachefile) > 0) {
+            $cached = @file_get_contents($cachefile);
+            if ($cached !== false && strlen($cached) > 0) {
+                return $cached;
+            }
+        }
+
+        $filename = $file->get_filename();
+        $mimetype = $file->get_mimetype();
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        $extracted = "";
+
+        if ($mimetype === 'text/plain' || $ext === 'txt') {
+            $extracted = substr($file->get_content(), 0, 4000);
+        } elseif ($mimetype === 'application/pdf' || $ext === 'pdf') {
+            $workdir = make_temp_directory('mod_ainotebook_tmp');
+            $tmpfile = $workdir . '/' . uniqid() . '.pdf';
+            try {
+                $file->copy_content_to($tmpfile);
+                $output = [];
+                $return_var = 0;
+                exec("pdftotext -layout " . escapeshellarg($tmpfile) . " - 2>/dev/null", $output, $return_var);
+                if ($return_var === 0 && !empty($output)) {
+                    $extracted = substr(implode("\n", $output), 0, 4500);
+                }
+            } catch (\Throwable $e) {
+            } finally {
+                if (file_exists($tmpfile)) @unlink($tmpfile);
+            }
+        } elseif ($mimetype === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' || $ext === 'pptx') {
+            $workdir = make_temp_directory('mod_ainotebook_tmp');
+            $tmpfile = $workdir . '/' . uniqid() . '.pptx';
+            try {
+                $file->copy_content_to($tmpfile);
+                $extracted = substr(self::extract_pptx_text($tmpfile), 0, 4500);
+            } catch (\Throwable $e) {
+            } finally {
+                if (file_exists($tmpfile)) @unlink($tmpfile);
+            }
+        } elseif ($mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || $ext === 'docx') {
+            $workdir = make_temp_directory('mod_ainotebook_tmp');
+            $tmpfile = $workdir . '/' . uniqid() . '.docx';
+            try {
+                $file->copy_content_to($tmpfile);
+                $extracted = substr(self::extract_docx_text($tmpfile), 0, 4500);
+            } catch (\Throwable $e) {
+            } finally {
+                if (file_exists($tmpfile)) @unlink($tmpfile);
+            }
+        }
+
+        if (!empty($extracted)) {
+            @file_put_contents($cachefile, $extracted);
+        }
+
+        return $extracted;
     }
 
     public static function extract_docx_text(string $filepath): string {

@@ -262,7 +262,13 @@
                 <div class="message ai">
                     <div class="ai-avatar-icon">DEMI</div>
                     <div class="message-bubble-body">
-                        <div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span>{{#time}}<span class="meta-time">{{time}}</span>{{/time}}</div>
+                        <div class="message-meta-header">
+                            <span class="meta-author">DEMI AI Tutor</span>
+                            <div class="meta-actions">
+                                <button type="button" class="btn-read-aloud" onclick="window.speakAiMessage(this)" title="Read aloud with AI voice"><i class="fa fa-volume-up"></i> Read Aloud</button>
+                                {{#time}}<span class="meta-time">{{time}}</span>{{/time}}
+                            </div>
+                        </div>
                         <div class="message-text"><div class="markdown-body">{{{ai_response}}}</div></div>
                     </div>
                 </div>
@@ -279,14 +285,29 @@
                     <button type="button" class="tool-btn mindmap" onclick="window.sendSuggested('Generate a comprehensive visual concept mindmap synthesizing the lecture slides for {{course_fullname}}.', 'mindmap')">
                         📊 Concept Mindmap
                     </button>
+                    <button type="button" class="tool-btn flashcards" onclick="window.sendSuggested('Generate 5 interactive study flashcards covering key definitions and formulas for {{course_fullname}}.', 'flashcards')">
+                        🗂️ Flashcards
+                    </button>
                     <button type="button" class="tool-btn summary" onclick="window.sendSuggested('Generate a comprehensive executive study summary report for {{course_fullname}}.', 'summary')">
                         📄 Study Summary
                     </button>
                 </div>
 
+                <!-- Active Topic Focus Chip -->
+                <div id="active-focus-chip-container" class="active-focus-chip-container" style="display: none;">
+                    <span class="focus-chip-badge">
+                        <i class="fa fa-bullseye"></i>
+                        <span id="focus-chip-label">Focus: All Course Materials</span>
+                        <button type="button" class="btn-clear-focus" onclick="window.clearTopicFocus()" title="Clear topic focus" aria-label="Clear topic focus">&times;</button>
+                    </span>
+                </div>
+
                 <div class="input-wrapper" {{#is_readonly}}style="opacity: 0.6; pointer-events: none;"{{/is_readonly}}>
                     <input type="text" id="chat-input" placeholder="Ask DEMI AI Tutor about {{course_fullname}}... (Enter to send, Shift+Enter for newline)" {{#is_readonly}}disabled{{/is_readonly}}>
                     <span id="source-count" class="source-pill">0 sources attached</span>
+                    <button type="button" id="mic-btn" class="btn-mic" onclick="window.toggleSpeechRecognition()" title="Voice input (Speech to text)" aria-label="Voice input" {{#is_readonly}}disabled{{/is_readonly}}>
+                        <i class="fa fa-microphone"></i>
+                    </button>
                     <button id="send-btn" {{#is_readonly}}disabled{{/is_readonly}}>
                         <i class="fa fa-paper-plane"></i>
                     </button>
@@ -378,6 +399,25 @@
 {{/is_readonly}}
 {{/is_teacher}}
 
+<!-- Modal: Fullscreen Mindmap Viewer -->
+<div id="mindmap-fullscreen-modal" class="ain-modal-overlay" style="display:none;">
+    <div class="ain-modal-content mindmap-modal-content" style="max-width: 90vw; width: 90vw; height: 85vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 14px;">
+        <div class="ain-modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
+            <h3 style="margin: 0; font-size: 1rem; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                <i class="fa fa-sitemap" style="color: #6366f1;"></i> Fullscreen Concept Mindmap
+            </h3>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.zoomMindmapModal(1.2)" title="Zoom In"><i class="fa fa-search-plus"></i></button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.zoomMindmapModal(0.8)" title="Zoom Out"><i class="fa fa-search-minus"></i></button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.zoomMindmapModal(1, true)" title="Reset Zoom"><i class="fa fa-refresh"></i> Reset</button>
+                <button type="button" class="btn-icon" onclick="window.closeMindmapModal()" title="Close"><i class="fa fa-times"></i></button>
+            </div>
+        </div>
+        <div id="mindmap-modal-body" class="mindmap-modal-body" style="flex: 1; overflow: auto; padding: 24px; display: flex; justify-content: center; align-items: center; background: #ffffff;">
+        </div>
+    </div>
+</div>
+
 {{#js}}
     var cmid = {{cmid}};
     var sesskey = '{{sesskey}}';
@@ -432,6 +472,17 @@
         });
         if (cardEl) cardEl.classList.add('active');
 
+        var chipContainer = document.getElementById('active-focus-chip-container');
+        var chipLabel = document.getElementById('focus-chip-label');
+        if (chipContainer && chipLabel) {
+            if (topicName && topicName !== 'All Course Materials') {
+                chipLabel.innerText = 'Topic Focus: ' + topicName;
+                chipContainer.style.display = 'block';
+            } else {
+                chipContainer.style.display = 'none';
+            }
+        }
+
         var headerSub = document.querySelector('.chat-header .chat-subtitle');
         if (headerSub) {
             if (topicName === 'All Course Materials') {
@@ -447,6 +498,221 @@
                 type: 'info'
             });
         });
+    };
+
+    window.clearTopicFocus = function() {
+        window.activeFocusTopic = 'All Course Materials';
+        document.querySelectorAll('.syllabus-topic-card').forEach(function(c) {
+            c.classList.remove('active');
+        });
+        var allCard = document.querySelector('.syllabus-topic-card');
+        if (allCard) allCard.classList.add('active');
+
+        var chipContainer = document.getElementById('active-focus-chip-container');
+        if (chipContainer) chipContainer.style.display = 'none';
+
+        var headerSub = document.querySelector('.chat-header .chat-subtitle');
+        if (headerSub) {
+            headerSub.innerText = 'All Course Materials · Direct Discussion Thread';
+        }
+
+        require(['core/notification'], function(Notification) {
+            Notification.addNotification({
+                message: 'Topic focus cleared. Using full course scope.',
+                type: 'info'
+            });
+        });
+    };
+
+    // ── Voice Input (Speech-to-Text) ─────────────────────────────────────────
+    var speechRecognition = null;
+    var isRecordingSpeech = false;
+
+    window.toggleSpeechRecognition = function() {
+        var micBtn = document.getElementById('mic-btn');
+        var input = document.getElementById('chat-input');
+        
+        var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRec) {
+            require(['core/notification'], function(Notification) {
+                Notification.addNotification({
+                    message: 'Speech Recognition is not supported by your browser. Please use Google Chrome, Edge, or Safari.',
+                    type: 'warning'
+                });
+            });
+            return;
+        }
+
+        if (isRecordingSpeech && speechRecognition) {
+            speechRecognition.stop();
+            return;
+        }
+
+        try {
+            speechRecognition = new SpeechRec();
+            speechRecognition.continuous = false;
+            speechRecognition.interimResults = false;
+            speechRecognition.lang = 'id-ID';
+
+            speechRecognition.onstart = function() {
+                isRecordingSpeech = true;
+                if (micBtn) micBtn.classList.add('listening');
+                if (input) input.placeholder = '🎙️ Listening... Speak your academic question...';
+            };
+
+            speechRecognition.onresult = function(event) {
+                if (event.results && event.results[0]) {
+                    var transcript = event.results[0][0].transcript;
+                    if (transcript && input) {
+                        input.value = input.value ? (input.value + ' ' + transcript) : transcript;
+                        input.focus();
+                    }
+                }
+            };
+
+            speechRecognition.onerror = function(event) {
+                console.warn('Speech recognition error:', event.error);
+                isRecordingSpeech = false;
+                if (micBtn) micBtn.classList.remove('listening');
+                if (input) input.placeholder = 'Ask DEMI AI Tutor about ' + courseFullname + '...';
+            };
+
+            speechRecognition.onend = function() {
+                isRecordingSpeech = false;
+                if (micBtn) micBtn.classList.remove('listening');
+                if (input) input.placeholder = 'Ask DEMI AI Tutor about ' + courseFullname + '...';
+            };
+
+            speechRecognition.start();
+        } catch (e) {
+            console.error('Speech rec init failed:', e);
+        }
+    };
+
+    // ── Text-to-Speech (Read Aloud) ──────────────────────────────────────────
+    var currentSpeechBtn = null;
+    window.speakAiMessage = function(btn) {
+        if (!('speechSynthesis' in window)) {
+            require(['core/notification'], function(Notification) {
+                Notification.alert('Speech Unavailable', 'Text-to-Speech is not supported in this browser.', 'OK');
+            });
+            return;
+        }
+
+        if (window.speechSynthesis.speaking && currentSpeechBtn === btn) {
+            window.speechSynthesis.cancel();
+            if (currentSpeechBtn) {
+                currentSpeechBtn.innerHTML = '<i class="fa fa-volume-up"></i> Read Aloud';
+                currentSpeechBtn.classList.remove('speaking');
+            }
+            currentSpeechBtn = null;
+            return;
+        }
+
+        window.speechSynthesis.cancel();
+        if (currentSpeechBtn) {
+            currentSpeechBtn.innerHTML = '<i class="fa fa-volume-up"></i> Read Aloud';
+            currentSpeechBtn.classList.remove('speaking');
+        }
+
+        var messageBubble = btn.closest('.message-bubble-body');
+        if (!messageBubble) return;
+        var textContainer = messageBubble.querySelector('.message-text');
+        if (!textContainer) return;
+
+        var rawText = textContainer.innerText || textContainer.textContent || '';
+        var cleanText = rawText
+            .replace(/```mermaid[\s\S]*?```/gi, ' [Visual diagram omitted] ')
+            .replace(/```(?:json)?\s*\[\s*\{[\s\S]*?\}\s*\]\s*```/gi, ' [Quiz omitted] ')
+            .replace(/```[\s\S]*?```/gi, ' [Code snippet omitted] ')
+            .replace(/[*_#`~>]/g, '')
+            .trim();
+
+        if (!cleanText) return;
+
+        var utterance = new SpeechSynthesisUtterance(cleanText);
+        var voices = window.speechSynthesis.getVoices();
+        var idVoice = voices.find(function(v) { return v.lang && (v.lang.startsWith('id') || v.lang.startsWith('in')); });
+        var enVoice = voices.find(function(v) { return v.lang && v.lang.startsWith('en'); });
+        if (idVoice) {
+            utterance.voice = idVoice;
+            utterance.lang = 'id-ID';
+        } else if (enVoice) {
+            utterance.voice = enVoice;
+            utterance.lang = 'en-US';
+        }
+
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+
+        utterance.onstart = function() {
+            currentSpeechBtn = btn;
+            btn.innerHTML = '<i class="fa fa-stop"></i> Stop';
+            btn.classList.add('speaking');
+        };
+
+        utterance.onend = function() {
+            if (currentSpeechBtn) {
+                currentSpeechBtn.innerHTML = '<i class="fa fa-volume-up"></i> Read Aloud';
+                currentSpeechBtn.classList.remove('speaking');
+            }
+            currentSpeechBtn = null;
+        };
+
+        utterance.onerror = function() {
+            if (currentSpeechBtn) {
+                currentSpeechBtn.innerHTML = '<i class="fa fa-volume-up"></i> Read Aloud';
+                currentSpeechBtn.classList.remove('speaking');
+            }
+            currentSpeechBtn = null;
+        };
+
+        window.speechSynthesis.speak(utterance);
+    };
+
+    // ── Fullscreen Mindmap Modal Controls ─────────────────────────────────────
+    var currentMindmapScale = 1.0;
+    window.openMindmapModal = function(mindmapContainerId) {
+        var sourceEl = document.getElementById(mindmapContainerId);
+        var modal = document.getElementById('mindmap-fullscreen-modal');
+        var modalBody = document.getElementById('mindmap-modal-body');
+        if (!sourceEl || !modal || !modalBody) return;
+
+        var svgEl = sourceEl.querySelector('svg');
+        if (svgEl) {
+            modalBody.innerHTML = svgEl.outerHTML;
+            var newSvg = modalBody.querySelector('svg');
+            if (newSvg) {
+                newSvg.style.maxWidth = '100%';
+                newSvg.style.height = 'auto';
+                newSvg.style.transformOrigin = 'center center';
+                newSvg.style.transition = 'transform 0.2s ease';
+            }
+        } else {
+            modalBody.innerHTML = sourceEl.innerHTML;
+        }
+
+        currentMindmapScale = 1.0;
+        modal.style.display = 'flex';
+    };
+
+    window.closeMindmapModal = function() {
+        var modal = document.getElementById('mindmap-fullscreen-modal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    window.zoomMindmapModal = function(factor, reset) {
+        var modalBody = document.getElementById('mindmap-modal-body');
+        if (!modalBody) return;
+        var svg = modalBody.querySelector('svg') || modalBody.firstElementChild;
+        if (!svg) return;
+
+        if (reset) {
+            currentMindmapScale = 1.0;
+        } else {
+            currentMindmapScale = Math.max(0.4, Math.min(3.0, currentMindmapScale * factor));
+        }
+        svg.style.transform = 'scale(' + currentMindmapScale + ')';
     };
 
         var currentSessionId = "{{active_session_id}}" || null;
@@ -531,7 +797,7 @@
                         html += '<div class="message ai">' +
                             '<div class="ai-avatar-icon">DEMI</div>' +
                             '<div class="message-bubble-body">' +
-                                '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span><span class="meta-time">' + m.time + '</span></div>' +
+                                '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span><div class="meta-actions"><button type="button" class="btn-read-aloud" onclick="window.speakAiMessage(this)" title="Read aloud with AI voice"><i class="fa fa-volume-up"></i> Read Aloud</button><span class="meta-time">' + m.time + '</span></div></div>' +
                                 '<div class="message-text"><div class="markdown-body">' + parsedAi + '</div></div>' +
                             '</div>' +
                         '</div>';
@@ -1166,13 +1432,21 @@
             var target = customTarget || getOrCreateTargetContainer();
             if (!target) return;
             var cleanData = sanitizeMermaid(data);
+            var mapContainerId = "mermaid-container-" + Math.random().toString(36).substring(2, 9);
 
-            target.innerHTML = prepareFormalHeader("Mindmap Visualization") + "<h3>Mindmap Concept</h3><div id='mermaid-container' class='mermaid'>" + cleanData + "</div>";
+            target.innerHTML = prepareFormalHeader("Mindmap Visualization") + 
+                "<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;'>" +
+                    "<h3 style='margin:0; font-size:1.1rem;'>Concept Mindmap</h3>" +
+                    "<button type='button' class='btn btn-sm btn-outline-primary' style='font-size:11px; padding:4px 10px; border-radius:6px;' onclick=\"window.openMindmapModal('" + mapContainerId + "')\">" +
+                        "<i class='fa fa-expand'></i> Fullscreen Zoom" +
+                    "</button>" +
+                "</div>" +
+                "<div id='" + mapContainerId + "' class='mermaid'>" + cleanData + "</div>";
             try {
                 mermaid.init(undefined, target.querySelectorAll(".mermaid"));
             } catch (err) {
                 console.error("Mermaid init error:", err);
-                var container = target.querySelector("#mermaid-container") || target;
+                var container = target.querySelector("#" + mapContainerId) || target;
                 if (container) container.innerHTML = "<div class='alert alert-warning'>Failed to render Mindmap. The AI generated invalid syntax. Please try again.</div>";
             }
             if (resultsContainer && !customTarget) resultsContainer.scrollIntoView({ behavior: "smooth" });
@@ -1222,7 +1496,7 @@
             } else {
                 msg.innerHTML = '<div class="ai-avatar-icon">DEMI</div>' +
                 '<div class="message-bubble-body">' +
-                    '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span></div>' +
+                    '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span><div class="meta-actions"><button type="button" class="btn-read-aloud" onclick="window.speakAiMessage(this)" title="Read aloud with AI voice"><i class="fa fa-volume-up"></i> Read Aloud</button></div></div>' +
                     '<div class="message-text"><div class="markdown-body">' + parsed + '</div></div>' +
                 '</div>';
             }
@@ -1447,7 +1721,7 @@
                                                 aiMsgDiv.className = "message ai";
                                                 aiMsgDiv.innerHTML = '<div class="ai-avatar-icon">DEMI</div>' +
                                                     '<div class="message-bubble-body">' +
-                                                        '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span></div>' +
+                                                        '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span><div class="meta-actions"><button type="button" class="btn-read-aloud" onclick="window.speakAiMessage(this)" title="Read aloud with AI voice"><i class="fa fa-volume-up"></i> Read Aloud</button></div></div>' +
                                                         '<div class="message-text"><div class="markdown-body"></div></div>' +
                                                     '</div>';
                                                 messages.appendChild(aiMsgDiv);

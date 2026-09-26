@@ -68,7 +68,7 @@ class ai_client {
     /**
      * Main entry point for generating AI response.
      */
-    public static function get_response(int $cmid, int $userid, string $user_message, array $selected_file_ids = [], array $config = [], bool $stream = false): array {
+    public static function get_response(int $cmid, int $userid, string $user_message, array $selected_file_ids = [], array $config = [], bool $stream = false, string $focus_topic = ''): array {
         self::$streamed = false;
         global $DB, $USER;
 
@@ -145,11 +145,38 @@ class ai_client {
                     }
                 }
                 if (empty($target_files)) {
+                    // Smart priority sorting based on active focus topic or query keywords (e.g. week 1, week 2, slide)
+                    $search_terms = [];
+                    if (!empty($focus_topic) && $focus_topic !== 'All Course Materials') {
+                        $search_terms[] = strtolower($focus_topic);
+                    }
+                    if (preg_match('/(week\s*\d+|minggu\s*\d+|pertemuan\s*\d+|module\s*\d+|project\s*\d+|slide\s*week\s*\d+)/i', $user_message, $m)) {
+                        $search_terms[] = strtolower($m[1]);
+                    }
+
+                    if (!empty($search_terms)) {
+                        usort($all_course_files, function($a, $b) use ($search_terms) {
+                            $nameA = strtolower($a->get_filename());
+                            $nameB = strtolower($b->get_filename());
+                            $scoreA = 0;
+                            $scoreB = 0;
+                            foreach ($search_terms as $term) {
+                                $cleanTerm = preg_replace('/[^a-z0-9]/', '', $term);
+                                $cleanA = preg_replace('/[^a-z0-9]/', '', $nameA);
+                                $cleanB = preg_replace('/[^a-z0-9]/', '', $nameB);
+                                if (!empty($cleanTerm)) {
+                                    if (strpos($cleanA, $cleanTerm) !== false) $scoreA += 10;
+                                    if (strpos($cleanB, $cleanTerm) !== false) $scoreB += 10;
+                                }
+                            }
+                            return $scoreB <=> $scoreA;
+                        });
+                    }
                     $target_files = $all_course_files;
                 }
 
                 $context_blocks = [];
-                // Limit to top 6 files
+                // Prioritize top 6 matching files
                 $target_files = array_slice($target_files, 0, 6);
 
                 foreach ($target_files as $file) {
@@ -215,6 +242,9 @@ class ai_client {
 
         $sources_count = $actual_material_count > 0 ? $actual_material_count : (count($selected_file_ids) > 0 ? count($selected_file_ids) : count($live_syllabus));
         $activity_name = $course->fullname . " (" . $ainotebook->name . ")";
+        if (!empty($focus_topic) && $focus_topic !== 'All Course Materials') {
+            $activity_name .= " [Active Topic Focus: " . $focus_topic . "]";
+        }
 
         // ── Pure DEMI Core AI Engine Integration (Port 8001) ─────────────────
         $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';

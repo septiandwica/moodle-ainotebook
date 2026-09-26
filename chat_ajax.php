@@ -174,6 +174,7 @@ if ($action === 'chat_stream') {
     $file_ids = json_decode($selected_files, true) ?: [];
     $config_raw = optional_param('config', '[]', PARAM_RAW);
     $config = json_decode($config_raw, true) ?: [];
+    $focus_topic = optional_param('focus_topic', '', PARAM_TEXT);
     
     // Check rate limits & trial limits
     try {
@@ -205,7 +206,7 @@ if ($action === 'chat_stream') {
     flush();
     
     try {
-        $result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config, true);
+        $result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config, true, $focus_topic);
         
         $response_text = $result['response'] ?? "";
         $sources_count = $result['sources_count'] ?? 0;
@@ -256,6 +257,7 @@ $selected_files = optional_param('selected_files', '[]', PARAM_RAW);
 $file_ids = json_decode($selected_files, true) ?: [];
 $config_raw = optional_param('config', '[]', PARAM_RAW);
 $config = json_decode($config_raw, true) ?: [];
+$focus_topic = optional_param('focus_topic', '', PARAM_TEXT);
 
 try {
     $estimated_input_tokens = \mod_ainotebook\rate_limiter::estimate_tokens($message);
@@ -268,7 +270,7 @@ try {
     exit;
 }
 
-$result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config);
+$result = \mod_ainotebook\ai_client::get_response($cmid, $USER->id, $message, $file_ids, $config, false, $focus_topic);
 $response_text = $result['response'] ?? "Error retrieving response.";
 $sources_count = $result['sources_count'] ?? 0;
 

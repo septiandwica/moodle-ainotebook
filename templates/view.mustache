@@ -424,7 +424,9 @@
         }
     };
 
+    window.activeFocusTopic = 'All Course Materials';
     window.filterTopicFocus = function(topicName, cardEl) {
+        window.activeFocusTopic = topicName || 'All Course Materials';
         document.querySelectorAll('.syllabus-topic-card').forEach(function(c) {
             c.classList.remove('active');
         });
@@ -1297,6 +1299,7 @@
             
             var savedConfig = localStorage.getItem("ainotebook_config") || "{}";
             formData.append("config", savedConfig);
+            formData.append("focus_topic", window.activeFocusTopic || "All Course Materials");
             
             if (!silent) {
                 formData.append("action", "chat_stream");

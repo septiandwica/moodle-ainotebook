@@ -229,7 +229,7 @@
                         </button>
                         <div id="voice-persona-menu" class="voice-persona-menu" style="display: none;">
                             <div class="voice-menu-header">
-                                <span>AI Voice Actor</span>
+                                <span>AI Voice Actor (10 Personas)</span>
                                 <button type="button" class="btn-voice-preview" onclick="window.previewCurrentVoice(event)" title="Listen to test audio">
                                     <i class="fa fa-play-circle"></i> Test
                                 </button>
@@ -247,7 +247,7 @@
                                     <span class="voice-opt-icon">👨‍🏫</span>
                                     <div class="voice-opt-info">
                                         <div class="voice-opt-title">Daniel</div>
-                                        <div class="voice-opt-desc">Professor Male · Deep & Authoritative (UK/US)</div>
+                                        <div class="voice-opt-desc">Professor Male · Deep & Oxford Accent (UK)</div>
                                     </div>
                                     <i class="fa fa-check voice-check-icon"></i>
                                 </button>
@@ -255,7 +255,7 @@
                                     <span class="voice-opt-icon">👩‍🎓</span>
                                     <div class="voice-opt-info">
                                         <div class="voice-opt-title">Victoria / Nova</div>
-                                        <div class="voice-opt-desc">Peer Tutor · Energetic & Fast Paced</div>
+                                        <div class="voice-opt-desc">Peer Tutor · Energetic & Fast Paced (US)</div>
                                     </div>
                                     <i class="fa fa-check voice-check-icon"></i>
                                 </button>
@@ -263,7 +263,47 @@
                                     <span class="voice-opt-icon">👨‍🎓</span>
                                     <div class="voice-opt-info">
                                         <div class="voice-opt-title">Alex / Echo</div>
-                                        <div class="voice-opt-desc">Calm Explainer · Steady & Relaxed</div>
+                                        <div class="voice-opt-desc">Calm Explainer · Steady & Relaxed (US)</div>
+                                    </div>
+                                    <i class="fa fa-check voice-check-icon"></i>
+                                </button>
+                                <button type="button" class="voice-option-btn" data-voice="serena" onclick="window.selectVoicePersona('serena')">
+                                    <span class="voice-opt-icon">👩‍💼</span>
+                                    <div class="voice-opt-info">
+                                        <div class="voice-opt-title">Serena / Fiona</div>
+                                        <div class="voice-opt-desc">Scholarly Female · Elegant British Accent (UK)</div>
+                                    </div>
+                                    <i class="fa fa-check voice-check-icon"></i>
+                                </button>
+                                <button type="button" class="voice-option-btn" data-voice="oliver" onclick="window.selectVoicePersona('oliver')">
+                                    <span class="voice-opt-icon">👨‍🔬</span>
+                                    <div class="voice-opt-info">
+                                        <div class="voice-opt-title">Oliver / George</div>
+                                        <div class="voice-opt-desc">Science Lecturer · Articulate British (UK)</div>
+                                    </div>
+                                    <i class="fa fa-check voice-check-icon"></i>
+                                </button>
+                                <button type="button" class="voice-option-btn" data-voice="karen" onclick="window.selectVoicePersona('karen')">
+                                    <span class="voice-opt-icon">🦘</span>
+                                    <div class="voice-opt-info">
+                                        <div class="voice-opt-title">Karen / Matilda</div>
+                                        <div class="voice-opt-desc">Friendly Lecturer · Australian English (AU)</div>
+                                    </div>
+                                    <i class="fa fa-check voice-check-icon"></i>
+                                </button>
+                                <button type="button" class="voice-option-btn" data-voice="rishi" onclick="window.selectVoicePersona('rishi')">
+                                    <span class="voice-opt-icon">🌏</span>
+                                    <div class="voice-opt-info">
+                                        <div class="voice-opt-title">Rishi / Veena</div>
+                                        <div class="voice-opt-desc">Technical Specialist · Indian English (IN)</div>
+                                    </div>
+                                    <i class="fa fa-check voice-check-icon"></i>
+                                </button>
+                                <button type="button" class="voice-option-btn" data-voice="jarvis" onclick="window.selectVoicePersona('jarvis')">
+                                    <span class="voice-opt-icon">🤖</span>
+                                    <div class="voice-opt-info">
+                                        <div class="voice-opt-title">Jarvis / Cyber</div>
+                                        <div class="voice-opt-desc">Futuristic AI Core · Synthesizer Mode</div>
                                     </div>
                                     <i class="fa fa-check voice-check-icon"></i>
                                 </button>
@@ -811,9 +851,9 @@
         },
         daniel: {
             id: 'daniel',
-            label: 'Daniel (UK/US Male)',
+            label: 'Daniel (UK Male)',
             icon: '👨‍🏫',
-            preferredNames: ['Daniel', 'George', 'David', 'Alex', 'Google UK English Male', 'Male', 'English'],
+            preferredNames: ['Daniel', 'George', 'David', 'Alex', 'Google UK English Male', 'Male', 'en-GB'],
             langPrefix: 'en',
             rate: 0.95,
             pitch: 0.9,
@@ -821,7 +861,7 @@
         },
         victoria: {
             id: 'victoria',
-            label: 'Victoria (Energetic Tutor)',
+            label: 'Victoria / Nova (Peer Tutor)',
             icon: '👩‍🎓',
             preferredNames: ['Victoria', 'Karen', 'Google US English', 'Samantha', 'Female'],
             langPrefix: 'en',
@@ -831,7 +871,7 @@
         },
         alex: {
             id: 'alex',
-            label: 'Alex (Calm Explainer)',
+            label: 'Alex / Echo (Calm Explainer)',
             icon: '👨‍🎓',
             preferredNames: ['Alex', 'Fred', 'David', 'Google US English', 'Male'],
             langPrefix: 'en',
@@ -839,11 +879,61 @@
             pitch: 0.85,
             sample: 'Hi, I am Alex. Take your time, and we will break down any complex concept step by step.'
         },
+        serena: {
+            id: 'serena',
+            label: 'Serena (UK Female)',
+            icon: '👩‍💼',
+            preferredNames: ['Serena', 'Fiona', 'Stephanie', 'Google UK English Female', 'en-GB', 'Female'],
+            langPrefix: 'en',
+            rate: 0.98,
+            pitch: 1.02,
+            sample: 'Good day. I am Serena. We shall examine each theoretical framework with precision.'
+        },
+        oliver: {
+            id: 'oliver',
+            label: 'Oliver (Science Lecturer)',
+            icon: '👨‍🔬',
+            preferredNames: ['Oliver', 'Arthur', 'George', 'Malcolm', 'en-GB', 'Male'],
+            langPrefix: 'en',
+            rate: 0.92,
+            pitch: 0.95,
+            sample: 'Welcome to class. I am Oliver. Let us dissect the core empirical foundations of this topic.'
+        },
+        karen: {
+            id: 'karen',
+            label: 'Karen (Australian)',
+            icon: '🦘',
+            preferredNames: ['Karen', 'Matilda', 'Lee', 'Catherine', 'en-AU', 'Australian'],
+            langPrefix: 'en',
+            rate: 1.05,
+            pitch: 1.05,
+            sample: 'G day! I am Karen. Let us get stuck into the course modules together.'
+        },
+        rishi: {
+            id: 'rishi',
+            label: 'Rishi (Indian English)',
+            icon: '🌏',
+            preferredNames: ['Rishi', 'Veena', 'Sangeeta', 'Google Indian English', 'en-IN'],
+            langPrefix: 'en',
+            rate: 1.0,
+            pitch: 1.0,
+            sample: 'Hello everyone! I am Rishi. Let us master the algorithms and data structures for this subject.'
+        },
+        jarvis: {
+            id: 'jarvis',
+            label: 'Jarvis / Cyber (AI Core)',
+            icon: '🤖',
+            preferredNames: ['Alex', 'Daniel', 'Fred', 'Google US English', 'Male'],
+            langPrefix: 'en',
+            rate: 1.08,
+            pitch: 0.75,
+            sample: 'System online. Neural tutor ready to analyze academic matrices and knowledge graphs.'
+        },
         larasati: {
             id: 'larasati',
             label: 'Larasati (Bilingual ID/EN)',
             icon: '🇮🇩',
-            preferredNames: ['Indonesian', 'Gadis', 'Ardi', 'Google Bahasa Indonesia', 'id-ID'],
+            preferredNames: ['Indonesian', 'Gadis', 'Ardi', 'Damayanti', 'Google Bahasa Indonesia', 'id-ID'],
             langPrefix: 'id',
             rate: 1.0,
             pitch: 1.0,

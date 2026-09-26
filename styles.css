@@ -192,6 +192,22 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
+/* Animated Streaming Cursor */
+.streaming-cursor {
+    display: inline-block;
+    width: 7px;
+    height: 14px;
+    background-color: var(--pres-primary, #102b52);
+    vertical-align: middle;
+    margin-left: 3px;
+    border-radius: 2px;
+    animation: streamBlink 0.8s infinite ease-in-out;
+}
+@keyframes streamBlink {
+    0%, 100% { opacity: 1; transform: scaleY(1); }
+    50% { opacity: 0.1; transform: scaleY(0.8); }
+}
+
 /* Base Sidebar Panel Styling */
 .ainotebook-sidebar {
     width: 340px;

@@ -98,6 +98,40 @@ class ai_client {
             }
         }
 
+        // ── Extract Live Syllabus from Moodle Course Structure ────────────────
+        $live_syllabus = [];
+        try {
+            $modinfo = get_fast_modinfo($course);
+            foreach ($modinfo->get_section_info_all() as $secnum => $section) {
+                if (!$section->uservisible) continue;
+                $raw_name = !empty($section->name) ? trim($section->name) : get_section_name($course, $section);
+                $sec_name = trim(strip_tags(format_string($raw_name)));
+                if (empty($sec_name) || $sec_name === 'New section') {
+                    $sec_name = ($secnum == 0) ? "Course Overview" : "Session " . sprintf("%02d", $secnum);
+                }
+                $modules = [];
+                if (!empty($modinfo->sections[$secnum])) {
+                    foreach ($modinfo->sections[$secnum] as $cmid_item) {
+                        $item_cm = $modinfo->cms[$cmid_item];
+                        if ($item_cm->uservisible && $item_cm->id != $cm->id) {
+                            $modules[] = $item_cm->name . " (" . $item_cm->modname . ")";
+                        }
+                    }
+                }
+                $clean_summary = trim(strip_tags($section->summary ?? ''));
+                $live_syllabus[] = [
+                    'topic'   => $sec_name,
+                    'summary' => $clean_summary,
+                    'modules' => $modules,
+                ];
+            }
+        } catch (\Throwable $t) {
+            // Graceful fallback
+        }
+
+        $sources_count = count($selected_file_ids) > 0 ? count($selected_file_ids) : (!empty($live_syllabus) ? count($live_syllabus) : 0);
+        $activity_name = $course->fullname . " (" . $ainotebook->name . ")";
+
         // ── Pure DEMI Core AI Engine Integration (Port 8001) ─────────────────
         $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
         $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
@@ -114,8 +148,9 @@ class ai_client {
             'user_id'       => (int) $userid,
             'course_id'     => (int) $course->id,
             'activity_id'   => (int) $cm->instance,
-            'activity_name' => (string) $ainotebook->name,
+            'activity_name' => $activity_name,
             'user_message'  => (string) $user_message,
+            'live_syllabus' => $live_syllabus,
             'chat_history'  => $formatted_history,
             'stream'        => (bool) $stream,
         ]);

@@ -1327,38 +1327,39 @@
                     
                     var aiMsgDiv = null;
                     var contentDiv = null;
-                    
                     var reader = response.body.getReader();
                     var decoder = new TextDecoder();
                     var fullText = "";
-                    var displayedText = "";
                     var sourcesCount = 0;
                     var streamBuffer = "";
-                    
-                    var typeInterval = setInterval(function() {
-                        if (contentDiv && displayedText.length < fullText.length) {
-                            var charsToAdd = Math.max(1, Math.floor((fullText.length - displayedText.length) / 3));
-                            displayedText += fullText.substring(displayedText.length, displayedText.length + charsToAdd);
-                            
-                            // Sanitize raw codeblocks and raw suggestions during typing
-                            var cleanTyping = displayedText
-                                .replace(/```(?:json-quiz|json)[\s\S]*?(?:```|$)/gi, '\n\n*(⚡ Generating Interactive Quiz...)*')
-                                .replace(/```mermaid[\s\S]*?(?:```|$)/gi, '\n\n*(⚡ Generating Mindmap...)*')
-                                .replace(/\[(?:SUMMARY|REPORT)_START\][\s\S]*?(?:\[(?:SUMMARY|REPORT)_END\]|$)/gi, '\n\n*(⚡ Generating Summary...)*')
-                                .replace(/<suggestions>[\s\S]*?(?:<\/suggestions>|$)/gi, '')
-                                .replace(/(?:^|\n|\r)\s*[^\n\r\|]{2,}\|[^\n\r\|]{2,}(?:\|[^\n\r\|]{2,})?\s*$/gim, '');
-                                
-                            contentDiv.innerHTML = window.marked.parse(cleanTyping + " ▊");
-                            messages.scrollTop = messages.scrollHeight;
-                        }
-                    }, 30);
-                    
                     var isFinalized = false;
+                    var renderPending = false;
+
+                    function updateStreamUI() {
+                        if (!contentDiv || isFinalized) return;
+                        var cleanTyping = fullText
+                            .replace(/```(?:json-quiz|json)[\s\S]*?(?:```|$)/gi, '\n\n*(⚡ Generating Interactive Quiz...)*')
+                            .replace(/```mermaid[\s\S]*?(?:```|$)/gi, '\n\n*(⚡ Generating Mindmap...)*')
+                            .replace(/\[(?:SUMMARY|REPORT)_START\][\s\S]*?(?:\[(?:SUMMARY|REPORT)_END\]|$)/gi, '\n\n*(⚡ Generating Summary...)*')
+                            .replace(/<suggestions>[\s\S]*?(?:<\/suggestions>|$)/gi, '')
+                            .replace(/(?:^|\n|\r)\s*[^\n\r\|]{2,}\|[^\n\r\|]{2,}(?:\|[^\n\r\|]{2,})?\s*$/gim, '');
+                            
+                        contentDiv.innerHTML = window.marked.parse(cleanTyping) + '<span class="streaming-cursor"></span>';
+                        messages.scrollTop = messages.scrollHeight;
+                        renderPending = false;
+                    }
+
+                    function scheduleRender() {
+                        if (!renderPending) {
+                            renderPending = true;
+                            requestAnimationFrame(updateStreamUI);
+                        }
+                    }
+                    
                     function finalizeCompletion() {
                         if (isFinalized) return;
                         isFinalized = true;
                         
-                        clearInterval(typeInterval);
                         if (loadingInterval) clearInterval(loadingInterval);
                         if (typing && typing.parentNode) messages.removeChild(typing);
                         
@@ -1411,6 +1412,7 @@
                             if (extractedSuggestions.length > 0) {
                                 renderSuggestions(extractedSuggestions, aiMsgDiv);
                             }
+                            messages.scrollTop = messages.scrollHeight;
                         } catch (err) {
                             console.error("Error finalizing stream completion:", err);
                         }
@@ -1450,6 +1452,7 @@
                                             }
                                             
                                             fullText += data.chunk;
+                                            scheduleRender();
                                         }
                                         if (data.sources_count !== undefined) {
                                             sourcesCount = data.sources_count;

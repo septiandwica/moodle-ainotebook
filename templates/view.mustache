@@ -524,24 +524,26 @@
         });
     };
 
-    // ── Voice Input (Speech-to-Text via Whisper / MediaRecorder) ───────────
+    // ── Voice Input (Speech-to-Text via Native Web Speech API & MediaRecorder) ───
     var mediaRecorder = null;
     var audioChunks = [];
     var activeAudioStream = null;
+    var activeSpeechRec = null;
     var isRecordingSpeech = false;
 
-    window.toggleSpeechRecognition = async function() {
+    // Pre-warm SpeechSynthesis voices immediately on page load
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.getVoices();
+        if (window.speechSynthesis.onvoiceschanged !== undefined) {
+            window.speechSynthesis.onvoiceschanged = function() {
+                window.speechSynthesis.getVoices();
+            };
+        }
+    }
+
+    function recordAndTranscribeFallback() {
         var micBtn = document.getElementById('mic-btn');
         var input = document.getElementById('chat-input');
-
-        // If currently recording, stop and transcribe
-        if (isRecordingSpeech) {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-            }
-            isRecordingSpeech = false;
-            return;
-        }
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             require(['core/notification'], function(Notification) {
@@ -550,8 +552,7 @@
             return;
         }
 
-        try {
-            var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
             activeAudioStream = stream;
             audioChunks = [];
 
@@ -628,14 +629,113 @@
             isRecordingSpeech = true;
             if (micBtn) micBtn.classList.add('listening');
             if (input) input.placeholder = '🎙️ Recording voice... Speak your question now, click mic to finish.';
-        } catch(permErr) {
+        }).catch(function(permErr) {
             console.warn('Microphone permission error:', permErr);
             isRecordingSpeech = false;
             if (micBtn) micBtn.classList.remove('listening');
             require(['core/notification'], function(Notification) {
-                Notification.alert('Microphone Access Blocked', 'Please click the lock/camera icon in your browser URL bar and allow microphone access.', 'OK');
+                Notification.alert('Microphone Access Blocked', 'Please allow microphone access in your browser to speak to DEMI AI.', 'OK');
             });
+        });
+    }
+
+    window.toggleSpeechRecognition = function() {
+        var micBtn = document.getElementById('mic-btn');
+        var input = document.getElementById('chat-input');
+        var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (isRecordingSpeech) {
+            if (activeSpeechRec) {
+                try { activeSpeechRec.stop(); } catch(e) {}
+                activeSpeechRec = null;
+            }
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                try { mediaRecorder.stop(); } catch(e) {}
+            }
+            isRecordingSpeech = false;
+            if (micBtn) {
+                micBtn.classList.remove('listening');
+                micBtn.innerHTML = '<i class="fa fa-microphone"></i>';
+            }
+            if (input) input.placeholder = 'Ask DEMI AI Tutor about ' + courseFullname + '...';
+            return;
         }
+
+        if (SpeechRec) {
+            try {
+                if (activeSpeechRec) {
+                    try { activeSpeechRec.abort(); } catch(e) {}
+                }
+
+                var rec = new SpeechRec();
+                activeSpeechRec = rec;
+                rec.continuous = false;
+                rec.interimResults = true;
+                rec.lang = 'en-US';
+
+                var baseVal = input ? input.value : '';
+
+                rec.onstart = function() {
+                    isRecordingSpeech = true;
+                    if (micBtn) {
+                        micBtn.classList.add('listening');
+                        micBtn.innerHTML = '<i class="fa fa-stop text-danger"></i>';
+                    }
+                    if (input) input.placeholder = '🎙️ Listening in English... Speak your academic question now.';
+                };
+
+                rec.onresult = function(e) {
+                    var interim = '';
+                    var final = '';
+                    for (var i = 0; i < e.results.length; ++i) {
+                        if (e.results[i].isFinal) {
+                            final += e.results[i][0].transcript + ' ';
+                        } else {
+                            interim += e.results[i][0].transcript;
+                        }
+                    }
+                    var captured = (final + interim).trim();
+                    if (input && captured) {
+                        input.value = baseVal ? (baseVal.trim() + ' ' + captured) : captured;
+                        input.focus();
+                    }
+                };
+
+                rec.onerror = function(e) {
+                    console.warn('Speech recognition error event:', e.error);
+                    isRecordingSpeech = false;
+                    if (micBtn) {
+                        micBtn.classList.remove('listening');
+                        micBtn.innerHTML = '<i class="fa fa-microphone"></i>';
+                    }
+                    if (input) input.placeholder = 'Ask DEMI AI Tutor about ' + courseFullname + '...';
+
+                    if (e.error === 'not-allowed') {
+                        require(['core/notification'], function(Notification) {
+                            Notification.alert('Microphone Permission Denied', 'Please click the lock/camera icon in your browser URL bar and allow microphone access.', 'OK');
+                        });
+                    } else if (e.error === 'network') {
+                        recordAndTranscribeFallback();
+                    }
+                };
+
+                rec.onend = function() {
+                    isRecordingSpeech = false;
+                    if (micBtn) {
+                        micBtn.classList.remove('listening');
+                        micBtn.innerHTML = '<i class="fa fa-microphone"></i>';
+                    }
+                    if (input) input.placeholder = 'Ask DEMI AI Tutor about ' + courseFullname + '...';
+                };
+
+                rec.start();
+                return;
+            } catch(err) {
+                console.warn('SpeechRecognition failed, using MediaRecorder fallback:', err);
+            }
+        }
+
+        recordAndTranscribeFallback();
     };
 
     // ── Text-to-Speech (Read Aloud) ──────────────────────────────────────────
@@ -682,17 +782,18 @@
         var utterance = new SpeechSynthesisUtterance(cleanText);
         var voices = window.speechSynthesis.getVoices();
         var preferredEnVoiceNames = ['Google US English', 'Samantha', 'Daniel', 'Alex', 'Karen', 'Victoria', 'Microsoft Zira', 'Natural', 'English'];
-        var chosenVoice = voices.find(function(v) { 
-            return preferredEnVoiceNames.some(function(p) { return v.name && v.name.indexOf(p) !== -1; }) && v.lang && v.lang.startsWith('en'); 
-        });
-        if (!chosenVoice) {
-            chosenVoice = voices.find(function(v) { return v.lang && (v.lang === 'en-US' || v.lang === 'en-GB'); });
-        }
-        if (!chosenVoice) {
-            chosenVoice = voices.find(function(v) { return v.lang && v.lang.startsWith('en'); });
-        }
-        if (!chosenVoice) {
-            chosenVoice = voices.find(function(v) { return v.lang && (v.lang.startsWith('id') || v.lang.startsWith('in')); });
+        var chosenVoice = null;
+
+        if (voices && voices.length > 0) {
+            chosenVoice = voices.find(function(v) { 
+                return preferredEnVoiceNames.some(function(p) { return v.name && v.name.indexOf(p) !== -1; }) && v.lang && v.lang.startsWith('en'); 
+            });
+            if (!chosenVoice) {
+                chosenVoice = voices.find(function(v) { return v.lang && (v.lang === 'en-US' || v.lang === 'en-GB'); });
+            }
+            if (!chosenVoice) {
+                chosenVoice = voices.find(function(v) { return v.lang && v.lang.startsWith('en'); });
+            }
         }
 
         if (chosenVoice) {

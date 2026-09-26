@@ -528,27 +528,46 @@
     var speechRecognition = null;
     var isRecordingSpeech = false;
 
-    window.toggleSpeechRecognition = function() {
+    window.toggleSpeechRecognition = async function() {
         var micBtn = document.getElementById('mic-btn');
         var input = document.getElementById('chat-input');
         
         var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRec) {
             require(['core/notification'], function(Notification) {
-                Notification.addNotification({
-                    message: 'Speech Recognition is not supported by your browser. Please use Google Chrome, Edge, or Safari.',
-                    type: 'warning'
-                });
+                Notification.alert('Speech Unsupported', 'Speech Recognition is not supported by your browser. Please use Google Chrome, Edge, or Safari.', 'OK');
             });
             return;
         }
 
         if (isRecordingSpeech && speechRecognition) {
-            speechRecognition.stop();
+            try {
+                speechRecognition.stop();
+            } catch(e) {}
+            isRecordingSpeech = false;
+            if (micBtn) micBtn.classList.remove('listening');
+            if (input) input.placeholder = 'Ask DEMI AI Tutor about ' + courseFullname + '...';
+            return;
+        }
+
+        // Request microphone permission explicitly so browser prompts the user immediately
+        try {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+        } catch(permErr) {
+            console.warn('Microphone permission error:', permErr);
+            require(['core/notification'], function(Notification) {
+                Notification.alert('Microphone Access Blocked', 'Please click the lock/settings icon in your browser URL bar and allow microphone permissions.', 'OK');
+            });
             return;
         }
 
         try {
+            if (speechRecognition) {
+                try { speechRecognition.abort(); } catch(e) {}
+            }
+
             speechRecognition = new SpeechRec();
             speechRecognition.continuous = false;
             speechRecognition.interimResults = false;
@@ -561,10 +580,10 @@
             };
 
             speechRecognition.onresult = function(event) {
-                if (event.results && event.results[0]) {
+                if (event.results && event.results[0] && event.results[0][0]) {
                     var transcript = event.results[0][0].transcript;
                     if (transcript && input) {
-                        input.value = input.value ? (input.value + ' ' + transcript) : transcript;
+                        input.value = input.value ? (input.value.trim() + ' ' + transcript) : transcript;
                         input.focus();
                     }
                 }
@@ -575,6 +594,11 @@
                 isRecordingSpeech = false;
                 if (micBtn) micBtn.classList.remove('listening');
                 if (input) input.placeholder = 'Ask DEMI AI Tutor about ' + courseFullname + '...';
+                if (event.error === 'not-allowed') {
+                    require(['core/notification'], function(Notification) {
+                        Notification.alert('Permission Denied', 'Microphone access is blocked in your browser settings.', 'OK');
+                    });
+                }
             };
 
             speechRecognition.onend = function() {
@@ -586,6 +610,8 @@
             speechRecognition.start();
         } catch (e) {
             console.error('Speech rec init failed:', e);
+            isRecordingSpeech = false;
+            if (micBtn) micBtn.classList.remove('listening');
         }
     };
 

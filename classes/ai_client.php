@@ -139,6 +139,10 @@ class ai_client {
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
 
+        if (class_exists('\core\session\manager')) {
+            @\core\session\manager::write_close();
+        }
+
         if ($stream) {
             curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch_handle, $data) use (&$full_text, &$buffer) {
                 $buffer .= $data;

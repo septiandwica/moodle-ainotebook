@@ -188,6 +188,9 @@ if ($action === 'chat_stream') {
         exit;
     }
 
+    // Release Moodle session lock immediately so other browser tabs and requests are not blocked
+    \core\session\manager::write_close();
+
     // Disable Moodle's output buffering and set SSE headers
     while (ob_get_level() > 0) {
         @ob_end_flush();

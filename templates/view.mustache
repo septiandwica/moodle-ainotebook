@@ -48,7 +48,6 @@
             <button id="btn-new-session" class="btn-new-session-red" onclick="window.startNewSession()" title="Start New Session">
                 <i class="fa fa-plus"></i> <span class="btn-text">New Session</span>
             </button>
-            <button id="open-settings" class="btn-icon" title="Configure Chat"><i class="fa fa-cog"></i></button>
         </div>
     </div>
 
@@ -351,40 +350,6 @@
 </div>
 {{/is_readonly}}
 {{/is_teacher}}
-
-<!-- Configuration Modal -->
-<div id="settings-modal" class="ain-modal-overlay">
-    <div class="ain-modal-content">
-        <div class="ain-modal-header">
-            <h3>Configure chat</h3>
-            <button id="close-settings" class="btn-icon"><i class="fa fa-times"></i></button>
-        </div>
-        <div class="ain-modal-body">
-            <p class="ain-modal-desc">Notebooks can be customised to help you achieve different goals: do research, help learn, show various perspectives or converse in a particular style and tone.</p>
-            
-            <div class="setting-group">
-                <label>Define your conversational goal, style or role</label>
-                <select id="chat-style" class="custom-select">
-                    <option value="general">Best for general purpose research and brainstorming tasks.</option>
-                    <option value="tutor">Professional Tutor - patient and encouraging.</option>
-                    <option value="critic">Critical Thinker - challenges your assumptions.</option>
-                </select>
-            </div>
-
-            <div class="setting-group">
-                <label>Choose your response length</label>
-                <select id="chat-length" class="custom-select">
-                    <option value="short">Short & Concise</option>
-                    <option value="medium" selected>Balanced</option>
-                    <option value="long">Detailed & Comprehensive</option>
-                </select>
-            </div>
-        </div>
-        <div class="ain-modal-footer">
-            <button id="save-settings" class="btn-premium">Save Settings</button>
-        </div>
-    </div>
-</div>
 
 <!-- Convert to Quiz Modal -->
 {{#is_teacher}}
@@ -696,42 +661,6 @@
                 });
             });
             updateHistoryList();
-        }
-
-        /* UI Handlers. */
-        var modal = document.getElementById("settings-modal");
-        var openBtn = document.getElementById("open-settings");
-        var closeBtn = document.getElementById("close-settings");
-        var saveBtn = document.getElementById("save-settings");
-
-        if (openBtn && modal) {
-            openBtn.onclick = function() { modal.classList.add("active"); };
-        }
-        if (closeBtn && modal) {
-            closeBtn.onclick = function() { modal.classList.remove("active"); };
-        }
-        if (saveBtn && modal) {
-            saveBtn.onclick = function() {
-                var config = {
-                    style: document.getElementById("chat-style").value,
-                    length: document.getElementById("chat-length").value
-                };
-                localStorage.setItem("ainotebook_config", JSON.stringify(config));
-                modal.classList.remove("active");
-                
-                /* Visual feedback. */
-                var originalText = saveBtn.innerHTML;
-                saveBtn.innerHTML = "<i class='fa fa-check'></i> Saved!";
-                setTimeout(() => { saveBtn.innerHTML = originalText; }, 2000);
-            };
-        }
-
-        /* Load existing config. */
-        var savedConfig = localStorage.getItem("ainotebook_config");
-        if (savedConfig) {
-            var config = JSON.parse(savedConfig);
-            if (document.getElementById("chat-style")) document.getElementById("chat-style").value = config.style;
-            if (document.getElementById("chat-length")) document.getElementById("chat-length").value = config.length;
         }
 
         var mqModal = document.getElementById("moodle-quiz-modal");

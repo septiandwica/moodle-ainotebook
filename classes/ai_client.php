@@ -129,7 +129,91 @@ class ai_client {
             // Graceful fallback
         }
 
-        $sources_count = count($selected_file_ids) > 0 ? count($selected_file_ids) : (!empty($live_syllabus) ? count($live_syllabus) : 0);
+        // ── Extract Material Text Context (PDF, PPTX, DOCX, TXT) ─────────────
+        $material_context = "";
+        $actual_material_count = 0;
+        try {
+            $all_course_files = self::get_all_course_materials($course->id, $cmid);
+            if (!empty($all_course_files)) {
+                $target_files = [];
+                if (!empty($selected_file_ids)) {
+                    $selected_set = array_flip($selected_file_ids);
+                    foreach ($all_course_files as $f) {
+                        if (isset($selected_set[$f->get_id()])) {
+                            $target_files[] = $f;
+                        }
+                    }
+                }
+                if (empty($target_files)) {
+                    $target_files = $all_course_files;
+                }
+
+                $context_blocks = [];
+                // Limit to top 6 files
+                $target_files = array_slice($target_files, 0, 6);
+
+                foreach ($target_files as $file) {
+                    $filename = $file->get_filename();
+                    $mimetype = $file->get_mimetype();
+                    $extracted = "";
+
+                    if ($mimetype === 'text/plain') {
+                        $extracted = substr($file->get_content(), 0, 3000);
+                    } elseif ($mimetype === 'application/pdf') {
+                        $tempdir = make_temp_directory('mod_ainotebook');
+                        $tmpfile = $tempdir . '/' . uniqid() . '.pdf';
+                        try {
+                            $file->copy_content_to($tmpfile);
+                            $output = [];
+                            $return_var = 0;
+                            exec("pdftotext -layout " . escapeshellarg($tmpfile) . " - 2>/dev/null", $output, $return_var);
+                            if ($return_var === 0 && !empty($output)) {
+                                $extracted = substr(implode("\n", $output), 0, 3500);
+                            }
+                        } catch (\Throwable $e) {
+                        } finally {
+                            if (file_exists($tmpfile)) @unlink($tmpfile);
+                        }
+                    } elseif ($mimetype === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' || strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'pptx') {
+                        $tempdir = make_temp_directory('mod_ainotebook');
+                        $tmpfile = $tempdir . '/' . uniqid() . '.pptx';
+                        try {
+                            $file->copy_content_to($tmpfile);
+                            $extracted = substr(self::extract_pptx_text($tmpfile), 0, 3500);
+                        } catch (\Throwable $e) {
+                        } finally {
+                            if (file_exists($tmpfile)) @unlink($tmpfile);
+                        }
+                    } elseif ($mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'docx') {
+                        $tempdir = make_temp_directory('mod_ainotebook');
+                        $tmpfile = $tempdir . '/' . uniqid() . '.docx';
+                        try {
+                            $file->copy_content_to($tmpfile);
+                            $extracted = substr(self::extract_docx_text($tmpfile), 0, 3500);
+                        } catch (\Throwable $e) {
+                        } finally {
+                            if (file_exists($tmpfile)) @unlink($tmpfile);
+                        }
+                    }
+
+                    if (!empty($extracted)) {
+                        $clean = trim(preg_replace('/\s+/', ' ', $extracted));
+                        if (strlen($clean) > 20) {
+                            $context_blocks[] = "[Lecture Slide/Document: {$filename}]:\n" . substr($clean, 0, 2500);
+                            $actual_material_count++;
+                        }
+                    }
+                }
+
+                if (!empty($context_blocks)) {
+                    $material_context = implode("\n\n---\n\n", $context_blocks);
+                }
+            }
+        } catch (\Throwable $t) {
+            // Graceful fallback
+        }
+
+        $sources_count = $actual_material_count > 0 ? $actual_material_count : (count($selected_file_ids) > 0 ? count($selected_file_ids) : count($live_syllabus));
         $activity_name = $course->fullname . " (" . $ainotebook->name . ")";
 
         // ── Pure DEMI Core AI Engine Integration (Port 8001) ─────────────────
@@ -145,14 +229,15 @@ class ai_client {
         }
 
         $payload = json_encode([
-            'user_id'       => (int) $userid,
-            'course_id'     => (int) $course->id,
-            'activity_id'   => (int) $cm->instance,
-            'activity_name' => $activity_name,
-            'user_message'  => (string) $user_message,
-            'live_syllabus' => $live_syllabus,
-            'chat_history'  => $formatted_history,
-            'stream'        => (bool) $stream,
+            'user_id'          => (int) $userid,
+            'course_id'        => (int) $course->id,
+            'activity_id'      => (int) $cm->instance,
+            'activity_name'    => $activity_name,
+            'user_message'     => (string) $user_message,
+            'live_syllabus'    => $live_syllabus,
+            'material_context' => $material_context,
+            'chat_history'     => $formatted_history,
+            'stream'           => (bool) $stream,
         ]);
 
         $endpoint = rtrim($engine_url, '/') . '/api/v1/chat/tutor';

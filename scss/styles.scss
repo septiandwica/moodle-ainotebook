@@ -2,7 +2,6 @@
  * AINotebook - Premium Master Suite
  * Ultra-Minimalist Edition | Flat & Professional
  */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800;900&family=Outfit:wght@300;400;600;700;800;900&display=swap');
 
 :root {
     --pres-primary: #003366;
@@ -26,9 +25,7 @@
     --pres-primary-soft: rgba(255, 255, 255, 0.05);
 }
 
-body { background-color: var(--pres-bg); color: var(--pres-text); font-family: 'Poppins', 'Outfit', sans-serif; }
-
-#ainotebook-wrapper { padding: 24px; max-width: 1440px; margin: 0 auto; }
+#ainotebook-wrapper { padding: 24px; max-width: 1440px; margin: 0 auto; color: var(--pres-text); }
 
 /* Dashboard Card */
 .main-dashboard-card { background: var(--pres-surface); border: 1px solid var(--pres-border); border-radius: 16px; display: flex; height: 75vh; min-height: 700px; overflow: hidden; margin-bottom: 24px; }

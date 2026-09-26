@@ -2,7 +2,6 @@
  * AINotebook - Premium Master Suite
  * Ultra-Minimalist Edition | Flat & Professional
  */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800;900&family=Outfit:wght@300;400;600;700;800;900&display=swap');
 
 :root {
     --pres-primary: #102b52;
@@ -26,10 +25,9 @@
     --pres-primary-soft: rgba(255, 255, 255, 0.05);
 }
 
-body { background-color: var(--pres-bg); color: var(--pres-text); font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-.chat-info h2, .sidebar-header h3, .creator-header-action h3, .demi-title-row h2 { font-family: Georgia, Cambria, "Times New Roman", Times, serif; font-weight: 700; color: #102b52; }
+.chat-info h2, .sidebar-header h3, .creator-header-action h3, .demi-title-row h2 { font-weight: 700; color: #102b52; }
 
-#ainotebook-wrapper { padding: 20px; max-width: 1440px; margin: 0 auto; }
+#ainotebook-wrapper { padding: 20px; max-width: 1440px; margin: 0 auto; color: var(--pres-text); }
 
 /* DEMI Top Control Bar (Matching Portal AiTutor.tsx 100%) */
 .demi-top-control-bar {

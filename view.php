@@ -339,6 +339,31 @@ if (!empty($sessions)) {
             'time' => $m['time']
         ];
     }
+} else {
+    // If no local session exists, pull unified history directly from DEMI Core AI Engine
+    $unified_logs = \mod_ainotebook\ai_client::get_unified_history($cm->id, $target_user->id);
+    if (!empty($unified_logs)) {
+        foreach ($unified_logs as $log) {
+            $msg = $log->message ?? '';
+            $resp = $log->response ?? '';
+            if (empty($msg) && empty($resp)) continue;
+
+            $clean_resp = preg_replace('/```json-quiz[\s\S]*?```/', '', $resp);
+            $clean_resp = preg_replace('/```mermaid[\s\S]*?```/', '', $clean_resp);
+            $clean_resp = preg_replace('/\[REPORT_START\][\s\S]*?\[REPORT_END\]/', '', $clean_resp);
+            $clean_resp = trim($clean_resp);
+            if (empty($clean_resp)) $clean_resp = "I have generated the requested material below.";
+
+            $time_str = !empty($log->timecreated) ? date('H:i', $log->timecreated) : date('H:i');
+            $initial_messages[] = [
+                'user_message' => nl2br(s($msg)),
+                'ai_response'  => nl2br($clean_resp),
+                'raw_user'     => $msg,
+                'raw_ai'       => $resp,
+                'time'         => $time_str
+            ];
+        }
+    }
 }
 
 $context_data['sessions'] = $sessions;

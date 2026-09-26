@@ -208,24 +208,12 @@ class ai_client {
      * Get unified chat history across demi-portal and moodle-ainotebook from demi-engine
      */
     public static function get_unified_history(int $cmid, int $userid): array {
-        global $DB, $CFG;
+        global $DB;
         $cm = get_coursemodule_from_id('ainotebook', $cmid, 0, false, MUST_EXIST);
         $course = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
 
         $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
         $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
-
-        require_once($CFG->libdir . '/filelib.php');
-        $curl = new \curl();
-        $curl->setopt([
-            'CURLOPT_TIMEOUT'        => 5,
-            'CURLOPT_CONNECTTIMEOUT' => 2,
-            'CURLOPT_HTTPHEADER'     => [
-                'X-Engine-API-Key: ' . $engine_key,
-                'Content-Type: application/json',
-                'Accept: application/json',
-            ],
-        ]);
 
         $payload = json_encode([
             'user_id'   => (int) $userid,
@@ -233,12 +221,28 @@ class ai_client {
             'limit'     => 30,
         ]);
 
-        $raw_response = $curl->post(rtrim($engine_url, '/') . '/api/v1/chat/history', $payload);
+        $ch = curl_init(rtrim($engine_url, '/') . '/api/v1/chat/history');
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'X-Engine-API-Key: ' . $engine_key,
+            'Content-Type: application/json',
+            'Accept: application/json',
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
 
-        $unified_list = [];
-        if (!$curl->errno) {
+        $raw_response = @curl_exec($ch);
+        $curl_errno   = curl_errno($ch);
+        curl_close($ch);
+
+        if (!$curl_errno && $raw_response) {
             $res_data = json_decode($raw_response, true);
             if (!empty($res_data['history']) && is_array($res_data['history'])) {
+                $unified_list = [];
                 foreach ($res_data['history'] as $item) {
                     $unified_list[] = (object)[
                         'message'     => $item['prompt'] ?? '',

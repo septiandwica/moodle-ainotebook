@@ -28,6 +28,11 @@ if (isguestuser() || !isloggedin()) {
 }
 $context = context_module::instance($cm->id);
 
+// Release session lock immediately so parallel page loads and other course tabs are NEVER blocked
+if (class_exists('\core\session\manager')) {
+    @\core\session\manager::write_close();
+}
+
 $viewself = optional_param('viewself', 0, PARAM_INT);
 $req_userid = optional_param('userid', 0, PARAM_INT);
 

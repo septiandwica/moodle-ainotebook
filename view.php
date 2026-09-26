@@ -380,13 +380,6 @@ $context_data['initial_messages'] = $initial_messages;
 $saved_artifacts = $DB->get_records('ainotebook_artifacts', ['ainotebookid' => $ainotebook->id, 'userid' => $target_user->id], 'timecreated DESC');
 $context_data['saved_json'] = json_encode(array_values($saved_artifacts));
 
-// Auto-ingest & sync course materials to vector index
-try {
-    \mod_ainotebook\ai_client::process_all_materials($cm->id);
-} catch (\Throwable $e) {
-    debugging("mod_ainotebook: Auto process materials failed: " . $e->getMessage(), DEBUG_DEVELOPER);
-}
-
 echo $OUTPUT->header();
 echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">';
 echo '<link rel="stylesheet" href="styles.css?v=' . $pluginrev . '">';

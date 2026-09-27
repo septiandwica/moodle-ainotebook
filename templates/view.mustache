@@ -1247,14 +1247,18 @@
 
                         var aiDiv = document.createElement("div");
                         aiDiv.className = "message ai";
+                        var rawEscaped = (m.ai_response || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                         aiDiv.innerHTML = '<div class="ai-avatar-icon">DEMI</div>' +
                             '<div class="message-bubble-body">' +
                                 '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span><div class="meta-actions"><button type="button" class="btn-read-aloud" onclick="window.speakAiMessage(this)" title="Read aloud with AI voice"><i class="fa fa-volume-up"></i> Read Aloud</button><span class="meta-time">' + m.time + '</span></div></div>' +
                                 '<div class="message-text"><div class="markdown-body"></div></div>' +
+                                '<textarea class="raw-ai-content" style="display:none;">' + rawEscaped + '</textarea>' +
                             '</div>';
                         messages.appendChild(aiDiv);
 
-                        if (typeof formatAndRenderAiBubble === "function") {
+                        if (typeof window.formatAndRenderAiBubble === "function") {
+                            window.formatAndRenderAiBubble(aiDiv, m.ai_response, true);
+                        } else if (typeof formatAndRenderAiBubble === "function") {
                             formatAndRenderAiBubble(aiDiv, m.ai_response, true);
                         } else {
                             var mb = aiDiv.querySelector(".markdown-body");
@@ -1439,6 +1443,17 @@
             };
         }
 
+        var sanitizeJsonString = function(str) {
+            if (!str || typeof str !== 'string') return str;
+            return str.replace(/"((?:\\.|[^"\\])*)"/g, function(m, inner) {
+                return '"' + inner
+                    .replace(/\r\n/g, '\\n')
+                    .replace(/\n/g, '\\n')
+                    .replace(/\r/g, '\\n')
+                    .replace(/\t/g, '\\t') + '"';
+            });
+        };
+
         var extractJsonByKeyword = function(text, keyword) {
             if (!text || typeof text !== 'string') return null;
             var lowerText = text.toLowerCase();
@@ -1505,7 +1520,8 @@
                     };
                 } catch (e) {
                     try {
-                        var cleaned = rawSubstring.replace(/,\s*([\]}])/g, '$1');
+                        var sanitized = sanitizeJsonString(rawSubstring);
+                        var cleaned = sanitized.replace(/,\s*([\]}])/g, '$1');
                         var parsed2 = JSON.parse(cleaned);
                         return {
                             raw: rawSubstring,
@@ -1538,7 +1554,19 @@
                         cleanText = text.replace(fcMatch[0], "").trim();
                         found = true;
                     }
-                } catch(e) {}
+                } catch(e) {
+                    try {
+                        var sanitized = sanitizeJsonString(fcMatch[1].trim());
+                        var parsed = JSON.parse(sanitized);
+                        var fcItems = Array.isArray(parsed) ? parsed : (parsed.flashcards || null);
+                        if (fcItems && Array.isArray(fcItems) && fcItems.length > 0) {
+                            artType = "flashcards";
+                            artifact = { type: "flashcards", data: fcItems, title: "Flashcards - " + new Date().toLocaleTimeString() };
+                            cleanText = text.replace(fcMatch[0], "").trim();
+                            found = true;
+                        }
+                    } catch(e2) {}
+                }
             }
 
             // Also check for raw JSON without codeblock (e.g. { "flashcards": [...] })
@@ -1552,6 +1580,28 @@
                         cleanText = text.replace(rawFc.raw, "").trim();
                         found = true;
                     }
+                }
+            }
+
+            // Also check for regex fallback extraction of Flashcard JSON cards
+            if (!found && (text.indexOf('"flashcards"') !== -1 || text.indexOf('"front"') !== -1)) {
+                var cardMatches = [];
+                var fcRegex = /\{\s*"front"\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*"back"\s*:\s*"((?:\\.|[^"\\])*)"\s*\}/gi;
+                var m;
+                while ((m = fcRegex.exec(text)) !== null) {
+                    var f = m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                    var b = m[2].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                    cardMatches.push({ front: f, back: b });
+                }
+                if (cardMatches.length > 0) {
+                    artType = "flashcards";
+                    artifact = { type: "flashcards", data: cardMatches, title: "Flashcards - " + new Date().toLocaleTimeString() };
+                    var startRaw = text.indexOf('{');
+                    var endRaw = text.lastIndexOf('}');
+                    if (startRaw !== -1 && endRaw !== -1 && endRaw > startRaw) {
+                        cleanText = (text.substring(0, startRaw) + text.substring(endRaw + 1)).trim();
+                    }
+                    found = true;
                 }
             }
 
@@ -1603,7 +1653,19 @@
                             cleanText = text.replace(quizMatch[0], "").trim();
                             found = true;
                         }
-                    } catch (e) {}
+                    } catch (e) {
+                        try {
+                            var sanitized = sanitizeJsonString(quizMatch[1].trim());
+                            var parsed = JSON.parse(sanitized);
+                            var quizData = parsed.quiz || (parsed.questions ? parsed : null);
+                            if (quizData && quizData.questions && Array.isArray(quizData.questions) && quizData.questions.length > 0) {
+                                artType = "quiz";
+                                artifact = { type: "quiz", data: quizData, title: "Quiz - " + new Date().toLocaleTimeString() };
+                                cleanText = text.replace(quizMatch[0], "").trim();
+                                found = true;
+                            }
+                        } catch (e2) {}
+                    }
                 }
             }
 
@@ -1618,6 +1680,41 @@
                         cleanText = text.replace(rawQuiz.raw, "").trim();
                         found = true;
                     }
+                }
+            }
+
+            // Also check for regex fallback extraction of Quiz JSON questions
+            if (!found && (text.indexOf('"questions"') !== -1 || text.indexOf('"options"') !== -1)) {
+                var qMatches = [];
+                var qRegex = /\{\s*"text"\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*"options"\s*:\s*\[([\s\S]*?)\]\s*,\s*"answer"\s*:\s*(\d+|"[A-Ea-e0-9]")(?:\s*,\s*"hint"\s*:\s*"((?:\\.|[^"\\])*)")?\s*\}/gi;
+                var qm;
+                while ((qm = qRegex.exec(text)) !== null) {
+                    var qTxt = qm[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                    var rawOpts = qm[2];
+                    var opts = [];
+                    var optRegex = /"((?:\\.|[^"\\])*)"/g;
+                    var om;
+                    while ((om = optRegex.exec(rawOpts)) !== null) {
+                        opts.push(om[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'));
+                    }
+                    var ansVal = qm[3].replace(/"/g, '');
+                    var hintVal = qm[4] ? qm[4].replace(/\\n/g, '\n').replace(/\\"/g, '"') : '';
+                    qMatches.push({
+                        text: qTxt,
+                        options: opts.length > 0 ? opts : ["A", "B", "C", "D"],
+                        answer: isNaN(ansVal) ? ansVal : parseInt(ansVal),
+                        hint: hintVal
+                    });
+                }
+                if (qMatches.length > 0) {
+                    artType = "quiz";
+                    artifact = { type: "quiz", data: { questions: qMatches }, title: "Quiz - " + new Date().toLocaleTimeString() };
+                    var startRaw = text.indexOf('{');
+                    var endRaw = text.lastIndexOf('}');
+                    if (startRaw !== -1 && endRaw !== -1 && endRaw > startRaw) {
+                        cleanText = (text.substring(0, startRaw) + text.substring(endRaw + 1)).trim();
+                    }
+                    found = true;
                 }
             }
 
@@ -1810,6 +1907,7 @@
                 renderSuggestions(extractedSuggestions, aiMsgDiv);
             }
         };
+        window.formatAndRenderAiBubble = formatAndRenderAiBubble;
 
         var getOrCreateTargetContainer = function() {
             if (resultsContent) return resultsContent;

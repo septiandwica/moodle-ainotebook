@@ -168,7 +168,20 @@ if ($action === 'chat_stream') {
     $message = required_param('message', PARAM_TEXT);
     $session_id = optional_param('session_id', '', PARAM_RAW);
     if (empty($session_id)) {
-        $session_id = 'sess_' . $USER->id . '_' . time() . '_' . substr(md5(uniqid()), 0, 6);
+        // Find user's latest session in this module within the last 6 hours to avoid fragmenting into multiple sessions
+        $recent = $DB->get_record_sql("
+            SELECT session_id
+              FROM {ainotebook_chat}
+             WHERE ainotebookid = :ainotebookid AND userid = :userid AND session_id IS NOT NULL AND session_id != '' AND timecreated >= :recent
+          ORDER BY timecreated DESC",
+          ['ainotebookid' => $cm->instance, 'userid' => $USER->id, 'recent' => time() - (6 * 3600)],
+          IGNORE_MULTIPLE
+        );
+        if ($recent && !empty($recent->session_id)) {
+            $session_id = $recent->session_id;
+        } else {
+            $session_id = 'sess_' . $USER->id . '_' . time() . '_' . substr(md5(uniqid()), 0, 6);
+        }
     }
     $selected_files = optional_param('selected_files', '[]', PARAM_RAW);
     $file_ids = json_decode($selected_files, true) ?: [];

@@ -192,6 +192,31 @@ class ai_client {
                     }
                 }
 
+                // Also extract Moodle Pages (Video Learning activities, lecture transcripts, embedded Bunny videos)
+                try {
+                    $course_pages = $DB->get_records('page', ['course' => $course->id]);
+                    if (!empty($course_pages)) {
+                        foreach ($course_pages as $cp) {
+                            $page_name = $cp->name;
+                            $page_content = $cp->content;
+                            
+                            $clean_page_text = trim(strip_tags($page_content));
+                            if (!empty($clean_page_text) && strlen($clean_page_text) > 10) {
+                                $context_blocks[] = "[Video Lecture / Page Activity: {$page_name}]:\n" . substr($clean_page_text, 0, 3000);
+                                $actual_material_count++;
+                            }
+                            
+                            // Extract Bunny Stream video reference
+                            if (preg_match('/https?:\/\/(?:vz-[a-zA-Z0-9_-]+\.b-cdn\.net|iframe\.mediadelivery\.net|video\.bunnycdn\.com)[^\s"\'<>]+/i', $page_content, $bMatch)) {
+                                $bunny_vid_url = $bMatch[0];
+                                $context_blocks[] = "[Video Stream Reference: {$page_name}]:\nVideo Stream URL: {$bunny_vid_url}";
+                            }
+                        }
+                    }
+                } catch (\Throwable $pe) {
+                    // Graceful fallback
+                }
+
                 if (!empty($context_blocks)) {
                     $material_context = implode("\n\n---\n\n", $context_blocks);
                 }

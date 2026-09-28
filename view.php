@@ -94,36 +94,27 @@ if ($logo_files) {
 }
 $context_data['pdf_logo_url'] = $pdf_logo_url;
 
-// Build Syllabus sections & modules with 2-Pass Subsection Merging
+// Build Syllabus sections & modules with Robust Subsection Merging
 $modinfo = get_fast_modinfo($course);
 $childSectionMap = [];
-$registeredChildNames = [];
-$knownSubsections = ['pre activities', 'main activities', 'post activities', 'new subsection'];
+$childSectionSubName = [];
+$knownSubsections = ['pre activities', 'pre-activity', 'main activities', 'main activity', 'post activities', 'post-activity', 'new subsection'];
 
-$lastParentSecNum = 0;
-foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
-    if (!$section->uservisible) continue;
-    $raw_name = !empty($section->name) ? trim($section->name) : get_section_name($course, $section);
-    $lower_name = strtolower(trim(strip_tags(format_string($raw_name))));
-
-    $is_child = in_array($lower_name, $knownSubsections) || (isset($section->component) && $section->component === 'mod_subsection');
-
-    if ($is_child) {
-        if (isset($childSectionMap[$lower_name])) {
-            $childSectionMap[$sectionnum] = $childSectionMap[$lower_name];
-        } else {
-            $childSectionMap[$sectionnum] = $lastParentSecNum;
-        }
-    } else {
-        $lastParentSecNum = $sectionnum;
-        if (!empty($modinfo->sections[$sectionnum])) {
-            foreach ($modinfo->sections[$sectionnum] as $sec_cmid) {
-                $sec_cm = $modinfo->cms[$sec_cmid];
-                if ($sec_cm->modname === 'subsection') {
-                    $m_name = strtolower(trim($sec_cm->name));
-                    if ($m_name) {
-                        $childSectionMap[$m_name] = $sectionnum;
-                        $registeredChildNames[] = $m_name;
+// Pass 0: Build exact mapping between mod_subsection CM and its delegated section
+foreach ($modinfo->get_section_info_all() as $parentSecNum => $pSection) {
+    if (!$pSection->uservisible) continue;
+    if (!empty($modinfo->sections[$parentSecNum])) {
+        foreach ($modinfo->sections[$parentSecNum] as $sec_cmid) {
+            $sec_cm = $modinfo->cms[$sec_cmid];
+            if ($sec_cm->modname === 'subsection') {
+                $sub_name_clean = strtolower(trim($sec_cm->name));
+                // Find matching delegated section by itemid/instance
+                foreach ($modinfo->get_section_info_all() as $childSecNum => $cSection) {
+                    if (isset($cSection->component) && $cSection->component === 'mod_subsection') {
+                        if ((int)$cSection->itemid === (int)$sec_cm->instance || (int)$cSection->itemid === (int)$sec_cm->id) {
+                            $childSectionMap[$childSecNum] = $parentSecNum;
+                            $childSectionSubName[$childSecNum] = $sub_name_clean;
+                        }
                     }
                 }
             }
@@ -131,7 +122,36 @@ foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
     }
 }
 
+// Additional fallback: Infer parent from module names inside delegated sections (e.g. "Session 01 - ...")
+foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
+    if (!$section->uservisible) continue;
+    $raw_name = !empty($section->name) ? trim($section->name) : get_section_name($course, $section);
+    $lower_name = strtolower(trim(strip_tags(format_string($raw_name))));
+
+    $is_child = isset($childSectionMap[$sectionnum]) 
+        || in_array($lower_name, $knownSubsections) 
+        || (isset($section->component) && $section->component === 'mod_subsection');
+
+    if ($is_child && !isset($childSectionMap[$sectionnum])) {
+        $detectedSession = null;
+        if (!empty($modinfo->sections[$sectionnum])) {
+            foreach ($modinfo->sections[$sectionnum] as $sec_cmid) {
+                $sec_cm = $modinfo->cms[$sec_cmid];
+                if (preg_match('/(?:session|sesi)\s*0?(\d+)/i', $sec_cm->name, $sm)) {
+                    $detectedSession = (int)$sm[1];
+                    break;
+                }
+            }
+        }
+        if ($detectedSession !== null) {
+            $childSectionMap[$sectionnum] = $detectedSession;
+            $childSectionSubName[$sectionnum] = $lower_name;
+        }
+    }
+}
+
 // Pass 1: Build top-level main sections and initialize subsections map
+$sections_data_map = [];
 foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
     if (!$section->uservisible) continue;
 
@@ -148,7 +168,7 @@ foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
     $sectionname = trim(strip_tags(format_string($raw_name)));
     $lower_name = strtolower($sectionname);
 
-    $is_child = isset($childSectionMap[$sectionnum]) || in_array($lower_name, $registeredChildNames) || in_array($lower_name, $knownSubsections);
+    $is_child = isset($childSectionMap[$sectionnum]) || in_array($lower_name, $knownSubsections) || (isset($section->component) && $section->component === 'mod_subsection');
 
     if (!$is_child) {
         if (empty($sectionname) || $sectionname === 'New section') {
@@ -201,13 +221,26 @@ foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
     $sectionname = trim(strip_tags(format_string($raw_name)));
     $lower_name = strtolower($sectionname);
 
-    $is_child = isset($childSectionMap[$sectionnum]) || in_array($lower_name, $registeredChildNames) || in_array($lower_name, $knownSubsections);
+    $is_child = isset($childSectionMap[$sectionnum]) || in_array($lower_name, $knownSubsections) || (isset($section->component) && $section->component === 'mod_subsection');
 
     if ($is_child) {
-        $parentSecNum = $childSectionMap[$sectionnum] ?? ($childSectionMap[$lower_name] ?? null);
+        $parentSecNum = $childSectionMap[$sectionnum] ?? null;
+        $subKey = $childSectionSubName[$sectionnum] ?? $lower_name;
+
+        // If parent not found directly, try to infer from first module's name
+        if ($parentSecNum === null && !empty($modinfo->sections[$sectionnum])) {
+            foreach ($modinfo->sections[$sectionnum] as $sec_cmid) {
+                $sec_cm = $modinfo->cms[$sec_cmid];
+                if (preg_match('/(?:session|sesi)\s*0?(\d+)/i', $sec_cm->name, $sm)) {
+                    $parentSecNum = (int)$sm[1];
+                    break;
+                }
+            }
+        }
+
         if ($parentSecNum !== null && isset($sections_data_map[$parentSecNum])) {
-            if (!isset($sections_data_map[$parentSecNum]['subsections_map'][$lower_name])) {
-                $sections_data_map[$parentSecNum]['subsections_map'][$lower_name] = [
+            if (!isset($sections_data_map[$parentSecNum]['subsections_map'][$subKey])) {
+                $sections_data_map[$parentSecNum]['subsections_map'][$subKey] = [
                     'name' => $sectionname,
                     'modules' => [],
                     'modules_count' => 0,

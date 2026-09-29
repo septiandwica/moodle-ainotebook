@@ -102,29 +102,165 @@ class ai_client {
         $live_syllabus = [];
         try {
             $modinfo = get_fast_modinfo($course);
-            foreach ($modinfo->get_section_info_all() as $secnum => $section) {
-                if (!$section->uservisible) continue;
-                $raw_name = !empty($section->name) ? trim($section->name) : get_section_name($course, $section);
-                $sec_name = trim(strip_tags(format_string($raw_name)));
-                if (empty($sec_name) || $sec_name === 'New section') {
-                    $sec_name = ($secnum == 0) ? "Course Overview" : "Session " . sprintf("%02d", $secnum);
-                }
-                $modules = [];
-                if (!empty($modinfo->sections[$secnum])) {
-                    foreach ($modinfo->sections[$secnum] as $cmid_item) {
-                        $item_cm = $modinfo->cms[$cmid_item];
-                        if ($item_cm->uservisible && $item_cm->id != $cm->id) {
-                            $modules[] = $item_cm->name . " (" . $item_cm->modname . ")";
+            $completioninfo = new \completion_info($course);
+            $childSectionMap = [];
+            $childSectionSubName = [];
+            $knownSubsections = ['pre activities', 'pre activity', 'pre-activities', 'pre-activity', 'main activities', 'main activity', 'main-activities', 'post activities', 'post activity', 'post-activities', 'post-activity', 'new subsection'];
+
+            // Pass 0: Build exact mapping between mod_subsection CM and its delegated section
+            foreach ($modinfo->get_section_info_all() as $parentSecNum => $pSection) {
+                if (!$pSection->uservisible) continue;
+                if (!empty($modinfo->sections[$parentSecNum])) {
+                    foreach ($modinfo->sections[$parentSecNum] as $sec_cmid) {
+                        $sec_cm = $modinfo->cms[$sec_cmid];
+                        if ($sec_cm->modname === 'subsection') {
+                            $sub_name_clean = strtolower(trim($sec_cm->name));
+                            foreach ($modinfo->get_section_info_all() as $childSecNum => $cSection) {
+                                if (isset($cSection->component) && $cSection->component === 'mod_subsection') {
+                                    if ((int)$cSection->itemid === (int)$sec_cm->instance || (int)$cSection->itemid === (int)$sec_cm->id) {
+                                        $childSectionMap[$childSecNum] = $parentSecNum;
+                                        $childSectionSubName[$childSecNum] = $sub_name_clean;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-                $clean_summary = trim(strip_tags($section->summary ?? ''));
-                $live_syllabus[] = [
-                    'topic'   => $sec_name,
-                    'summary' => $clean_summary,
-                    'modules' => $modules,
-                ];
             }
+
+            // Fallback: Infer parent from module names inside delegated sections (e.g. "Session 01 - ...")
+            foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
+                if (!$section->uservisible) continue;
+                $raw_name = !empty($section->name) ? trim($section->name) : get_section_name($course, $section);
+                $lower_name = strtolower(trim(strip_tags(format_string($raw_name))));
+
+                $is_child = isset($childSectionMap[$sectionnum]) 
+                    || in_array($lower_name, $knownSubsections) 
+                    || (isset($section->component) && $section->component === 'mod_subsection');
+
+                if ($is_child && !isset($childSectionMap[$sectionnum])) {
+                    $detectedSession = null;
+                    if (!empty($modinfo->sections[$sectionnum])) {
+                        foreach ($modinfo->sections[$sectionnum] as $sec_cmid) {
+                            $sec_cm = $modinfo->cms[$sec_cmid];
+                            if (preg_match('/(?:session|sesi)\s*0?(\d+)/i', $sec_cm->name, $sm)) {
+                                $detectedSession = (int)$sm[1];
+                                break;
+                            }
+                        }
+                    }
+                    if ($detectedSession !== null) {
+                        $childSectionMap[$sectionnum] = $detectedSession;
+                        $childSectionSubName[$sectionnum] = $lower_name;
+                    }
+                }
+            }
+
+            // Pass 1: Build top-level main sections
+            $sylMap = [];
+            foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
+                if (!$section->uservisible) continue;
+                $raw_name = !empty($section->name) ? trim($section->name) : '';
+                if (empty($raw_name) && !empty($section->summary)) {
+                    $clean_summary = trim(strip_tags($section->summary));
+                    if (!empty($clean_summary)) {
+                        $lines = explode("\n", $clean_summary);
+                        $raw_name = trim($lines[0]);
+                        if (strlen($raw_name) > 80) $raw_name = substr($raw_name, 0, 77) . '...';
+                    }
+                }
+                if (empty($raw_name)) $raw_name = get_section_name($course, $section);
+                $sec_name = trim(strip_tags(format_string($raw_name)));
+                $lower_name = strtolower($sec_name);
+
+                $is_child = isset($childSectionMap[$sectionnum]) || in_array($lower_name, $knownSubsections) || (isset($section->component) && $section->component === 'mod_subsection');
+
+                if (!$is_child) {
+                    if (empty($sec_name) || $sec_name === 'New section' || $sec_name === 'Course Overview' || $sec_name === 'General') {
+                        $sec_name = ($sectionnum == 0) ? "Sylabus" : "Session " . sprintf("%02d", $sectionnum);
+                    } elseif ($sectionnum == 0 && (strcasecmp($sec_name, 'Course Overview') === 0 || strcasecmp($sec_name, 'General') === 0)) {
+                        $sec_name = "Sylabus";
+                    }
+
+                    $sylMap[$sectionnum] = [
+                        'topic'   => $sec_name,
+                        'summary' => trim(strip_tags($section->summary ?? '')),
+                        'modules' => [],
+                    ];
+                }
+            }
+
+            // Pass 2: Populate modules into direct section or child subsections
+            foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
+                if (!$section->uservisible) continue;
+                $raw_name = !empty($section->name) ? trim($section->name) : get_section_name($course, $section);
+                $sec_name = trim(strip_tags(format_string($raw_name)));
+                $lower_name = strtolower($sec_name);
+
+                $is_child = isset($childSectionMap[$sectionnum]) || in_array($lower_name, $knownSubsections) || (isset($section->component) && $section->component === 'mod_subsection');
+
+                if ($is_child) {
+                    $parentSecNum = $childSectionMap[$sectionnum] ?? null;
+                    if ($parentSecNum !== null && isset($sylMap[$parentSecNum])) {
+                        if (!empty($modinfo->sections[$sectionnum])) {
+                            foreach ($modinfo->sections[$sectionnum] as $sec_cmid) {
+                                $item_cm = $modinfo->cms[$sec_cmid];
+                                if (!$item_cm->uservisible || $item_cm->modname === 'subsection' || $item_cm->id == $cm->id) continue;
+
+                                $mod_restriction = "";
+                                $mod_completion = "";
+
+                                if (!$item_cm->uservisible || !empty($item_cm->availableinfo)) {
+                                    $mod_restriction = " [Access Restricted: " . strip_tags($item_cm->availableinfo ?: 'Locked') . "]";
+                                }
+
+                                if ($item_cm->completion > 0) {
+                                    try {
+                                        $cdata = $completioninfo->get_data($item_cm, false, $USER->id);
+                                        $c_state = ($cdata->completionstate == COMPLETION_COMPLETE || $cdata->completionstate == COMPLETION_COMPLETE_PASS) ? 'Completed' : 'Pending/Required';
+                                        $mod_completion = " [Completion: {$c_state}]";
+                                    } catch (\Throwable $ce) {
+                                        $mod_completion = " [Completion Tracked]";
+                                    }
+                                }
+
+                                $subLabel = !empty($sec_name) ? "[{$sec_name}] " : "";
+                                $sylMap[$parentSecNum]['modules'][] = $subLabel . $item_cm->name . " (" . $item_cm->modname . ")" . $mod_restriction . $mod_completion;
+                            }
+                        }
+                    }
+                } else {
+                    if (isset($sylMap[$sectionnum])) {
+                        if (!empty($modinfo->sections[$sectionnum])) {
+                            foreach ($modinfo->sections[$sectionnum] as $sec_cmid) {
+                                $item_cm = $modinfo->cms[$sec_cmid];
+                                if (!$item_cm->uservisible || $item_cm->modname === 'subsection' || $item_cm->id == $cm->id) continue;
+
+                                $mod_restriction = "";
+                                $mod_completion = "";
+
+                                if (!$item_cm->uservisible || !empty($item_cm->availableinfo)) {
+                                    $mod_restriction = " [Access Restricted: " . strip_tags($item_cm->availableinfo ?: 'Locked') . "]";
+                                }
+
+                                if ($item_cm->completion > 0) {
+                                    try {
+                                        $cdata = $completioninfo->get_data($item_cm, false, $USER->id);
+                                        $c_state = ($cdata->completionstate == COMPLETION_COMPLETE || $cdata->completionstate == COMPLETION_COMPLETE_PASS) ? 'Completed' : 'Pending/Required';
+                                        $mod_completion = " [Completion: {$c_state}]";
+                                    } catch (\Throwable $ce) {
+                                        $mod_completion = " [Completion Tracked]";
+                                    }
+                                }
+
+                                $sylMap[$sectionnum]['modules'][] = $item_cm->name . " (" . $item_cm->modname . ")" . $mod_restriction . $mod_completion;
+                            }
+                        }
+                    }
+                }
+            }
+
+            $live_syllabus = array_values($sylMap);
         } catch (\Throwable $t) {
             // Graceful fallback
         }

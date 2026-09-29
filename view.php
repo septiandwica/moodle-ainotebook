@@ -98,7 +98,8 @@ $context_data['pdf_logo_url'] = $pdf_logo_url;
 $modinfo = get_fast_modinfo($course);
 $childSectionMap = [];
 $childSectionSubName = [];
-$knownSubsections = ['pre activities', 'pre-activity', 'main activities', 'main activity', 'post activities', 'post-activity', 'new subsection'];
+$knownSubsections = ['main activities', 'main activity', 'new subsection'];
+$excludedSubsections = ['pre activities', 'pre activity', 'pre-activities', 'pre-activity', 'post activities', 'post activity', 'post-activities', 'post-activity'];
 
 // Pass 0: Build exact mapping between mod_subsection CM and its delegated section
 foreach ($modinfo->get_section_info_all() as $parentSecNum => $pSection) {
@@ -108,6 +109,9 @@ foreach ($modinfo->get_section_info_all() as $parentSecNum => $pSection) {
             $sec_cm = $modinfo->cms[$sec_cmid];
             if ($sec_cm->modname === 'subsection') {
                 $sub_name_clean = strtolower(trim($sec_cm->name));
+                if (in_array($sub_name_clean, $excludedSubsections) || str_starts_with($sub_name_clean, 'pre') || str_starts_with($sub_name_clean, 'post')) {
+                    continue;
+                }
                 // Find matching delegated section by itemid/instance
                 foreach ($modinfo->get_section_info_all() as $childSecNum => $cSection) {
                     if (isset($cSection->component) && $cSection->component === 'mod_subsection') {
@@ -127,6 +131,10 @@ foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
     if (!$section->uservisible) continue;
     $raw_name = !empty($section->name) ? trim($section->name) : get_section_name($course, $section);
     $lower_name = strtolower(trim(strip_tags(format_string($raw_name))));
+
+    if (in_array($lower_name, $excludedSubsections) || str_starts_with($lower_name, 'pre') || str_starts_with($lower_name, 'post')) {
+        continue;
+    }
 
     $is_child = isset($childSectionMap[$sectionnum]) 
         || in_array($lower_name, $knownSubsections) 
@@ -168,11 +176,17 @@ foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
     $sectionname = trim(strip_tags(format_string($raw_name)));
     $lower_name = strtolower($sectionname);
 
+    if (in_array($lower_name, $excludedSubsections) || str_starts_with($lower_name, 'pre') || str_starts_with($lower_name, 'post')) {
+        continue;
+    }
+
     $is_child = isset($childSectionMap[$sectionnum]) || in_array($lower_name, $knownSubsections) || (isset($section->component) && $section->component === 'mod_subsection');
 
     if (!$is_child) {
-        if (empty($sectionname) || $sectionname === 'New section') {
-            $sectionname = ($sectionnum == 0) ? "Course Overview" : "Session " . sprintf("%02d", $sectionnum);
+        if (empty($sectionname) || $sectionname === 'New section' || $sectionname === 'Course Overview' || $sectionname === 'General') {
+            $sectionname = ($sectionnum == 0) ? "Sylabus" : "Session " . sprintf("%02d", $sectionnum);
+        } elseif ($sectionnum == 0 && (strcasecmp($sectionname, 'Course Overview') === 0 || strcasecmp($sectionname, 'General') === 0)) {
+            $sectionname = "Sylabus";
         }
 
         $subsections_in_sec = [];
@@ -182,6 +196,9 @@ foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
                 if ($sec_cm->uservisible && $sec_cm->modname === 'subsection') {
                     $sub_name = trim($sec_cm->name);
                     $sub_lower = strtolower($sub_name);
+                    if (in_array($sub_lower, $excludedSubsections) || str_starts_with($sub_lower, 'pre') || str_starts_with($sub_lower, 'post')) {
+                        continue;
+                    }
                     $subsections_in_sec[$sub_lower] = [
                         'name' => $sub_name,
                         'modules' => [],
@@ -220,6 +237,10 @@ foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
     if (empty($raw_name)) $raw_name = get_section_name($course, $section);
     $sectionname = trim(strip_tags(format_string($raw_name)));
     $lower_name = strtolower($sectionname);
+
+    if (in_array($lower_name, $excludedSubsections) || str_starts_with($lower_name, 'pre') || str_starts_with($lower_name, 'post')) {
+        continue;
+    }
 
     $is_child = isset($childSectionMap[$sectionnum]) || in_array($lower_name, $knownSubsections) || (isset($section->component) && $section->component === 'mod_subsection');
 

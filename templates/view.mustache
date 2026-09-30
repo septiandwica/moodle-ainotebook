@@ -51,8 +51,18 @@
         </div>
     </div>
 
+    <!-- Mobile View Switcher (Visible on <= 992px, matching PJJ Portal) -->
+    <div class="demi-mobile-view-switcher">
+        <button type="button" class="mobile-tab-btn active" data-view="chat" onclick="window.switchMobileView('chat', this)">
+            <i class="fa fa-comments"></i> <span>AI Tutor Chat</span>
+        </button>
+        <button type="button" class="mobile-tab-btn" data-view="sidebar" onclick="window.switchMobileView('sidebar', this)">
+            <i class="fa fa-book"></i> <span>Syllabus & History</span>
+        </button>
+    </div>
+
     <!-- Main Workspace Card: 3-Tab Sidebar + Chat Interface -->
-    <div class="main-dashboard-card">
+    <div class="main-dashboard-card show-mobile-chat">
         <!-- 3-Tab Sidebar Panel (Matching AiTutor.tsx) -->
         <div id="ainotebook-sidebar-nav" class="ainotebook-sidebar">
             <div class="sidebar-tab-header">
@@ -453,11 +463,32 @@
         if (btnEl) btnEl.classList.add('active');
     };
 
-    window.toggleMobileSidebar = function() {
-        var sidebar = document.getElementById('ainotebook-sidebar-nav');
-        if (sidebar) {
-            sidebar.classList.toggle('mobile-open');
+    window.switchMobileView = function(view, btnEl) {
+        var card = document.querySelector('.main-dashboard-card');
+        var buttons = document.querySelectorAll('.demi-mobile-view-switcher .mobile-tab-btn');
+        buttons.forEach(function(b) {
+            if (b.getAttribute('data-view') === view) {
+                b.classList.add('active');
+            } else {
+                b.classList.remove('active');
+            }
+        });
+        
+        if (card) {
+            if (view === 'sidebar') {
+                card.classList.add('show-mobile-sidebar');
+                card.classList.remove('show-mobile-chat');
+            } else {
+                card.classList.add('show-mobile-chat');
+                card.classList.remove('show-mobile-sidebar');
+            }
         }
+    };
+
+    window.toggleMobileSidebar = function() {
+        var card = document.querySelector('.main-dashboard-card');
+        var isSidebarOpen = card && card.classList.contains('show-mobile-sidebar');
+        window.switchMobileView(isSidebarOpen ? 'chat' : 'sidebar');
     };
 
     window.activeFocusTopic = 'All Course Materials';
@@ -467,6 +498,11 @@
             c.classList.remove('active');
         });
         if (cardEl) cardEl.classList.add('active');
+
+        // Auto switch back to chat view on mobile
+        if (window.innerWidth <= 992 && typeof window.switchMobileView === 'function') {
+            window.switchMobileView('chat');
+        }
 
         var chipContainer = document.getElementById('active-focus-chip-container');
         var chipLabel = document.getElementById('focus-chip-label');
@@ -922,6 +958,9 @@
                 input.value = '';
                 input.focus();
             }
+            if (window.innerWidth <= 992 && typeof window.switchMobileView === 'function') {
+                window.switchMobileView('chat');
+            }
             require(['core/notification'], function(Notification) {
                 Notification.addNotification({
                     message: 'New Tutoring Session Started! Active discussion thread cleared.',
@@ -933,6 +972,10 @@
         window.loadSession = function(sessionId, cardEl) {
             if (!sessionId) return;
             currentSessionId = sessionId;
+
+            if (window.innerWidth <= 992 && typeof window.switchMobileView === 'function') {
+                window.switchMobileView('chat');
+            }
 
             document.querySelectorAll("#session-history-list .session-history-card").forEach(function(el) {
                 el.classList.remove("active");
@@ -1027,6 +1070,9 @@
         };
 
         window.sendSuggested = function(text, toolType = null) {
+            if (window.innerWidth <= 992 && typeof window.switchMobileView === 'function') {
+                window.switchMobileView('chat');
+            }
             var input = document.getElementById("chat-input");
             if (input) {
                 input.value = text;

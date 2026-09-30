@@ -2483,17 +2483,55 @@
     border-color: #94a3b8;
 }
 
-/* Tablets and below (<= 992px) */
+/* Mobile View Switcher (Matching PJJ Portal) */
+.demi-mobile-view-switcher {
+    display: none;
+    background: #e2e8f0;
+    padding: 4px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    gap: 4px;
+}
+.mobile-tab-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #475569;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.mobile-tab-btn:hover {
+    color: #0f172a;
+}
+.mobile-tab-btn.active {
+    background: #ffffff;
+    color: #07366c;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Tablets and Mobile (<= 992px) */
 @media (max-width: 992px) {
     #ainotebook-wrapper {
-        padding: 12px;
+        padding: 8px 4px;
+        max-width: 100%;
+        overflow-x: hidden;
     }
 
     .demi-top-control-bar {
-        padding: 12px 16px;
+        padding: 10px 14px;
         flex-direction: column;
         align-items: stretch;
-        gap: 12px;
+        gap: 10px;
+        margin-bottom: 10px;
+        border-radius: 12px;
     }
 
     .demi-brand-group {
@@ -2505,120 +2543,28 @@
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        justify-content: flex-start;
+        justify-content: space-between;
         gap: 8px;
     }
 
     .btn-sidebar-toggle-mobile {
-        display: inline-flex;
+        display: none !important;
     }
 
     .demi-course-pill {
         flex: 1 1 auto;
-        min-width: 180px;
+        min-width: 140px;
         max-width: calc(100% - 130px);
         overflow: hidden;
+        padding: 4px 8px;
+        font-size: 0.75rem;
     }
     .demi-course-pill .pill-value {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         display: inline-block;
-        max-width: 160px;
-    }
-
-    /* Main Workspace Layout */
-    .main-dashboard-card {
-        flex-direction: column;
-        height: auto;
-        min-height: 600px;
-    }
-
-    .ainotebook-sidebar {
-        width: 100%;
-        min-width: 100%;
-        max-height: 0;
-        overflow: hidden;
-        border-right: none;
-        border-bottom: 1px solid var(--pres-border);
-        transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        display: none;
-    }
-
-    .ainotebook-sidebar.mobile-open {
-        display: flex;
-        max-height: 420px;
-        overflow-y: auto;
-    }
-
-    .ainotebook-chat {
-        width: 100%;
-        flex: 1;
-        min-height: 520px;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .chat-messages {
-        max-height: 460px;
-    }
-
-    .creator-workspace {
-        flex-direction: column;
-        gap: 16px;
-    }
-
-    .creator-history-panel {
-        width: 100% !important;
-        max-height: 200px;
-    }
-
-    .creator-preview-panel {
-        width: 100%;
-    }
-
-    .preview-scroll-area {
-        height: 450px;
-        padding: 16px;
-    }
-}
-
-/* Mobile Devices (<= 768px) */
-@media (max-width: 768px) {
-    #ainotebook-wrapper {
-        padding: 8px;
-    }
-
-    .demi-top-control-bar {
-        border-radius: 12px;
-        padding: 10px 14px;
-        margin-bottom: 12px;
-    }
-
-    .demi-avatar-badge {
-        width: 36px;
-        height: 36px;
-        font-size: 0.75rem;
-    }
-
-    .demi-title-row h2 {
-        font-size: 0.95rem;
-    }
-
-    .demi-subtitle {
-        font-size: 0.72rem;
-        display: none;
-    }
-
-    .demi-header-controls {
-        gap: 6px;
-    }
-
-    .demi-course-pill {
-        font-size: 0.75rem;
-        padding: 4px 8px;
-        min-width: 0;
-        max-width: 100%;
+        max-width: 180px;
     }
 
     .demi-status-pill {
@@ -2627,12 +2573,55 @@
     }
 
     .btn-new-session-red {
-        padding: 6px 10px;
+        padding: 6px 12px;
         font-size: 0.75rem;
     }
 
+    /* Show the Segmented Mobile View Switcher */
+    .demi-mobile-view-switcher {
+        display: flex;
+    }
+
+    /* Main Workspace Layout */
     .main-dashboard-card {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 180px);
+        min-height: 520px;
         border-radius: 12px;
+        overflow: hidden;
+    }
+
+    /* Seamless View Switching between Sidebar and Chat */
+    .main-dashboard-card.show-mobile-sidebar .ainotebook-sidebar {
+        display: flex !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        flex: 1 !important;
+        min-height: 0 !important;
+        border-right: none;
+        max-height: none;
+    }
+    .main-dashboard-card.show-mobile-sidebar .ainotebook-chat {
+        display: none !important;
+    }
+
+    .main-dashboard-card.show-mobile-chat .ainotebook-sidebar {
+        display: none !important;
+    }
+    .main-dashboard-card.show-mobile-chat .ainotebook-chat {
+        display: flex !important;
+        width: 100% !important;
+        flex: 1 !important;
+        min-height: 0 !important;
+    }
+
+    .ainotebook-chat {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
     }
 
     .chat-header {
@@ -2651,17 +2640,19 @@
     }
 
     .chat-messages {
-        padding: 12px;
+        flex: 1;
+        min-height: 0;
+        max-height: none;
+        overflow-y: auto;
+        padding: 12px 10px;
         gap: 12px;
+        -webkit-overflow-scrolling: touch;
     }
 
     .message-bubble-body {
-        max-width: 94%;
-        padding: 10px 14px;
-    }
-
-    .message.user .message-bubble-body {
-        max-width: 90%;
+        max-width: 95%;
+        word-break: break-word;
+        overflow-wrap: break-word;
     }
 
     .floating-study-tools-bar {
@@ -2686,12 +2677,12 @@
     }
 
     .input-wrapper {
-        padding: 4px 6px;
+        padding: 4px 6px 4px 10px;
     }
 
     .input-wrapper input {
-        font-size: 0.85rem;
-        padding: 8px 10px;
+        font-size: 16px; /* Prevents auto-zoom on iOS Safari */
+        padding: 8px 0;
     }
 
     .source-pill {
@@ -2713,10 +2704,9 @@
         justify-content: flex-start;
     }
 
-    /* Modal responsiveness */
     .ain-modal-content {
-        width: 94% !important;
-        max-width: 94% !important;
+        width: 95% !important;
+        max-width: 95% !important;
         margin: 16px auto;
         padding: 16px;
         border-radius: 12px;
@@ -2742,6 +2732,10 @@
         font-size: 0.88rem;
     }
 
+    .demi-subtitle {
+        display: none;
+    }
+
     .btn-new-session-red .btn-text {
         display: none;
     }
@@ -2749,16 +2743,12 @@
         padding: 6px 10px;
     }
 
-    .btn-sidebar-toggle-mobile span {
-        font-size: 0.72rem;
-    }
-
     .chat-messages {
         padding: 8px;
     }
 
     .message-text {
-        font-size: 0.82rem;
+        font-size: 0.84rem;
     }
 }
 

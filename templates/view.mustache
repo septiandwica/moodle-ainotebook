@@ -221,103 +221,6 @@
                     </div>
                 </div>
                 <div class="chat-header-actions" style="display: flex; align-items: center; gap: 8px;">
-                    <!-- Voice Actor Persona Dropdown -->
-                    <div class="voice-selector-dropdown-wrap">
-                        <button type="button" id="voice-persona-btn" class="voice-persona-btn" onclick="window.toggleVoiceMenu(event)" title="Choose AI Voice Actor / Persona">
-                            <span id="current-voice-label">🎙️ Samantha (US Female)</span>
-                            <i class="fa fa-caret-down ml-1"></i>
-                        </button>
-                        <div id="voice-persona-menu" class="voice-persona-menu" style="display: none;">
-                            <div class="voice-menu-header">
-                                <span>AI Voice Actor (10 Personas)</span>
-                                <button type="button" class="btn-voice-preview" onclick="window.previewCurrentVoice(event)" title="Listen to test audio">
-                                    <i class="fa fa-play-circle"></i> Test
-                                </button>
-                            </div>
-                            <div class="voice-options-list">
-                                <button type="button" class="voice-option-btn active" data-voice="samantha" onclick="window.selectVoicePersona('samantha')">
-                                    <span class="voice-opt-icon">👩‍🏫</span>
-                                    <div class="voice-opt-info">
-                                        <div class="voice-opt-title">Samantha <span class="voice-opt-tag">Default</span></div>
-                                        <div class="voice-opt-desc">Academic Female · Warm & Clear (US)</div>
-                                    </div>
-                                    <i class="fa fa-check voice-check-icon"></i>
-                                </button>
-                                <button type="button" class="voice-option-btn" data-voice="daniel" onclick="window.selectVoicePersona('daniel')">
-                                    <span class="voice-opt-icon">👨‍🏫</span>
-                                    <div class="voice-opt-info">
-                                        <div class="voice-opt-title">Daniel</div>
-                                        <div class="voice-opt-desc">Professor Male · Deep & Oxford Accent (UK)</div>
-                                    </div>
-                                    <i class="fa fa-check voice-check-icon"></i>
-                                </button>
-                                <button type="button" class="voice-option-btn" data-voice="victoria" onclick="window.selectVoicePersona('victoria')">
-                                    <span class="voice-opt-icon">👩‍🎓</span>
-                                    <div class="voice-opt-info">
-                                        <div class="voice-opt-title">Victoria / Nova</div>
-                                        <div class="voice-opt-desc">Peer Tutor · Energetic & Fast Paced (US)</div>
-                                    </div>
-                                    <i class="fa fa-check voice-check-icon"></i>
-                                </button>
-                                <button type="button" class="voice-option-btn" data-voice="alex" onclick="window.selectVoicePersona('alex')">
-                                    <span class="voice-opt-icon">👨‍🎓</span>
-                                    <div class="voice-opt-info">
-                                        <div class="voice-opt-title">Alex / Echo</div>
-                                        <div class="voice-opt-desc">Calm Explainer · Steady & Relaxed (US)</div>
-                                    </div>
-                                    <i class="fa fa-check voice-check-icon"></i>
-                                </button>
-                                <button type="button" class="voice-option-btn" data-voice="serena" onclick="window.selectVoicePersona('serena')">
-                                    <span class="voice-opt-icon">👩‍💼</span>
-                                    <div class="voice-opt-info">
-                                        <div class="voice-opt-title">Serena / Fiona</div>
-                                        <div class="voice-opt-desc">Scholarly Female · Elegant British Accent (UK)</div>
-                                    </div>
-                                    <i class="fa fa-check voice-check-icon"></i>
-                                </button>
-                                <button type="button" class="voice-option-btn" data-voice="oliver" onclick="window.selectVoicePersona('oliver')">
-                                    <span class="voice-opt-icon">👨‍🔬</span>
-                                    <div class="voice-opt-info">
-                                        <div class="voice-opt-title">Oliver / George</div>
-                                        <div class="voice-opt-desc">Science Lecturer · Articulate British (UK)</div>
-                                    </div>
-                                    <i class="fa fa-check voice-check-icon"></i>
-                                </button>
-                                <button type="button" class="voice-option-btn" data-voice="karen" onclick="window.selectVoicePersona('karen')">
-                                    <span class="voice-opt-icon">🦘</span>
-                                    <div class="voice-opt-info">
-                                        <div class="voice-opt-title">Karen / Matilda</div>
-                                        <div class="voice-opt-desc">Friendly Lecturer · Australian English (AU)</div>
-                                    </div>
-                                    <i class="fa fa-check voice-check-icon"></i>
-                                </button>
-                                <button type="button" class="voice-option-btn" data-voice="rishi" onclick="window.selectVoicePersona('rishi')">
-                                    <span class="voice-opt-icon">🌏</span>
-                                    <div class="voice-opt-info">
-                                        <div class="voice-opt-title">Rishi / Veena</div>
-                                        <div class="voice-opt-desc">Technical Specialist · Indian English (IN)</div>
-                                    </div>
-                                    <i class="fa fa-check voice-check-icon"></i>
-                                </button>
-                                <button type="button" class="voice-option-btn" data-voice="jarvis" onclick="window.selectVoicePersona('jarvis')">
-                                    <span class="voice-opt-icon">🤖</span>
-                                    <div class="voice-opt-info">
-                                        <div class="voice-opt-title">Jarvis / Cyber</div>
-                                        <div class="voice-opt-desc">Futuristic AI Core · Synthesizer Mode</div>
-                                    </div>
-                                    <i class="fa fa-check voice-check-icon"></i>
-                                </button>
-                                <button type="button" class="voice-option-btn" data-voice="larasati" onclick="window.selectVoicePersona('larasati')">
-                                    <span class="voice-opt-icon">🇮🇩</span>
-                                    <div class="voice-opt-info">
-                                        <div class="voice-opt-title">Larasati / Ardi</div>
-                                        <div class="voice-opt-desc">Indonesian Bilingual · Aksara & English</div>
-                                    </div>
-                                    <i class="fa fa-check voice-check-icon"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
                     <span class="academic-mode-tag"><i class="fa fa-graduation-cap"></i> Academic Study Mode</span>
                 </div>
             </div>
@@ -831,182 +734,14 @@
         recordAndTranscribeFallback();
     };
 
-    // ── AI Voice Personas Engine ─────────────────────────────────────────────
-    var VOICE_PERSONAS = {
-        samantha: {
-            id: 'samantha',
-            label: 'Samantha (US Female)',
-            icon: '👩‍🏫',
-            preferredNames: ['Samantha', 'Google US English', 'Zira', 'Victoria', 'Jenny', 'Female', 'English'],
-            langPrefix: 'en',
-            rate: 1.0,
-            pitch: 1.05,
-            sample: 'Hello! I am Samantha, your academic AI tutor at President University World Campus. How can I help you excel in your studies today?'
-        },
-        daniel: {
-            id: 'daniel',
-            label: 'Daniel (UK Male)',
-            icon: '👨‍🏫',
-            preferredNames: ['Daniel', 'George', 'David', 'Alex', 'Google UK English Male', 'Male', 'en-GB'],
-            langPrefix: 'en',
-            rate: 0.95,
-            pitch: 0.9,
-            sample: 'Greetings. I am Professor Daniel from President University World Campus. Let us review your lecture materials and assignments thoroughly.'
-        },
-        victoria: {
-            id: 'victoria',
-            label: 'Victoria / Nova (Peer Tutor)',
-            icon: '👩‍🎓',
-            preferredNames: ['Victoria', 'Karen', 'Google US English', 'Samantha', 'Female'],
-            langPrefix: 'en',
-            rate: 1.15,
-            pitch: 1.2,
-            sample: 'Hey there! I am Victoria from President University World Campus. Ready to boost your study session and test your knowledge?'
-        },
-        alex: {
-            id: 'alex',
-            label: 'Alex / Echo (Calm Explainer)',
-            icon: '👨‍🎓',
-            preferredNames: ['Alex', 'Fred', 'David', 'Google US English', 'Male'],
-            langPrefix: 'en',
-            rate: 0.9,
-            pitch: 0.85,
-            sample: 'Hi, I am Alex from President University World Campus. Take your time, and we will break down any complex concept step by step.'
-        },
-        serena: {
-            id: 'serena',
-            label: 'Serena (UK Female)',
-            icon: '👩‍💼',
-            preferredNames: ['Serena', 'Fiona', 'Stephanie', 'Google UK English Female', 'en-GB', 'Female'],
-            langPrefix: 'en',
-            rate: 0.98,
-            pitch: 1.02,
-            sample: 'Good day. I am Serena from President University World Campus. We shall examine each theoretical framework and case study with precision.'
-        },
-        oliver: {
-            id: 'oliver',
-            label: 'Oliver (Science Lecturer)',
-            icon: '👨‍🔬',
-            preferredNames: ['Oliver', 'Arthur', 'George', 'Malcolm', 'en-GB', 'Male'],
-            langPrefix: 'en',
-            rate: 0.92,
-            pitch: 0.95,
-            sample: 'Welcome to President University World Campus. I am Oliver. Let us dissect the core empirical foundations of your course modules.'
-        },
-        karen: {
-            id: 'karen',
-            label: 'Karen (Australian)',
-            icon: '🦘',
-            preferredNames: ['Karen', 'Matilda', 'Lee', 'Catherine', 'en-AU', 'Australian'],
-            langPrefix: 'en',
-            rate: 1.05,
-            pitch: 1.05,
-            sample: 'G day! I am Karen, your tutor at President University World Campus. Let us get stuck into the course modules together.'
-        },
-        rishi: {
-            id: 'rishi',
-            label: 'Rishi (Indian English)',
-            icon: '🌏',
-            preferredNames: ['Rishi', 'Veena', 'Sangeeta', 'Google Indian English', 'en-IN'],
-            langPrefix: 'en',
-            rate: 1.0,
-            pitch: 1.0,
-            sample: 'Hello everyone! I am Rishi from President University World Campus. Let us master the algorithms and key course concepts.'
-        },
-        jarvis: {
-            id: 'jarvis',
-            label: 'Jarvis / Cyber (AI Core)',
-            icon: '🤖',
-            preferredNames: ['Alex', 'Daniel', 'Fred', 'Google US English', 'Male'],
-            langPrefix: 'en',
-            rate: 1.08,
-            pitch: 0.75,
-            sample: 'President University World Campus AI systems online. Neural tutor ready to assist your academic journey.'
-        },
-        larasati: {
-            id: 'larasati',
-            label: 'Larasati (Bilingual ID/EN)',
-            icon: '🇮🇩',
-            preferredNames: ['Indonesian', 'Gadis', 'Ardi', 'Damayanti', 'Google Bahasa Indonesia', 'id-ID'],
-            langPrefix: 'id',
-            rate: 1.0,
-            pitch: 1.0,
-            sample: 'Halo! Saya Larasati dari President University World Campus, siap membantu diskusi materi kuliah baik dalam Bahasa Indonesia maupun English.'
-        }
+    // ── AI Voice Engine (Victoria) ──────────────────────────────────────────
+    var VICTORIA_PERSONA = {
+        name: 'Victoria',
+        preferredNames: ['Victoria', 'Karen', 'Google US English', 'Samantha', 'Female'],
+        langPrefix: 'en',
+        rate: 1.15,
+        pitch: 1.2
     };
-
-    var currentVoicePersona = localStorage.getItem('ainotebook_voice_actor') || 'samantha';
-    if (!VOICE_PERSONAS[currentVoicePersona]) currentVoicePersona = 'samantha';
-
-    window.updateVoiceButtonUI = function() {
-        var persona = VOICE_PERSONAS[currentVoicePersona] || VOICE_PERSONAS.samantha;
-        var labelEl = document.getElementById('current-voice-label');
-        if (labelEl) {
-            labelEl.innerText = persona.icon + ' ' + persona.label;
-        }
-        document.querySelectorAll('.voice-option-btn').forEach(function(btn) {
-            if (btn.getAttribute('data-voice') === currentVoicePersona) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-            }
-        });
-    };
-
-    window.toggleVoiceMenu = function(e) {
-        if (e) e.stopPropagation();
-        var menu = document.getElementById('voice-persona-menu');
-        if (!menu) return;
-        var isVisible = menu.style.display === 'block';
-        menu.style.display = isVisible ? 'none' : 'block';
-    };
-
-    window.selectVoicePersona = function(personaId) {
-        if (!VOICE_PERSONAS[personaId]) return;
-        currentVoicePersona = personaId;
-        localStorage.setItem('ainotebook_voice_actor', personaId);
-        window.updateVoiceButtonUI();
-        var menu = document.getElementById('voice-persona-menu');
-        if (menu) menu.style.display = 'none';
-        window.previewCurrentVoice();
-    };
-
-    window.previewCurrentVoice = function(e) {
-        if (e) e.stopPropagation();
-        if (!('speechSynthesis' in window)) return;
-        var persona = VOICE_PERSONAS[currentVoicePersona] || VOICE_PERSONAS.samantha;
-        window.speechSynthesis.cancel();
-        var utterance = new SpeechSynthesisUtterance(persona.sample);
-        var voices = window.speechSynthesis.getVoices();
-        var chosen = null;
-        if (voices && voices.length > 0) {
-            chosen = voices.find(function(v) {
-                return persona.preferredNames.some(function(p) { return v.name && v.name.indexOf(p) !== -1; }) && v.lang && v.lang.startsWith(persona.langPrefix);
-            });
-            if (!chosen) {
-                chosen = voices.find(function(v) { return v.lang && v.lang.startsWith(persona.langPrefix); });
-            }
-        }
-        if (chosen) {
-            utterance.voice = chosen;
-            utterance.lang = chosen.lang;
-        } else {
-            utterance.lang = persona.langPrefix === 'id' ? 'id-ID' : 'en-US';
-        }
-        utterance.rate = persona.rate;
-        utterance.pitch = persona.pitch;
-        window.speechSynthesis.speak(utterance);
-    };
-
-    document.addEventListener('click', function(e) {
-        var menu = document.getElementById('voice-persona-menu');
-        var btn = document.getElementById('voice-persona-btn');
-        if (menu && menu.style.display === 'block') {
-            if (!menu.contains(e.target) && (!btn || !btn.contains(e.target))) {
-                menu.style.display = 'none';
-            }
-        }
-    });
 
     // ── Text-to-Speech (Read Aloud) ──────────────────────────────────────────
     var currentSpeechBtn = null;
@@ -1049,17 +784,16 @@
 
         if (!cleanText) return;
 
-        var persona = VOICE_PERSONAS[currentVoicePersona] || VOICE_PERSONAS.samantha;
         var utterance = new SpeechSynthesisUtterance(cleanText);
         var voices = window.speechSynthesis.getVoices();
         var chosenVoice = null;
 
         if (voices && voices.length > 0) {
             chosenVoice = voices.find(function(v) { 
-                return persona.preferredNames.some(function(p) { return v.name && v.name.indexOf(p) !== -1; }) && v.lang && v.lang.startsWith(persona.langPrefix); 
+                return VICTORIA_PERSONA.preferredNames.some(function(p) { return v.name && v.name.indexOf(p) !== -1; }) && v.lang && v.lang.startsWith(VICTORIA_PERSONA.langPrefix); 
             });
             if (!chosenVoice) {
-                chosenVoice = voices.find(function(v) { return v.lang && v.lang.startsWith(persona.langPrefix); });
+                chosenVoice = voices.find(function(v) { return v.lang && v.lang.startsWith(VICTORIA_PERSONA.langPrefix); });
             }
             if (!chosenVoice) {
                 chosenVoice = voices.find(function(v) { return v.lang && (v.lang === 'en-US' || v.lang === 'en-GB'); });
@@ -1070,11 +804,11 @@
             utterance.voice = chosenVoice;
             utterance.lang = chosenVoice.lang;
         } else {
-            utterance.lang = persona.langPrefix === 'id' ? 'id-ID' : 'en-US';
+            utterance.lang = 'en-US';
         }
 
-        utterance.rate = persona.rate;
-        utterance.pitch = persona.pitch;
+        utterance.rate = VICTORIA_PERSONA.rate;
+        utterance.pitch = VICTORIA_PERSONA.pitch;
 
         utterance.onstart = function() {
             currentSpeechBtn = btn;

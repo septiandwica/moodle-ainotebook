@@ -2132,21 +2132,140 @@
             return out.join("\n");
         };
 
+        // ── Helper PDF Exporter Utility (Matches PJJ Portal) ──────────────────
+        var exportHtmlToPdf = function(elementId, filename, orientation) {
+            orientation = orientation || 'portrait';
+            filename = filename || ('DEMI_Academic_Document_' + Date.now() + '.pdf');
+            var el = (typeof elementId === 'string') ? document.getElementById(elementId) : elementId;
+            if (!el) {
+                console.error("Could not find element to export as PDF:", elementId);
+                window.print();
+                return;
+            }
+
+            var printWindow = window.open('', '_blank', 'width=900,height=700');
+            if (!printWindow) {
+                window.print();
+                return;
+            }
+
+            var htmlContent = el.innerHTML;
+            printWindow.document.open();
+            printWindow.document.write('<!DOCTYPE html>' +
+                '<html>' +
+                '<head>' +
+                    '<title>' + filename.replace('.pdf', '') + '</title>' +
+                    '<style>' +
+                        '@page {' +
+                            'size: A4 ' + orientation + ';' +
+                            'margin: 12mm;' +
+                        '}' +
+                        'body {' +
+                            'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;' +
+                            'color: #1e293b;' +
+                            'background: #ffffff;' +
+                            'margin: 0;' +
+                            'padding: 10px;' +
+                            '-webkit-print-color-adjust: exact;' +
+                            'print-color-adjust: exact;' +
+                        '}' +
+                        '.pdf-export-container {' +
+                            'width: 100%;' +
+                        '}' +
+                        'h1, h2, h3, h4 { color: #0f172a; margin-top: 14px; margin-bottom: 6px; }' +
+                        'p { font-size: 12px; line-height: 1.6; margin-bottom: 8px; }' +
+                        'ul, ol { font-size: 12px; line-height: 1.6; padding-left: 20px; }' +
+                        'li { margin-bottom: 4px; }' +
+                        'strong { color: #0f172a; }' +
+                        'blockquote { border-left: 3px solid #3b82f6; padding-left: 10px; color: #475569; font-style: italic; }' +
+                        'table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 11px; }' +
+                        'th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }' +
+                        'th { background-color: #f1f5f9; font-weight: bold; }' +
+                        'svg {' +
+                            'max-width: 100% !important;' +
+                            'height: auto !important;' +
+                            'display: block;' +
+                            'margin: 0 auto;' +
+                        '}' +
+                    '</style>' +
+                '</head>' +
+                '<body>' +
+                    '<div class="pdf-export-container">' +
+                        htmlContent +
+                    '</div>' +
+                    '<script>' +
+                        'window.onload = function() {' +
+                            'setTimeout(function() {' +
+                                'window.print();' +
+                                'window.close();' +
+                            '}, 400);' +
+                        '};' +
+                    '<\/script>' +
+                '</body>' +
+                '</html>');
+            printWindow.document.close();
+        };
+
+        var downloadMarkdown = function(filename, content) {
+            var fullFormattedMd = "# PRESIDENT UNIVERSITY · WORLD CAMPUS\n" +
+                "## DEMI AI Academic Tutor · Course Study Summary\n" +
+                "*Generated on " + new Date().toLocaleDateString() + " · Grounded in Professor Lecture Materials*\n\n" +
+                "---\n\n" + content;
+            
+            var blob = new Blob([fullFormattedMd], { type: "text/markdown;charset=utf-8;" });
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        };
+
+        var downloadFile = function(filename, text) {
+            var element = document.createElement("a");
+            element.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(text));
+            element.setAttribute("download", filename);
+            element.style.display = "none";
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        };
+
         var renderMindmap = function(data, customTarget = null) {
             if (resultsContainer && !customTarget) resultsContainer.style.display = "block";
             var target = customTarget || getOrCreateTargetContainer();
             if (!target) return;
             var cleanData = sanitizeMermaid(data);
+            var cardId = "mindmap-card-" + Math.random().toString(36).substring(2, 9);
             var mapContainerId = "mermaid-container-" + Math.random().toString(36).substring(2, 9);
+            var bodyBoxId = "mindmap-box-" + cardId;
 
-            target.innerHTML = prepareFormalHeader("Mindmap Visualization") + 
-                "<div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;'>" +
-                    "<h3 style='margin:0; font-size:1.1rem;'>Concept Mindmap</h3>" +
-                    "<button type='button' class='btn btn-sm btn-outline-primary' style='font-size:11px; padding:4px 10px; border-radius:6px;' onclick=\"window.openMindmapModal('" + mapContainerId + "')\">" +
-                        "<i class='fa fa-expand'></i> Fullscreen Zoom" +
-                    "</button>" +
-                "</div>" +
-                "<div id='" + mapContainerId + "' class='mermaid'>" + cleanData + "</div>";
+            var mindmapHTML = '<div class="demi-mindmap-card" id="' + cardId + '">' +
+                '<div class="demi-mindmap-header">' +
+                    '<div class="demi-mindmap-title-group">' +
+                        '<i class="fa fa-sitemap" style="font-size:1.1rem; color:#4f46e5;"></i>' +
+                        '<span class="demi-mindmap-title">Visual Concept Mindmap</span>' +
+                        '<span class="demi-mindmap-badge">Concept Diagram</span>' +
+                    '</div>' +
+                    '<div class="demi-mindmap-actions">' +
+                        '<button type="button" class="btn btn-sm btn-secondary zoom-btn" title="Fullscreen Zoom"><i class="fa fa-expand mr-1"></i> Fullscreen Zoom</button>' +
+                        '<button type="button" class="btn btn-sm btn-primary pdf-btn" style="background:#4f46e5; border-color:#4f46e5; color:#fff;" title="Download PDF"><i class="fa fa-file-pdf-o mr-1"></i> Download PDF</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="demi-mindmap-body-box" id="' + bodyBoxId + '">' +
+                    '<div class="demi-summary-hero text-center mb-3 pb-2" style="border-bottom: 1px solid #e2e8f0;">' +
+                        '<div class="demi-summary-inst" style="font-size: 10px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px;">PRESIDENT UNIVERSITY · WORLD CAMPUS</div>' +
+                        '<h3 class="demi-summary-heading" style="font-size: 14px; font-weight: 800; color: #0f172a; margin: 4px 0;">DEMI AI Academic Tutor · Concept Mindmap</h3>' +
+                        '<div class="demi-summary-meta" style="font-size: 10px; color: #64748b;">Generated on ' + new Date().toLocaleDateString() + ' · Grounded in Professor Lecture Materials</div>' +
+                    '</div>' +
+                    '<div id="' + mapContainerId + '" class="mermaid">' + cleanData + '</div>' +
+                '</div>' +
+            '</div>';
+
+            target.innerHTML = mindmapHTML;
+
             try {
                 mermaid.init(undefined, target.querySelectorAll(".mermaid"));
             } catch (err) {
@@ -2156,9 +2275,27 @@
             }
             if (resultsContainer && !customTarget) resultsContainer.scrollIntoView({ behavior: "smooth" });
 
+            var cardEl = target.querySelector("#" + cardId);
+            if (cardEl) {
+                var zoomBtn = cardEl.querySelector(".zoom-btn");
+                if (zoomBtn) {
+                    zoomBtn.onclick = function() {
+                        window.openMindmapModal(mapContainerId);
+                    };
+                }
+                var pdfBtn = cardEl.querySelector(".pdf-btn");
+                if (pdfBtn) {
+                    pdfBtn.onclick = function() {
+                        exportHtmlToPdf(bodyBoxId, 'DEMI_Mindmap_' + Date.now() + '.pdf', 'landscape');
+                    };
+                }
+            }
+
             if (downloadBtn) {
                 downloadBtn.innerHTML = "<i class='fa fa-file-pdf-o'></i> Export as PDF";
-                downloadBtn.onclick = function() { window.print(); };
+                downloadBtn.onclick = function() {
+                    exportHtmlToPdf(bodyBoxId, 'DEMI_Mindmap_' + Date.now() + '.pdf', 'landscape');
+                };
             }
         };
 
@@ -2168,6 +2305,7 @@
             if (!target) return;
 
             var containerId = "summary-container-" + Math.random().toString(36).substring(2, 9);
+            var bodyBoxId = "summary-body-" + containerId;
             var headerHTML = '<div class="demi-summary-card" id="' + containerId + '">' +
                 '<div class="demi-summary-header">' +
                     '<div class="demi-summary-title-group">' +
@@ -2180,13 +2318,13 @@
                         '<button type="button" class="btn btn-sm btn-success pdf-btn" title="Download PDF" style="background:#059669; border-color:#059669; color:#fff;"><i class="fa fa-file-pdf-o mr-1"></i> Download PDF</button>' +
                     '</div>' +
                 '</div>' +
-                '<div class="demi-summary-body">' +
+                '<div class="demi-summary-body-box" id="' + bodyBoxId + '">' +
                     '<div class="demi-summary-hero text-center mb-3 pb-2" style="border-bottom: 1px solid #e2e8f0;">' +
-                        '<div class="demi-summary-inst" style="font-size: 10px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px;">PRESIDENT UNIVERSITY · DISTANCE LEARNING</div>' +
+                        '<div class="demi-summary-inst" style="font-size: 10px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px;">PRESIDENT UNIVERSITY · WORLD CAMPUS</div>' +
                         '<h3 class="demi-summary-heading" style="font-size: 14px; font-weight: 800; color: #0f172a; margin: 4px 0;">DEMI AI Academic Tutor · Course Study Summary</h3>' +
                         '<div class="demi-summary-meta" style="font-size: 10px; color: #64748b;">Generated on ' + new Date().toLocaleDateString() + ' · Grounded in Professor Lecture Materials</div>' +
                     '</div>' +
-                    '<div class="markdown-body" style="font-size:0.85rem; line-height:1.6; color:#1e293b;">' + (typeof marked !== 'undefined' ? marked.parse(content) : content.replace(/\n/g, '<br>')) + '</div>' +
+                    '<div class="markdown-body" style="font-size:0.85rem; line-height:1.6; color:#1e293b;">' + parseMarkdownSafely(content) + '</div>' +
                 '</div>' +
             '</div>';
 
@@ -2198,26 +2336,16 @@
                 var mdBtn = cardEl.querySelector(".md-btn");
                 if (mdBtn) {
                     mdBtn.onclick = function() {
-                        downloadFile("Study_Summary_" + new Date().toISOString().slice(0, 10) + ".md", content);
+                        downloadMarkdown("DEMI_Study_Summary_" + Date.now() + ".md", content);
                     };
                 }
                 var pdfBtn = cardEl.querySelector(".pdf-btn");
                 if (pdfBtn) {
                     pdfBtn.onclick = function() {
-                        window.print();
+                        exportHtmlToPdf(bodyBoxId, "DEMI_Study_Summary_" + Date.now() + ".pdf", "portrait");
                     };
                 }
             }
-        };
-
-        var downloadFile = function(filename, text) {
-            var element = document.createElement("a");
-            element.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(text));
-            element.setAttribute("download", filename);
-            element.style.display = "none";
-            document.body.appendChild(element);
-            element.click();
-            document.body.removeChild(element);
         };
 
         var parseMarkdownSafely = function(text) {

@@ -2220,10 +2220,37 @@
             document.body.removeChild(element);
         };
 
+        var parseMarkdownSafely = function(text) {
+            if (!text) return "";
+            if (typeof marked === "undefined") {
+                return text.replace(/\n/g, "<br>");
+            }
+            if (!window._markedDirectLinkConfigured) {
+                window._markedDirectLinkConfigured = true;
+                try {
+                    var renderer = new marked.Renderer();
+                    renderer.link = function(tokenOrHref, title, text) {
+                        var href = (typeof tokenOrHref === 'object' && tokenOrHref !== null) ? tokenOrHref.href : tokenOrHref;
+                        var label = (typeof tokenOrHref === 'object' && tokenOrHref !== null) ? (tokenOrHref.text || href) : (text || href);
+                        var linkTitle = (typeof tokenOrHref === 'object' && tokenOrHref !== null) ? tokenOrHref.title : title;
+                        return '<a href="' + href + '" target="_blank" rel="noopener noreferrer" class="demi-direct-action-link"' + (linkTitle ? ' title="' + linkTitle + '"' : '') + '>' + label + ' <i class="fa fa-external-link" style="font-size:0.75em; margin-left:4px;"></i></a>';
+                    };
+                    marked.use({ renderer: renderer });
+                } catch(e) {
+                    console.warn("Could not configure marked renderer:", e);
+                }
+            }
+            try {
+                return (typeof marked.parse === 'function') ? marked.parse(text) : marked(text);
+            } catch(e) {
+                return text.replace(/\n/g, "<br>");
+            }
+        };
+
         var addMessage = function(text, type) {
             var msg = document.createElement("div");
             msg.className = "message " + type;
-            var parsed = (typeof marked !== "undefined") ? marked.parse(text) : text.replace(/\n/g, "<br>");
+            var parsed = parseMarkdownSafely(text);
             
             if (type === "user") {
                 msg.innerHTML = '<div class="message-bubble-body">' +
@@ -2362,7 +2389,7 @@
                             .replace(/<suggestions>[\s\S]*?(?:<\/suggestions>|$)/gi, '')
                             .replace(/(?:^|\n|\r)\s*[^\n\r\|]{2,}\|[^\n\r\|]{2,}(?:\|[^\n\r\|]{2,})?\s*$/gim, '');
                             
-                        contentDiv.innerHTML = window.marked.parse(cleanTyping) + '<span class="streaming-cursor"></span>';
+                        contentDiv.innerHTML = parseMarkdownSafely(cleanTyping) + '<span class="streaming-cursor"></span>';
                         messages.scrollTop = messages.scrollHeight;
                         renderPending = false;
                     }
@@ -2439,7 +2466,7 @@
                             }
                             
                             if (contentDiv) {
-                                contentDiv.innerHTML = window.marked.parse(displayMsg);
+                                contentDiv.innerHTML = parseMarkdownSafely(displayMsg);
                                 if (result.found) {
                                     contentDiv.appendChild(artifactBox);
                                 }

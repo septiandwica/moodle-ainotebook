@@ -224,8 +224,15 @@ class ai_client {
                                     }
                                 }
 
+                                $item_url_str = "";
+                                if ($item_cm->url) {
+                                    $item_url_str = " [Direct Link: " . $item_cm->url->out(false) . "]";
+                                } elseif (!empty($item_cm->id)) {
+                                    $item_url_str = " [Direct Link: " . (new \moodle_url('/mod/' . $item_cm->modname . '/view.php', ['id' => $item_cm->id]))->out(false) . "]";
+                                }
+
                                 $subLabel = !empty($sec_name) ? "[{$sec_name}] " : "";
-                                $sylMap[$parentSecNum]['modules'][] = $subLabel . $item_cm->name . " (" . $item_cm->modname . ")" . $mod_restriction . $mod_completion;
+                                $sylMap[$parentSecNum]['modules'][] = $subLabel . $item_cm->name . " (" . $item_cm->modname . ")" . $item_url_str . $mod_restriction . $mod_completion;
                             }
                         }
                     }
@@ -246,14 +253,21 @@ class ai_client {
                                 if ($item_cm->completion > 0) {
                                     try {
                                         $cdata = $completioninfo->get_data($item_cm, false, $USER->id);
-                                        $c_state = ($cdata->completionstate == COMPLETION_COMPLETE || $cdata->completionstate == COMPLETION_COMPLETE_PASS) ? 'Completed' : 'Pending/Required';
+                                        $c_state = ($cdata->completionstate == COMPLETION_COMPLETE || $cdata->completionstate == COMPLETION_COMPLETE_PASS) ? 'Completed' : 'Pending/Required Prerequisite';
                                         $mod_completion = " [Completion: {$c_state}]";
                                     } catch (\Throwable $ce) {
                                         $mod_completion = " [Completion Tracked]";
                                     }
                                 }
 
-                                $sylMap[$sectionnum]['modules'][] = $item_cm->name . " (" . $item_cm->modname . ")" . $mod_restriction . $mod_completion;
+                                $item_url_str = "";
+                                if ($item_cm->url) {
+                                    $item_url_str = " [Direct Link: " . $item_cm->url->out(false) . "]";
+                                } elseif (!empty($item_cm->id)) {
+                                    $item_url_str = " [Direct Link: " . (new \moodle_url('/mod/' . $item_cm->modname . '/view.php', ['id' => $item_cm->id]))->out(false) . "]";
+                                }
+
+                                $sylMap[$sectionnum]['modules'][] = $item_cm->name . " (" . $item_cm->modname . ")" . $item_url_str . $mod_restriction . $mod_completion;
                             }
                         }
                     }

@@ -93,6 +93,9 @@ if ($logo_files) {
     $pdf_logo_url = $CFG->wwwroot . '/mod/ainotebook/pix/presunivlogo.png';
 }
 $context_data['pdf_logo_url'] = $pdf_logo_url;
+$context_data['demi_logo_url'] = $CFG->wwwroot . '/mod/ainotebook/pix/demi-logo.png';
+$context_data['demi_logo_white_url'] = $CFG->wwwroot . '/mod/ainotebook/pix/demi-logo-white.png';
+
 
 // Build Syllabus sections & modules with Robust Subsection Merging
 $modinfo = get_fast_modinfo($course);

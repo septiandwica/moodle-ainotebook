@@ -24,7 +24,7 @@
     <!-- DEMI Top Control Bar (Matching DEMI AI Academic Tutor Portal 100%) -->
     <div class="demi-top-control-bar">
         <div class="demi-brand-group">
-            <div class="demi-avatar-badge">DEMI</div>
+            <div class="demi-avatar-badge"><img src="{{demi_logo_white_url}}" alt="DEMI AI" class="demi-brand-logo-img"></div>
             <div class="demi-brand-meta">
                 <div class="demi-title-row">
                     <h2>24/7 Academic AI Tutor</h2>
@@ -237,7 +237,7 @@
 
             <div id="chat-messages" class="chat-messages">
                 <div class="message ai">
-                    <div class="ai-avatar-icon">DEMI</div>
+                    <div class="ai-avatar-icon"><img src="{{demi_logo_white_url}}" alt="DEMI AI" class="demi-avatar-img"></div>
                     <div class="message-bubble-body">
                         <div class="message-meta-header">
                             <span class="meta-author">DEMI AI Tutor</span>
@@ -269,7 +269,7 @@
                     </div>
                 </div>
                 <div class="message ai">
-                    <div class="ai-avatar-icon">DEMI</div>
+                    <div class="ai-avatar-icon"><img src="{{demi_logo_white_url}}" alt="DEMI AI" class="demi-avatar-img"></div>
                     <div class="message-bubble-body">
                         <div class="message-meta-header">
                             <span class="meta-author">DEMI AI Tutor</span>
@@ -430,6 +430,8 @@
     var wwwroot = '{{wwwroot}}';
     var activityName = {{#activityname}}{{{activityname}}}{{/activityname}}{{^activityname}}'DEMI AI Tutor'{{/activityname}};
     var pdfLogoUrl = '{{pdf_logo_url}}';
+    var demiLogoUrl = '{{demi_logo_url}}';
+    var demiLogoWhiteUrl = '{{demi_logo_white_url}}';
     var studentName = '{{target_fullname}}';
     var studentFirstName = '{{target_firstname}}';
     var courseFullname = '{{course_fullname}}';
@@ -932,7 +934,7 @@
             var messages = document.getElementById("chat-messages");
             if (messages) {
                 var welcomeHTML = '<div class="message ai welcome-msg">' +
-                    '<div class="ai-avatar-icon">DEMI</div>' +
+                    '<div class="ai-avatar-icon"><img src="' + demiLogoWhiteUrl + '" alt="DEMI AI" class="demi-avatar-img"></div>' +
                     '<div class="message-bubble-body">' +
                         '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span></div>' +
                         '<div class="message-text">' +
@@ -994,7 +996,7 @@
                     messages.innerHTML = '';
                     var welcomeDiv = document.createElement("div");
                     welcomeDiv.className = "message ai welcome-msg";
-                    welcomeDiv.innerHTML = '<div class="ai-avatar-icon">DEMI</div>' +
+                    welcomeDiv.innerHTML = '<div class="ai-avatar-icon"><img src="' + demiLogoWhiteUrl + '" alt="DEMI AI" class="demi-avatar-img"></div>' +
                         '<div class="message-bubble-body">' +
                             '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span></div>' +
                             '<div class="message-text">Session loaded. Continue your discussion below!</div>' +
@@ -1015,7 +1017,7 @@
                         var aiDiv = document.createElement("div");
                         aiDiv.className = "message ai";
                         var rawEscaped = (m.ai_response || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                        aiDiv.innerHTML = '<div class="ai-avatar-icon">DEMI</div>' +
+                        aiDiv.innerHTML = '<div class="ai-avatar-icon"><img src="' + demiLogoWhiteUrl + '" alt="DEMI AI" class="demi-avatar-img"></div>' +
                             '<div class="message-bubble-body">' +
                                 '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span><div class="meta-actions"><button type="button" class="btn-read-aloud" onclick="window.speakAiMessage(this)" title="Read aloud with AI voice"><i class="fa fa-volume-up"></i> Read Aloud</button><span class="meta-time">' + m.time + '</span></div></div>' +
                                 '<div class="message-text"><div class="markdown-body"></div></div>' +
@@ -2432,7 +2434,7 @@
                     '<div class="message-text">' + parsed + '</div>' +
                 '</div>';
             } else {
-                msg.innerHTML = '<div class="ai-avatar-icon">DEMI</div>' +
+                msg.innerHTML = '<div class="ai-avatar-icon"><img src="' + demiLogoWhiteUrl + '" alt="DEMI AI" class="demi-avatar-img"></div>' +
                 '<div class="message-bubble-body">' +
                     '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span><div class="meta-actions"><button type="button" class="btn-read-aloud" onclick="window.speakAiMessage(this)" title="Read aloud with AI voice"><i class="fa fa-volume-up"></i> Read Aloud</button></div></div>' +
                     '<div class="message-text"><div class="markdown-body">' + parsed + '</div></div>' +
@@ -2679,7 +2681,7 @@
                                                 
                                                 aiMsgDiv = document.createElement("div");
                                                 aiMsgDiv.className = "message ai";
-                                                aiMsgDiv.innerHTML = '<div class="ai-avatar-icon">DEMI</div>' +
+                                                aiMsgDiv.innerHTML = '<div class="ai-avatar-icon"><img src="' + demiLogoWhiteUrl + '" alt="DEMI AI" class="demi-avatar-img"></div>' +
                                                     '<div class="message-bubble-body">' +
                                                         '<div class="message-meta-header"><span class="meta-author">DEMI AI Tutor</span><div class="meta-actions"><button type="button" class="btn-read-aloud" onclick="window.speakAiMessage(this)" title="Read aloud with AI voice"><i class="fa fa-volume-up"></i> Read Aloud</button></div></div>' +
                                                         '<div class="message-text"><div class="markdown-body"></div></div>' +

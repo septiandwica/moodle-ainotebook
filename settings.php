@@ -46,7 +46,7 @@ if ($ADMIN->fulltree) {
         'mod_ainotebook/demi_engine_key',
         'DEMI AI Engine Secret Key (X-Engine-API-Key)',
         'Authentication key used to communicate with DEMI Core AI Engine.',
-        'demi_secret_engine_key_2026'
+        'demi_sk_live_master_2026_system'
     ));
 
     // ── General Settings ──────────────────────────────────────────────────────

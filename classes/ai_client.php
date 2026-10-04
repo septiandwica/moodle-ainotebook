@@ -383,7 +383,7 @@ class ai_client {
 
         // ── Pure DEMI Core AI Engine Integration (Port 8001) ─────────────────
         $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
-        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
+        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_sk_live_master_2026_system';
 
         $formatted_history = [];
         if ($history) {
@@ -501,7 +501,7 @@ class ai_client {
         $course = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
 
         $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
-        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
+        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_sk_live_master_2026_system';
 
         $payload = json_encode([
             'user_id'   => (int) $userid,
@@ -753,7 +753,7 @@ class ai_client {
         string $activity_name = ''
     ): string {
         $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
-        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
+        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_sk_live_master_2026_system';
 
         global $CFG;
         require_once($CFG->libdir . '/filelib.php');
@@ -1545,7 +1545,7 @@ class ai_client {
      */
     public static function generate_embedding_for_text(string $text): ?array {
         $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
-        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
+        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_sk_live_master_2026_system';
 
         global $CFG;
         require_once($CFG->libdir . '/filelib.php');
@@ -1698,7 +1698,7 @@ class ai_client {
      */
     public static function sync_video_material(int $course_id, string $topic, string $video_url, string $filename = ''): bool {
         $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
-        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
+        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_sk_live_master_2026_system';
 
         global $CFG;
         require_once($CFG->libdir . '/filelib.php');
@@ -1734,7 +1734,7 @@ class ai_client {
      */
     public static function transcribe_audio_file(string $tmp_filepath, string $filename = 'voice.webm'): array {
         $engine_url = get_config('mod_ainotebook', 'demi_engine_url') ?: 'http://localhost:8001';
-        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_secret_engine_key_2026';
+        $engine_key = get_config('mod_ainotebook', 'demi_engine_key') ?: 'demi_sk_live_master_2026_system';
 
         $endpoint = rtrim($engine_url, '/') . '/api/v1/chat/transcribe-audio';
 

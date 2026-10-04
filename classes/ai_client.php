@@ -632,27 +632,34 @@ class ai_client {
             });
 
             if (!empty($portal_msgs)) {
-                $portal_msgs = array_values($portal_msgs);
-                $latest = end($portal_msgs);
-                $firstPrompt = $latest->message ?? 'PJJ Portal Activity';
-                $clean_p = trim(strip_tags($firstPrompt));
-                $title = strlen($clean_p) > 40 ? substr($clean_p, 0, 37) . '...' : $clean_p;
+                $grouped_portal = [];
+                foreach ($portal_msgs as $pmsg) {
+                    $psess = !empty($pmsg->session_id) ? $pmsg->session_id : 'pjj_portal_sync';
+                    $grouped_portal[$psess][] = $pmsg;
+                }
 
-                $diff = time() - $latest->timecreated;
-                if ($diff < 60) $rel_time = 'Just now';
-                elseif ($diff < 3600) $rel_time = floor($diff / 60) . ' mins ago';
-                elseif ($diff < 86400) $rel_time = floor($diff / 3600) . ' hours ago';
-                else $rel_time = floor($diff / 86400) . ' days ago';
+                foreach ($grouped_portal as $psessId => $pGroup) {
+                    $latest = end($pGroup);
+                    $firstPrompt = $pGroup[0]->message ?? ($latest->message ?? 'PJJ Portal Activity');
+                    $clean_p = trim(strip_tags($firstPrompt));
+                    $title = strlen($clean_p) > 40 ? substr($clean_p, 0, 37) . '...' : $clean_p;
 
-                $sessions[] = [
-                    'session_id'      => 'pjj_portal_sync',
-                    'course_fullname' => s($course->fullname),
-                    'title'           => '🌐 ' . s($title),
-                    'time'            => !empty($latest->timecreated) ? date('h:i A', $latest->timecreated) : date('h:i A'),
-                    'rel_time'        => $rel_time,
-                    'message_count'   => count($portal_msgs),
-                    'updated_at_ts'   => !empty($latest->timecreated) ? $latest->timecreated : time()
-                ];
+                    $diff = time() - ($latest->timecreated ?? time());
+                    if ($diff < 60) $rel_time = 'Just now';
+                    elseif ($diff < 3600) $rel_time = floor($diff / 60) . ' mins ago';
+                    elseif ($diff < 86400) $rel_time = floor($diff / 3600) . ' hours ago';
+                    else $rel_time = floor($diff / 86400) . ' days ago';
+
+                    $sessions[] = [
+                        'session_id'      => $psessId,
+                        'course_fullname' => s($course->fullname),
+                        'title'           => '🌐 Portal: ' . s($title),
+                        'time'            => !empty($latest->timecreated) ? date('h:i A', $latest->timecreated) : date('h:i A'),
+                        'rel_time'        => $rel_time,
+                        'message_count'   => count($pGroup),
+                        'updated_at_ts'   => !empty($latest->timecreated) ? $latest->timecreated : time()
+                    ];
+                }
             }
         } catch (\Throwable $t) {
             // Graceful fallback
@@ -669,12 +676,22 @@ class ai_client {
         self::ensure_session_id_field();
         $cm = self::get_cm_safe($cmid);
 
-        if ($session_id === 'pjj_portal_sync' || str_starts_with($session_id, 'pjj_portal_') || str_starts_with($session_id, 'portal_')) {
+        if ($session_id === 'pjj_portal_sync' || str_starts_with($session_id, 'pjj_portal_') || str_starts_with($session_id, 'portal_') || str_starts_with($session_id, 'ses_')) {
             $unified = self::get_unified_history($cmid, $userid);
-            $portal_msgs = array_filter($unified, function($item) {
-                $app = strtolower($item->client_app ?? '');
-                return str_contains($app, 'portal') || str_contains($app, 'pjj');
+            $portal_msgs = array_filter($unified, function($item) use ($session_id) {
+                if ($session_id === 'pjj_portal_sync') {
+                    $app = strtolower($item->client_app ?? '');
+                    return str_contains($app, 'portal') || str_contains($app, 'pjj');
+                }
+                return ($item->session_id ?? '') === $session_id;
             });
+
+            if (empty($portal_msgs) && ($session_id === 'pjj_portal_sync' || str_starts_with($session_id, 'ses_'))) {
+                $portal_msgs = array_filter($unified, function($item) {
+                    $app = strtolower($item->client_app ?? '');
+                    return str_contains($app, 'portal') || str_contains($app, 'pjj');
+                });
+            }
 
             $messages = [];
             foreach (array_values($portal_msgs) as $idx => $r) {
@@ -687,7 +704,9 @@ class ai_client {
                     'timecreated'  => $r->timecreated ?? time()
                 ];
             }
-            return $messages;
+            if (!empty($messages)) {
+                return $messages;
+            }
         }
 
         $records = $DB->get_records('ainotebook_chat', [

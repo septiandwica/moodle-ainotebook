@@ -222,6 +222,7 @@ foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
 }
 
 // Pass 2: Populate modules into direct section or child subsections
+$completioninfo = new \completion_info($course);
 foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
     if (!$section->uservisible) continue;
 
@@ -299,12 +300,25 @@ foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
                         }
                     }
 
+                    $is_locked = !$sec_cm->uservisible || !empty($sec_cm->availableinfo);
+                    $restriction_text = !empty($sec_cm->availableinfo) ? strip_tags($sec_cm->availableinfo) : '';
+                    $is_completed = false;
+                    if ($sec_cm->completion > 0) {
+                        try {
+                            $cdata = $completioninfo->get_data($sec_cm, false, $target_user->id);
+                            $is_completed = ($cdata->completionstate == COMPLETION_COMPLETE || $cdata->completionstate == COMPLETION_COMPLETE_PASS);
+                        } catch (\Throwable $t) {}
+                    }
+
                     $sections_data_map[$parentSecNum]['subsections_map'][$lower_name]['modules'][] = [
                         'cmid' => $sec_cm->id,
                         'name' => s($sec_cm->name),
                         'modname' => $sec_cm->modname,
                         'icon' => $icon,
-                        'url' => $url
+                        'url' => $url,
+                        'is_locked' => $is_locked,
+                        'restriction_text' => $restriction_text,
+                        'is_completed' => $is_completed
                     ];
                     $sections_data_map[$parentSecNum]['subsections_map'][$lower_name]['modules_count']++;
                     $sections_data_map[$parentSecNum]['subsections_map'][$lower_name]['has_modules'] = true;
@@ -344,12 +358,25 @@ foreach ($modinfo->get_section_info_all() as $sectionnum => $section) {
                         }
                     }
 
+                    $is_locked = !$sec_cm->uservisible || !empty($sec_cm->availableinfo);
+                    $restriction_text = !empty($sec_cm->availableinfo) ? strip_tags($sec_cm->availableinfo) : '';
+                    $is_completed = false;
+                    if ($sec_cm->completion > 0) {
+                        try {
+                            $cdata = $completioninfo->get_data($sec_cm, false, $target_user->id);
+                            $is_completed = ($cdata->completionstate == COMPLETION_COMPLETE || $cdata->completionstate == COMPLETION_COMPLETE_PASS);
+                        } catch (\Throwable $t) {}
+                    }
+
                     $sections_data_map[$sectionnum]['modules'][] = [
                         'cmid' => $sec_cm->id,
                         'name' => s($sec_cm->name),
                         'modname' => $sec_cm->modname,
                         'icon' => $icon,
-                        'url' => $url
+                        'url' => $url,
+                        'is_locked' => $is_locked,
+                        'restriction_text' => $restriction_text,
+                        'is_completed' => $is_completed
                     ];
                     $sections_data_map[$sectionnum]['modules_count']++;
                     $sections_data_map[$sectionnum]['has_modules'] = true;

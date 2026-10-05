@@ -2,7 +2,7 @@
 
 DEMI Tutor (AI Notebook) is an advanced, premium AI-powered study assistant plugin for Moodle. Developed by **septiandwica** and supported by **Tateta** ([samastanuswantara.com](https://samastanuswantara.com)). This plugin transforms traditional study materials into interactive, AI-driven learning experiences with a completely customized and premium UI.
 
-![PresMate Icon](pix/icon.svg)
+![DEMI Icon](pix/icon.svg)
 
 ## 🚀 Key Features
 
